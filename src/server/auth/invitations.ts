@@ -121,11 +121,15 @@ async function describeInvitation(inv: typeof invitations.$inferSelect) {
   return { headline, edition: e ?? null, company: company ?? null, stand: stand ?? null, supplier: supplier ?? null };
 }
 
-export async function createInvitation(actor: Actor, input: CreateInvitationInput, opts: { send?: boolean } = {}) {
+/**
+ * Creates (and normally emails) an invitation. `bulk` is for sends that were already counted
+ * against the edition's bulk allowance (imports and "send all").
+ */
+export async function createInvitation(actor: Actor, input: CreateInvitationInput, opts: { send?: boolean; bulk?: boolean } = {}) {
   const email = normaliseEmail(input.email);
   if (!isValidEmail(email)) throw invalid('Enter a valid email address.', { email: 'Enter a valid email address.' });
   await authorize(actor, input);
-  await assertRateLimit(`invite:${actor.realUserId}`, 300, 3600);
+  if (!opts.bulk) await assertRateLimit(`invite:${actor.realUserId}`, 300, 3600);
 
   const permissions = (input.permissions ?? []).filter((p) =>
     input.kind === 'edition_staff' ? EDITION_PERMISSIONS.includes(p as EditionPermission) : p === 'pay',

@@ -62,11 +62,12 @@ export function env(): Env {
     if (!value.DATABASE_URL) missing.push('DATABASE_URL');
     if (!value.APP_ENCRYPTION_KEY) missing.push('APP_ENCRYPTION_KEY');
     if (!value.CRON_SECRET) missing.push('CRON_SECRET');
-    if (value.EMAIL_PROVIDER === 'resend' && !value.RESEND_API_KEY) missing.push('RESEND_API_KEY');
-    if (value.STORAGE_PROVIDER === 'r2') {
-      for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'] as const) {
-        if (!value[k]) missing.push(k);
-      }
+    // A real deployment must send real email and keep files in R2 (a server's own disk is wiped).
+    if (value.EMAIL_PROVIDER !== 'resend') missing.push('EMAIL_PROVIDER=resend');
+    if (!value.RESEND_API_KEY) missing.push('RESEND_API_KEY');
+    if (value.STORAGE_PROVIDER !== 'r2') missing.push('STORAGE_PROVIDER=r2');
+    for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'] as const) {
+      if (!value[k]) missing.push(k);
     }
     if (missing.length && process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION !== 'true') {
       throw new Error(`Missing required production settings: ${missing.join(', ')}`);

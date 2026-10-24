@@ -7,17 +7,17 @@ export type RateLimitResult = { allowed: boolean; remaining: number; retryAfterS
 
 /**
  * Fixed-window rate limiting stored in Postgres, so it works across serverless instances.
- * Each call counts one attempt against `key` within the current window.
+ * Each call counts `cost` attempts (one by default) against `key` within the current window.
  */
-export async function consumeRateLimit(key: string, limit: number, windowSeconds: number): Promise<RateLimitResult> {
+export async function consumeRateLimit(key: string, limit: number, windowSeconds: number, cost = 1): Promise<RateLimitResult> {
   const db = await getDb();
   const nowMs = Date.now();
   const windowStartMs = Math.floor(nowMs / (windowSeconds * 1000)) * windowSeconds * 1000;
   const windowStart = new Date(windowStartMs);
   const [row] = await db
     .insert(rateLimits)
-    .values({ key, windowStart, count: 1 })
-    .onConflictDoUpdate({ target: [rateLimits.key, rateLimits.windowStart], set: { count: sql`${rateLimits.count} + 1` } })
+    .values({ key, windowStart, count: cost })
+    .onConflictDoUpdate({ target: [rateLimits.key, rateLimits.windowStart], set: { count: sql`${rateLimits.count} + ${cost}` } })
     .returning({ count: rateLimits.count });
   const count = row?.count ?? 1;
   const retryAfterSeconds = Math.max(1, Math.ceil((windowStartMs + windowSeconds * 1000 - nowMs) / 1000));
@@ -30,8 +30,8 @@ export class RateLimitedError extends Error {
   }
 }
 
-export async function assertRateLimit(key: string, limit: number, windowSeconds: number) {
-  const r = await consumeRateLimit(key, limit, windowSeconds);
+export async function assertRateLimit(key: string, limit: number, windowSeconds: number, cost = 1) {
+  const r = await consumeRateLimit(key, limit, windowSeconds, cost);
   if (!r.allowed) throw new RateLimitedError(r.retryAfterSeconds);
 }
 

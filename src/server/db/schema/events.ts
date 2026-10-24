@@ -230,9 +230,11 @@ export const files = pgTable(
     companyId: uuid('company_id'),
     standId: uuid('stand_id'),
     supplierId: uuid('supplier_id'),
-    /** Public files (branding, product photos) can be shown to any signed-in user of the edition. */
+    /** Public files (branding, logos, product photos) can be fetched without signing in, e.g. by email clients. */
     isPublic: boolean('is_public').notNull().default(false),
     uploadedBy: uuid('uploaded_by'),
+    /** Set once the upload has been checked (real type, size). Unchecked files are never served. */
+    verifiedAt: timestamp('verified_at', tz),
     deletedAt: timestamp('deleted_at', tz),
     createdAt: createdAt(),
   },

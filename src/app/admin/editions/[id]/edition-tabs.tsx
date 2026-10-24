@@ -9,7 +9,6 @@ import {
   NumberInput,
   Paper,
   SegmentedControl,
-  Select,
   Stack,
   Switch,
   Tabs,
@@ -21,6 +20,7 @@ import { modals } from '@mantine/modals';
 import { useAction } from '@/lib/use-action';
 import { commissionLabel, percentFromBps } from '@/lib/format';
 import { StaffManager, type StaffRow, type PendingInvite } from '@/components/staff-manager';
+import { EditionDetailsForm } from '@/components/edition-details-form';
 import { cloneEditionAction, deleteEditionAction, updateCommercialAction, updateEditionAction } from '../../actions';
 
 type EditionProps = {
@@ -49,14 +49,6 @@ type Props = {
   currentUserId: string;
 };
 
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft (only staff can see it)' },
-  { value: 'live', label: 'Live (exhibitors invited)' },
-  { value: 'onsite', label: 'On site' },
-  { value: 'closed', label: 'Closed (read-only for exhibitors)' },
-  { value: 'archived', label: 'Archived' },
-];
-
 export function EditionTabs({ edition, platformFeeMode, platformCommission, staff, pending, currentUserId }: Props) {
   return (
     <Tabs defaultValue="details" keepMounted={false}>
@@ -70,7 +62,7 @@ export function EditionTabs({ edition, platformFeeMode, platformCommission, staf
         </Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="details">
-        <DetailsForm edition={edition} />
+        <EditionDetailsForm edition={edition} action={updateEditionAction} allowArchive />
       </Tabs.Panel>
       <Tabs.Panel value="commercial">
         <CommercialForm edition={edition} platformFeeMode={platformFeeMode} platformCommission={platformCommission} />
@@ -85,76 +77,6 @@ export function EditionTabs({ edition, platformFeeMode, platformCommission, staf
         <DeletePanel edition={edition} />
       </Tabs.Panel>
     </Tabs>
-  );
-}
-
-function DetailsForm({ edition }: { edition: EditionProps }) {
-  const [f, setF] = useState(edition);
-  const save = useAction(updateEditionAction);
-  return (
-    <Paper withBorder p="lg">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          save.run(edition.id, {
-            name: f.name,
-            slug: f.slug,
-            venue: f.venue,
-            city: f.city,
-            status: f.status as never,
-            vatRateBps: f.vatRateBps,
-            buildUpStartsAt: f.buildUpStartsAt,
-            openStartsAt: f.openStartsAt,
-            openEndsAt: f.openEndsAt,
-            breakdownEndsAt: f.breakdownEndsAt,
-          });
-        }}
-      >
-        <Stack>
-          <Group grow>
-            <TextInput label="Edition name" required value={f.name} onChange={(e) => setF({ ...f, name: e.currentTarget.value })} error={save.fieldErrors.name} />
-            <TextInput
-              label="Web address"
-              description={`Exhibitors use /portal/${f.slug || '…'}`}
-              value={f.slug}
-              onChange={(e) => setF({ ...f, slug: e.currentTarget.value })}
-              error={save.fieldErrors.slug}
-            />
-          </Group>
-          <Group grow>
-            <TextInput label="Venue" value={f.venue} onChange={(e) => setF({ ...f, venue: e.currentTarget.value })} />
-            <TextInput label="City" value={f.city} onChange={(e) => setF({ ...f, city: e.currentTarget.value })} />
-          </Group>
-          <Group grow>
-            <DateTimePicker label="Build-up starts" value={f.buildUpStartsAt} onChange={(v) => setF({ ...f, buildUpStartsAt: v })} clearable />
-            <DateTimePicker label="Show opens" value={f.openStartsAt} onChange={(v) => setF({ ...f, openStartsAt: v })} clearable />
-          </Group>
-          <Group grow>
-            <DateTimePicker label="Show closes" value={f.openEndsAt} onChange={(v) => setF({ ...f, openEndsAt: v })} clearable />
-            <DateTimePicker label="Breakdown ends" value={f.breakdownEndsAt} onChange={(v) => setF({ ...f, breakdownEndsAt: v })} clearable />
-          </Group>
-          <Group grow>
-            <Select label="Status" data={STATUS_OPTIONS} value={f.status} onChange={(v) => v && setF({ ...f, status: v })} allowDeselect={false} />
-            <NumberInput
-              label="VAT rate (%)"
-              value={f.vatRateBps / 100}
-              onChange={(v) => setF({ ...f, vatRateBps: Math.round(Number(v || 0) * 100) })}
-              min={0}
-              max={100}
-              decimalScale={2}
-            />
-          </Group>
-          <Text fz="xs" c="dimmed">
-            Times are UK time. Deadlines set as &ldquo;days before build-up&rdquo; move automatically when you change the build-up date.
-          </Text>
-          <Group>
-            <Button type="submit" loading={save.pending}>
-              Save details
-            </Button>
-          </Group>
-        </Stack>
-      </form>
-    </Paper>
   );
 }
 

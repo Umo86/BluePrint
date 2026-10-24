@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { expectToast, signInStaff, signInWithCode, watchForErrors } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -135,8 +135,11 @@ test('super admin dashboard: every page works and changes are saved', async ({ p
     await page.reload();
     await expect(page.getByRole('status').filter({ hasText: `Maintenance window ${stamp}` })).toBeVisible();
     await page.getByLabel('Notice shown to everyone').fill('');
+    await expect(page.getByLabel('Notice shown to everyone')).toHaveValue('');
     await page.locator('form', { has: page.getByLabel('Notice shown to everyone') }).getByRole('button', { name: 'Save' }).click();
     await expectToast(page, 'Settings saved.');
+    await page.reload();
+    await expect(page.getByRole('status').filter({ hasText: 'Maintenance window' })).toHaveCount(0);
   });
 
   await test.step('audit log, CSV download, system and privacy pages', async () => {

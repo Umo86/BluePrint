@@ -7,6 +7,7 @@ import {
   editionStaff,
   editions,
   emailTemplates,
+  files,
   exhibitorTypes,
   halls,
   manualPages,
@@ -19,7 +20,7 @@ import {
   tasks,
   type SpaceOnlyRules,
 } from '../db/schema';
-import { assertSuperAdmin, assertWritable, requireEditionPermission, requireShowAdmin } from '../authz';
+import { assertSuperAdmin, assertWritable, getEditionAccess, requireEditionPermission, requireShowAdmin } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { slugify, SLUG_PATTERN } from '@/lib/slug';
@@ -194,6 +195,15 @@ export async function getEdition(editionId: string) {
   return row ?? null;
 }
 
+/** The edition and what the actor may do in it, for the show dashboard. Anyone else gets "not found". */
+export async function getEditionForStaff(actor: Actor, editionId: string) {
+  const access = await getEditionAccess(actor, editionId);
+  if (!access) throw notFound();
+  const found = await getEdition(editionId);
+  if (!found) throw notFound();
+  return { ...found, access };
+}
+
 export async function getEditionBySlug(slug: string) {
   const db = await getDb();
   const [row] = await db
@@ -275,6 +285,14 @@ export async function updateEditionBranding(actor: Actor, editionId: string, inp
   await requireEditionPermission(actor, editionId, 'edit_content', { write: true });
   const data = brandingSchema.parse(input);
   const db = await getDb();
+  // Images must be branding uploads for this edition that passed their checks.
+  for (const fileId of [data.logoFileId, data.headerImageFileId]) {
+    if (!fileId) continue;
+    const [f] = await db.select().from(files).where(eq(files.id, fileId)).limit(1);
+    if (!f || f.purpose !== 'branding' || f.editionId !== editionId || !f.verifiedAt || f.deletedAt) {
+      throw invalid('That image could not be found. Please upload it again.');
+    }
+  }
   const [current] = await db.select().from(editions).where(eq(editions.id, editionId)).limit(1);
   if (!current) throw notFound();
   await db.update(editions).set({ branding: { ...current.branding, ...data } }).where(eq(editions.id, editionId));

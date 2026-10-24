@@ -7,6 +7,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
+  // Uploads go straight from the browser to Cloudflare R2 with a short-lived signed URL.
+  const uploadOrigin = process.env.STORAGE_PROVIDER === 'r2' && process.env.R2_ACCOUNT_ID ? ` https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '';
 
   const csp = [
     `default-src 'self'`,
@@ -15,7 +17,7 @@ export function proxy(request: NextRequest) {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob:`,
     `font-src 'self' data:`,
-    `connect-src 'self'${isDev ? ' ws: wss:' : ''}`,
+    `connect-src 'self'${uploadOrigin}${isDev ? ' ws: wss:' : ''}`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
@@ -37,7 +39,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      // Pages only: API routes and file downloads set their own headers.
+      source: '/((?!api|files/|_next/static|_next/image|favicon.ico).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },
