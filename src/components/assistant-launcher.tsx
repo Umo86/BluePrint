@@ -30,7 +30,7 @@ export function AssistantLauncher({ slug, standId }: { slug: string; standId: st
           Ask the assistant
         </Button>
       </Affix>
-      <Drawer opened={opened} onClose={() => setOpened(false)} position="right" size="lg" title="Your exhibitor assistant">
+      <Drawer opened={opened} onClose={() => setOpened(false)} position="right" size="lg" title="Your exhibitor assistant" closeButtonProps={{ 'aria-label': 'Close the assistant' }}>
         {!view ? (
           <Stack align="center" py="xl">
             <Loader size="sm" />

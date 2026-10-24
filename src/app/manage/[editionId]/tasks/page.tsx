@@ -97,7 +97,7 @@ export default async function TasksPage({ params }: PageProps<'/manage/[editionI
                       <Text fz="xs">
                         {r.done} of {r.applicable} stands
                       </Text>
-                      <Progress value={(r.done / r.applicable) * 100} size="sm" />
+                      <Progress value={(r.done / r.applicable) * 100} size="sm" aria-label={`${r.done} of ${r.applicable} stands done`} />
                     </>
                   ) : (
                     <Text fz="xs" c="dimmed">

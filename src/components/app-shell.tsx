@@ -101,8 +101,9 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
             ) : null}
             <Menu position="bottom-end" width={240}>
               <Menu.Target>
-                <UnstyledButton aria-label="Account menu">
+                <UnstyledButton>
                   <Group gap={6} wrap="nowrap">
+                    <span className="visually-hidden">Account menu: </span>
                     <Avatar size={32} radius="xl" color="blueprint">
                       {initials(user.name, user.email)}
                     </Avatar>

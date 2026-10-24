@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BluePrint
 
-## Getting Started
+BluePrint is Media10's online exhibitor manual and service-ordering platform for its shows (UK Construction Week, Futurebuild, Stone & Surface and any new ones).
 
-First, run the development server:
+- **Exhibitors** see the manual and the tasks for their stand type (shell scheme or space only), fill in forms, upload documents, order services, ask the show team questions and use the assistant.
+- **Contractors** for space-only stands prepare and send the stand pack for health and safety review.
+- **Suppliers** manage their catalogue, see their orders and set up payouts.
+- **The show team** runs each show from its dashboard: exhibitors and progress, tasks and deadlines, manual pages, reminders and emails, orders and refunds, the help desk, reports.
+- **Super admins** control everything: shows and editions, users and permissions, suppliers, the shared library, platform settings, payments, the audit log and data protection requests.
+
+## Guides
+
+| Guide | For |
+| --- | --- |
+| [Deployment](docs/deployment.md) | Setting up the live site and running it |
+| [Security](docs/security.md) | How BluePrint protects accounts and data |
+| [Email](docs/email.md) | Sending through Resend, SPF/DKIM/DMARC, reminders and updates |
+| [Payments](docs/payments.md) | The money model, Stripe, supplier payouts and refunds (share with finance) |
+| [Assistant and help desk](docs/assistant.md) | The exhibitor assistant and the team's help desk |
+| [Reports](docs/reports.md) | Progress tracking, service lists and spreadsheets |
+
+## Running it on your computer
+
+You need Node.js 22 or later.
 
 ```bash
+npm install
+npm run seed    # demo shows, exhibitors, suppliers and staff
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 and sign in as `admin@blueprint.test`. Sign-in codes appear in the local mailbox at http://localhost:3000/dev/mailbox, and the seed prints the two-factor key to add to an authenticator app. It also prints demo exhibitor, supplier and show admin accounts.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+On your computer BluePrint needs no accounts or keys: the database is an embedded Postgres in `.data/`, files are kept in `.data/files`, email goes to the local mailbox, a payment simulator stands in for Stripe and the assistant runs in practice mode. None of these stand-ins can run on a live site.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Checks
 
-## Learn More
+```bash
+npm run typecheck   # TypeScript
+npm run lint        # ESLint
+npm test            # unit and integration tests, on a fresh in-memory database
+npm run test:e2e    # browser tests (Playwright) against a freshly seeded development server
+npm run build && E2E_MODE=production npm run test:e2e   # the same against a production build
+```
 
-To learn more about Next.js, take a look at the following resources:
+The browser tests include automated accessibility checks (WCAG 2.2 A and AA rules, using axe) on every main page of the exhibitor portal, the supplier portal, the show dashboard and the super admin dashboard. Colours meet the AA contrast ratio, every control has a name for screen readers, and links in text are underlined.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Changing the database
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Edit the schema in `src/server/db/schema/`, then run `npm run db:generate -- --name what_changed` to write a migration into `drizzle/`. Migrations run automatically on your computer and with `npm run db:migrate` on deployment.
 
-## Deploy on Vercel
+## Where things are
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Folder | What |
+| --- | --- |
+| `src/app/portal` | Exhibitor portal |
+| `src/app/manage` | Show dashboard for the show team |
+| `src/app/admin` | Super admin dashboard |
+| `src/app/supplier`, `src/app/contractor` | Supplier portal, contractor pages |
+| `src/app/api` | Webhooks (Stripe, Resend), scheduled jobs, uploads |
+| `src/server/services` | Business rules; every function checks who is asking |
+| `src/server/auth`, `src/server/authz`, `src/server/security` | Sign-in, permissions, security helpers |
+| `src/server/assistant` | The exhibitor assistant (Claude) |
+| `src/server/email`, `src/server/payments`, `src/server/storage` | Resend, Stripe, R2 |
+| `drizzle` | Database migrations |
+| `tests` | Unit, integration and browser tests |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Built with Next.js 16, React 19, Mantine, Drizzle ORM and Postgres.

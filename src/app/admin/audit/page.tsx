@@ -90,7 +90,8 @@ export default async function AuditPage({ searchParams }: PageProps<'/admin/audi
                 <TableTd>{r.editionId ? editionNames.get(r.editionId) ?? '—' : '—'}</TableTd>
                 <TableTd>
                   {r.details && Object.keys(r.details).length ? (
-                    <Code block fz="xs" mah={90} style={{ overflow: 'auto', maxWidth: 380 }}>
+                    // Scrollable, so it can take keyboard focus and be scrolled without a mouse.
+                    <Code block fz="xs" mah={90} style={{ overflow: 'auto', maxWidth: 380 }} tabIndex={0} aria-label="Details">
                       {JSON.stringify(r.details)}
                     </Code>
                   ) : null}

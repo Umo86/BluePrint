@@ -80,7 +80,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
           <Text fz={28} fw={700}>
             {pct}%
           </Text>
-          <Progress value={pct} color={brand} mb={6} />
+          <Progress value={pct} color={brand} mb={6} aria-label={`${pct}% of required tasks done`} />
           <Text fz="sm" c="dimmed">
             {p.requiredDone} of {p.required} required tasks done
           </Text>

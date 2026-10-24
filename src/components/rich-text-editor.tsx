@@ -16,6 +16,8 @@ export function RichTextEditor({ value, onChange, minHeight = 240, label }: Prop
     extensions: [StarterKit.configure({ link: false, heading: { levels: [2, 3, 4] } }), Link.configure({ openOnClick: false, autolink: true })],
     content: value,
     immediatelyRender: false,
+    // The editable area itself needs a name for screen readers.
+    editorProps: { attributes: { 'aria-label': label ?? 'Text', role: 'textbox', 'aria-multiline': 'true' } },
     onUpdate: ({ editor: e }) => {
       const html = e.getHTML();
       lastEmitted.current = html;

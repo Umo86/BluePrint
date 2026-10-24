@@ -255,7 +255,7 @@ export default async function EditionOverview({ params }: PageProps<'/manage/[ed
             <Text fz="sm" c="dimmed" mb="sm">
               {doneSteps} of {o.setup.length} done
             </Text>
-            <Progress value={(doneSteps / o.setup.length) * 100} mb="sm" />
+            <Progress value={(doneSteps / o.setup.length) * 100} mb="sm" aria-label={`${doneSteps} of ${o.setup.length} set-up steps done`} />
             <List spacing={6} size="sm" center>
               {o.setup.map((s) => (
                 <ListItem

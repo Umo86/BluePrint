@@ -111,7 +111,7 @@ export function FileUpload({
           <Text fz="xs" c="dimmed">
             Uploading {progress.name}…
           </Text>
-          <Progress value={progress.pct} size="sm" animated />
+          <Progress value={progress.pct} size="sm" animated aria-label={`Uploading: ${progress.pct}%`} />
         </div>
       ) : null}
     </Stack>

@@ -34,7 +34,11 @@ export default async function Checklist({ params }: PageProps<'/portal/[slug]/ch
             </Badge>
           ) : null}
         </Group>
-        <Progress value={progress.required ? (progress.requiredDone / progress.required) * 100 : 100} color={ctx.edition.branding.accentColor ?? undefined} />
+        <Progress
+          value={progress.required ? (progress.requiredDone / progress.required) * 100 : 100}
+          color={ctx.edition.branding.accentColor ?? undefined}
+          aria-label={`${progress.requiredDone} of ${progress.required} required tasks done`}
+        />
       </Paper>
       {groups.map((g) =>
         g.items.length ? (

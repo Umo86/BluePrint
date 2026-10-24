@@ -47,3 +47,10 @@ body {
   max-width: 100%;
   height: auto;
 }
+
+/* Links inside running text are underlined, so they can be told apart without relying on colour (WCAG 1.4.1). */
+.mantine-Text-root a,
+.mantine-Alert-message a,
+.rich-text a {
+  text-decoration: underline;
+}
