@@ -8,6 +8,7 @@ import {
   IconLayoutDashboard,
   IconLayoutGrid,
   IconMail,
+  IconFileSpreadsheet,
   IconReceipt,
   IconSettings,
   IconSpeakerphone,
@@ -42,6 +43,9 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
   const nav: NavItem[] = [];
   if (p.has('view')) {
     nav.push({ label: 'Overview', href: base, exact: true, icon: <IconLayoutDashboard size={18} /> });
+    if (p.has('view_reports') || p.has('manage_exhibitors') || p.has('manage_orders') || p.has('review_space_only')) {
+      nav.push({ label: 'Reports', href: `${base}/reports`, icon: <IconFileSpreadsheet size={18} /> });
+    }
     nav.push({ label: 'Exhibitors', href: `${base}/exhibitors`, icon: <IconAddressBook size={18} />, section: 'Exhibitors' });
     nav.push({ label: 'Stands', href: `${base}/stands`, icon: <IconLayoutGrid size={18} />, section: 'Exhibitors' });
   }

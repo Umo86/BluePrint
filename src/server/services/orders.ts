@@ -91,11 +91,11 @@ async function orderContext(db: DbLike, orderId: string) {
 }
 type OrderContext = Awaited<ReturnType<typeof orderContext>>;
 
-const lineGross = (l: Pick<LineRow, 'netPence' | 'vatPence'>) => l.netPence + l.vatPence;
+export const lineGross = (l: Pick<LineRow, 'netPence' | 'vatPence'>) => l.netPence + l.vatPence;
 const cardFeeRefunded = (o: OrderRow, lines: LineRow[]) => Math.max(0, o.refundedPence - lines.reduce((a, l) => a + l.refundedPence, 0));
 
 /** What the supplier is owed for a line after any refunds. */
-function linePayoutAfterRefunds(l: LineRow) {
+export function linePayoutAfterRefunds(l: LineRow) {
   return l.supplierPayoutPence - reversalFor(l.refundedPence, lineGross(l), l.supplierPayoutPence);
 }
 
@@ -880,6 +880,20 @@ export async function ordersForStand(actor: Actor, standId: string) {
     : [];
   const counts = new Map(lineCounts.map((c) => [c.orderId, Number(c.n)]));
   return rows.map((o) => ({ ...o, lineCount: counts.get(o.id) ?? 0 }));
+}
+
+/** A company's orders at a show, for its record on the show dashboard. */
+export async function companyOrdersForStaff(actor: Actor, editionId: string, companyId: string) {
+  const access = await getEditionAccess(actor, editionId);
+  if (!access) throw notFound();
+  if (!access.permissions.has('manage_orders') && !access.permissions.has('view_reports')) throw forbidden();
+  const db = await getDb();
+  return db
+    .select({ id: orders.id, number: orders.number, status: orders.status, paymentMethod: orders.paymentMethod, totalPence: orders.totalPence, refundedPence: orders.refundedPence, createdAt: orders.createdAt, standNumber: stands.number })
+    .from(orders)
+    .innerJoin(stands, eq(stands.id, orders.standId))
+    .where(and(eq(orders.editionId, editionId), eq(orders.companyId, companyId)))
+    .orderBy(desc(orders.createdAt));
 }
 
 function publicLine(l: LineRow) {

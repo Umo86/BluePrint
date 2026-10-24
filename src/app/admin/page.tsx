@@ -1,25 +1,24 @@
 import { desc } from 'drizzle-orm';
-import { Paper, SimpleGrid, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
+import { Group, Paper, SimpleGrid, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 import { PageHeader } from '@/components/ui/page-header';
 import { TextLink } from '@/components/links';
 import { StatCard } from '@/components/ui/stat-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { requireSuperAdmin } from '@/server/auth/current';
 import { platformCounts } from '@/server/services/users';
-import { listShowsWithEditions } from '@/server/services/editions';
+import { editionsAtAGlance } from '@/server/services/overview';
 import { systemStatus } from '@/server/services/system';
 import { getDb } from '@/server/db/client';
 import { auditLog } from '@/server/db/schema';
-import { dateShort, dateTime } from '@/lib/format';
+import { dateShort, dateTime, money } from '@/lib/format';
 
 export default async function AdminOverview() {
   const actor = await requireSuperAdmin();
   const counts = await platformCounts(actor);
-  const shows = await listShowsWithEditions(actor);
+  const editions = await editionsAtAGlance(actor);
   const status = await systemStatus(actor);
   const db = await getDb();
   const recent = await db.select().from(auditLog).orderBy(desc(auditLog.at)).limit(12);
-  const editions = shows.flatMap((s) => s.editions.map((e) => ({ ...e, showName: s.name }))).filter((e) => e.status !== 'archived');
   const warnings = Object.entries(status.config).filter(([, v]) => /missing|Not set up|Not connected|Development key/.test(v));
 
   return (
@@ -57,7 +56,11 @@ export default async function AdminOverview() {
             <TableTr>
               <TableTh>Edition</TableTh>
               <TableTh>Opens</TableTh>
-              <TableTh>Stands</TableTh>
+              <TableTh ta="right">Stands</TableTh>
+              <TableTh ta="right">Signed up</TableTh>
+              <TableTh ta="right">Checklists</TableTh>
+              <TableTh ta="right">Stands behind</TableTh>
+              <TableTh ta="right">Shop sales</TableTh>
               <TableTh>Status</TableTh>
             </TableTr>
           </TableThead>
@@ -73,15 +76,28 @@ export default async function AdminOverview() {
                   </Text>
                 </TableTd>
                 <TableTd>{dateShort(e.openStartsAt)}</TableTd>
-                <TableTd>{e.standCount}</TableTd>
+                <TableTd ta="right">{e.standCount}</TableTd>
+                <TableTd ta="right">{e.signedUpPct === null ? '—' : `${e.signedUpPct}%`}</TableTd>
+                <TableTd ta="right">{e.checklistPct === null ? '—' : `${e.checklistPct}%`}</TableTd>
+                <TableTd ta="right">
+                  <Text fz="sm" c={e.standsOverdue ? 'red' : undefined}>
+                    {e.standsOverdue}
+                  </Text>
+                </TableTd>
+                <TableTd ta="right">{money(e.salesPence)}</TableTd>
                 <TableTd>
-                  <StatusBadge status={e.status} />
+                  <Group gap={6} wrap="nowrap">
+                    <StatusBadge status={e.status} />
+                    <TextLink href={`/manage/${e.id}`} fz="xs">
+                      Dashboard
+                    </TextLink>
+                  </Group>
                 </TableTd>
               </TableTr>
             ))}
             {editions.length === 0 ? (
               <TableTr>
-                <TableTd colSpan={4}>
+                <TableTd colSpan={8}>
                   <Text c="dimmed" fz="sm">
                     No editions yet. <TextLink href="/admin/shows">Create a show</TextLink> to start.
                   </Text>

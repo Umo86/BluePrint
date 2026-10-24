@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Alert,
   Badge,
@@ -29,6 +30,7 @@ import { useAction } from '@/lib/use-action';
 import { TASK_STATE_LABELS, REQUIREMENT_LABELS } from '@/lib/task-labels';
 import type { FormField } from '@/lib/forms';
 import { extendDeadlineAction, reopenSubmissionAction, reviewSubmissionAction, submissionDetailAction } from '../../../actions';
+import { taskReminderAction } from '../../../email-actions';
 
 export type ResponseRow = {
   standId: string;
@@ -64,6 +66,7 @@ export function ResponsesPanel({
   fields,
   canReview,
   canExport,
+  canEmail,
   requiresApproval,
 }: {
   editionId: string;
@@ -72,8 +75,16 @@ export function ResponsesPanel({
   fields: FormField[];
   canReview: boolean;
   canExport: boolean;
+  canEmail: boolean;
   requiresApproval: boolean;
 }) {
+  const router = useRouter();
+  const remind = useAction(taskReminderAction, {
+    onSuccess: (data) => {
+      if (data?.id) router.push(`/manage/${editionId}/emails/campaigns/${data.id}`);
+    },
+  });
+  const hasQuestions = fields.some((f) => f.type !== 'heading');
   const [filter, setFilter] = useState<'all' | 'todo' | 'review' | 'done'>(requiresApproval ? 'review' : 'all');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<ResponseRow | null>(null);
@@ -106,6 +117,7 @@ export function ResponsesPanel({
   };
 
   const counts = {
+    overdue: rows.filter((x) => x.state === 'overdue').length,
     review: rows.filter((x) => x.state === 'submitted').length,
     todo: rows.filter((x) => ['to_do', 'overdue', 'draft', 'changes_needed'].includes(x.state)).length,
     done: rows.filter((x) => ['completed', 'approved', 'not_needed'].includes(x.state)).length,
@@ -127,12 +139,29 @@ export function ResponsesPanel({
           />
           <TextInput aria-label="Find a stand" placeholder="Company or stand" leftSection={<IconSearch size={16} />} value={q} onChange={(e) => setQ(e.currentTarget.value)} w={220} />
         </Group>
-        {canExport ? (
-          <Button component="a" href={`/manage/${editionId}/tasks/${taskId}/export`} variant="default">
-            Download CSV
-          </Button>
-        ) : null}
+        <Group gap="xs">
+          {canEmail && counts.todo ? (
+            <Button variant="light" loading={remind.pending} onClick={() => remind.run(taskId)}>
+              Email the {counts.todo === 1 ? 'stand' : `${counts.todo} stands`} that have not done it
+            </Button>
+          ) : null}
+          {canExport && hasQuestions ? (
+            <Button component="a" href={`/manage/${editionId}/reports/responses?task=${taskId}`} variant="default">
+              Download (Excel)
+            </Button>
+          ) : null}
+          {canExport ? (
+            <Button component="a" href={`/manage/${editionId}/tasks/${taskId}/export`} variant="default">
+              Download CSV
+            </Button>
+          ) : null}
+        </Group>
       </Group>
+      {counts.overdue ? (
+        <Text fz="sm" c="red">
+          {counts.overdue} {counts.overdue === 1 ? 'stand has' : 'stands have'} missed the deadline without sending this.
+        </Text>
+      ) : null}
       <Paper withBorder>
         <Table verticalSpacing="xs" highlightOnHover>
           <TableThead>

@@ -53,6 +53,7 @@ export function TaskEditor(props: {
   canEdit: boolean;
   canReview: boolean;
   canExport: boolean;
+  canEmail: boolean;
   canSaveToLibrary: boolean;
   initialTab?: string;
   initial: Values;
@@ -269,6 +270,7 @@ export function TaskEditor(props: {
               fields={props.initial.formSchema}
               canReview={props.canReview}
               canExport={props.canExport}
+              canEmail={props.canEmail}
               requiresApproval={props.initial.requiresApproval}
             />
           </Tabs.Panel>

@@ -147,6 +147,17 @@ export async function soldQuantities(db: DbLike, productIds: string[]) {
 // Show team
 // ---------------------------------------------------------------------------
 
+/** Shop categories by name, for "has not ordered from" filters. */
+export async function shopCategoriesForFilters(actor: Actor, editionId: string) {
+  await requireEditionPermission(actor, editionId, 'view');
+  const db = await getDb();
+  return db
+    .select({ id: serviceCategories.id, name: serviceCategories.name, visibleToTypes: serviceCategories.visibleToTypes })
+    .from(serviceCategories)
+    .where(eq(serviceCategories.editionId, editionId))
+    .orderBy(asc(serviceCategories.sort), asc(serviceCategories.name));
+}
+
 export async function catalogueForStaff(actor: Actor, editionId: string) {
   const access = await requireEditionPermission(actor, editionId, 'manage_orders');
   const db = await getDb();

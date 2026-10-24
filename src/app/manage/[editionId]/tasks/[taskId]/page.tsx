@@ -46,6 +46,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<'/man
         canEdit={access.permissions.has('edit_content')}
         canReview={access.permissions.has('manage_exhibitors')}
         canExport={access.permissions.has('manage_exhibitors') || access.permissions.has('view_reports')}
+        canEmail={access.permissions.has('send_emails') && !actor.readOnly}
         canSaveToLibrary={actor.isSuperAdmin && !actor.readOnly}
         initialTab={typeof sp.tab === 'string' ? sp.tab : undefined}
         initial={{

@@ -96,6 +96,18 @@ export function CampaignEditor({
               <Title order={2} fz="md">
                 Who gets it
               </Title>
+              {c.filter.standIds.length ? (
+                <Alert color="blue">
+                  <Text fz="sm">
+                    Only the {c.filter.standIds.length} {c.filter.standIds.length === 1 ? 'stand' : 'stands'} you chose. The filters below narrow this further.
+                  </Text>
+                  {editable ? (
+                    <Button size="compact-xs" variant="subtle" mt={4} onClick={() => setF({ standIds: [] })}>
+                      Send to every stand that matches the filters instead
+                    </Button>
+                  ) : null}
+                </Alert>
+              ) : null}
               <SegmentedControl
                 value={c.filter.audience}
                 onChange={(v) => setF({ audience: v as Filter['audience'] })}

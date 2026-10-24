@@ -1,23 +1,27 @@
 import { notFound } from 'next/navigation';
-import { Badge, Code, Group, Paper, SimpleGrid, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
+import { Badge, Code, Group, Paper, Progress, SimpleGrid, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ActionButton } from '@/components/action-button';
 import { TextLink } from '@/components/links';
 import { getExhibitor } from '@/server/services/stands';
+import { checklistForCompany } from '@/server/services/progress';
+import { companyOrdersForStaff, ORDER_STATUS_LABELS } from '@/server/services/orders';
+import { TASK_STATE_LABELS, REQUIREMENT_LABELS } from '@/lib/task-labels';
 import { listExhibitorTypes, listHalls } from '@/server/services/show-setup';
 import { AppError } from '@/server/errors';
-import { dateShort, dateTime } from '@/lib/format';
+import { dateShort, dateTime, money } from '@/lib/format';
 import { resendInvitationAction, revokeInvitationAction } from '@/app/admin/actions';
 import { deleteNoteAction } from '../../../actions';
 import { loadEdition } from '../../load';
 import { CompanyForm, EditStandButton, InviteContactForm, MemberActions, NoteForm, ViewAsButton } from './exhibitor-detail-controls';
+import { EmailStandsButton } from '../../overview-controls';
 
 const INVITE_KIND: Record<string, string> = { exhibitor: 'Exhibitor', colleague: 'Colleague', contractor: 'Stand contractor' };
 
 export default async function ExhibitorPage({ params }: PageProps<'/manage/[editionId]/exhibitors/[companyId]'>) {
   const { editionId, companyId } = await params;
-  const { actor, edition, isAdmin } = await loadEdition(editionId);
+  const { actor, edition, isAdmin, access } = await loadEdition(editionId);
   if (!/^[0-9a-f-]{36}$/i.test(companyId)) notFound();
   let d: Awaited<ReturnType<typeof getExhibitor>>;
   try {
@@ -27,6 +31,8 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
     throw err;
   }
   const [types, halls] = d.canManage ? await Promise.all([listExhibitorTypes(actor, edition.id), listHalls(actor, edition.id)]) : [[], []];
+  const canSeeOrders = access.permissions.has('manage_orders') || access.permissions.has('view_reports');
+  const [checklist, companyOrders] = await Promise.all([checklistForCompany(actor, edition.id, companyId), canSeeOrders ? companyOrdersForStaff(actor, edition.id, companyId) : Promise.resolve(null)]);
   const typeOptions = types.map((t) => ({ value: t.id, label: t.name }));
   const hallOptions = halls.map((h) => ({ value: h.id, label: h.name }));
   const c = d.company;
@@ -43,6 +49,9 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
                 {s.stand.number} · {s.type.name}
               </Badge>
             ))}
+            {access.permissions.has('send_emails') && !actor.readOnly && d.stands.length && d.members.length ? (
+              <EmailStandsButton editionId={edition.id} standIds={d.stands.map((s) => s.stand.id)} label="Email them" />
+            ) : null}
             {isAdmin && d.members.length ? <ViewAsButton editionId={edition.id} members={d.members.map((m) => ({ id: m.user.id, name: m.user.name || m.user.email }))} /> : null}
           </Group>
         }
@@ -101,6 +110,125 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
           </TableTbody>
         </Table>
       </Paper>
+
+      {checklist.stands.length ? (
+        <Paper withBorder p="md">
+          <Title order={2} fz="md" mb="sm">
+            Checklist
+          </Title>
+          <Stack gap="md">
+            {checklist.stands.map((st) => {
+              const pctDone = st.required ? Math.floor((st.requiredDone / st.required) * 100) : 100;
+              const items = checklist.tasks.filter((t) => st.states[t.id]);
+              return (
+                <div key={st.standId}>
+                  {checklist.stands.length > 1 ? (
+                    <Text fz="sm" fw={600} mb={4}>
+                      Stand {st.number}
+                    </Text>
+                  ) : null}
+                  <Group gap="sm" mb="xs" wrap="nowrap">
+                    <Progress value={pctDone} size="sm" w={160} color={st.overdue ? 'red' : pctDone === 100 ? 'green' : 'blue'} aria-label={`${pctDone}% of required tasks done`} />
+                    <Text fz="sm">
+                      {st.requiredDone} of {st.required} required tasks done
+                      {st.overdue ? ` · ${st.overdue} overdue` : ''}
+                    </Text>
+                  </Group>
+                  {items.length ? (
+                    <Table verticalSpacing={4} fz="sm">
+                      <TableThead>
+                        <TableTr>
+                          <TableTh>Task</TableTh>
+                          <TableTh w={130}>Due</TableTh>
+                          <TableTh w={180}>Status</TableTh>
+                        </TableTr>
+                      </TableThead>
+                      <TableTbody>
+                        {items.map((t) => {
+                          const state = st.states[t.id];
+                          return (
+                            <TableTr key={t.id}>
+                              <TableTd>
+                                <TextLink href={`/manage/${edition.id}/tasks/${t.id}?tab=responses`} fz="sm">
+                                  {t.title}
+                                </TextLink>
+                                <Text fz="xs" c="dimmed">
+                                  {REQUIREMENT_LABELS[state.requirement]}
+                                </Text>
+                              </TableTd>
+                              <TableTd>{state.deadline ? dateShort(state.deadline) : '—'}</TableTd>
+                              <TableTd>
+                                <Badge variant="light" color={TASK_STATE_LABELS[state.state]?.color ?? 'gray'}>
+                                  {TASK_STATE_LABELS[state.state]?.label ?? state.state}
+                                </Badge>
+                              </TableTd>
+                            </TableTr>
+                          );
+                        })}
+                      </TableTbody>
+                    </Table>
+                  ) : (
+                    <Text fz="sm" c="dimmed">
+                      No published tasks for this stand type yet.
+                    </Text>
+                  )}
+                </div>
+              );
+            })}
+          </Stack>
+        </Paper>
+      ) : null}
+
+      {companyOrders ? (
+        <Paper withBorder p="md">
+          <Title order={2} fz="md" mb="sm">
+            Orders ({companyOrders.length})
+          </Title>
+          {companyOrders.length ? (
+            <Table verticalSpacing={4} fz="sm">
+              <TableThead>
+                <TableTr>
+                  <TableTh>Order</TableTh>
+                  <TableTh>Placed</TableTh>
+                  <TableTh>Stand</TableTh>
+                  <TableTh ta="right">Total</TableTh>
+                  <TableTh>Status</TableTh>
+                </TableTr>
+              </TableThead>
+              <TableTbody>
+                {companyOrders.map((o) => (
+                  <TableTr key={o.id}>
+                    <TableTd>
+                      <TextLink href={`/manage/${edition.id}/orders/${o.id}`} fz="sm" fw={600}>
+                        {o.number}
+                      </TextLink>
+                    </TableTd>
+                    <TableTd>{dateShort(o.createdAt)}</TableTd>
+                    <TableTd>{o.standNumber}</TableTd>
+                    <TableTd ta="right">
+                      {money(o.totalPence - o.refundedPence)}
+                      {o.refundedPence ? (
+                        <Text fz="xs" c="dimmed">
+                          after {money(o.refundedPence)} refunded
+                        </Text>
+                      ) : null}
+                    </TableTd>
+                    <TableTd>
+                      <Badge variant="light" color="gray">
+                        {ORDER_STATUS_LABELS[o.status]}
+                      </Badge>
+                    </TableTd>
+                  </TableTr>
+                ))}
+              </TableTbody>
+            </Table>
+          ) : (
+            <Text fz="sm" c="dimmed">
+              Nothing ordered yet.
+            </Text>
+          )}
+        </Paper>
+      ) : null}
 
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Stack>

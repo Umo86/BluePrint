@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, desc, eq, inArray, isNull, lte, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
 import {
@@ -9,8 +9,6 @@ import {
   editions,
   exhibitorTypes,
   halls,
-  orderLines,
-  orders,
   serviceCategories,
   stands,
   submissions,
@@ -32,6 +30,7 @@ import { brandingFor, checkTemplateImages, editionVars, senderFor, templateConte
 import { assertRateLimit } from '../security/rate-limit';
 import { signToken, verifyToken } from '../security/signed-token';
 import { sendQueuedEmails } from './housekeeping';
+import { standsWithoutOrderFrom } from './stands';
 import type { Actor } from '../auth/actor';
 
 /**
@@ -86,13 +85,8 @@ export async function recipientsFor(editionId: string, raw: CampaignFilter | Cam
     rows = rows.filter((r) => reqs.some((q) => q.exhibitorTypeId === r.stand.exhibitorTypeId) && !done.has(r.stand.id));
   }
   if (f.categoryNotOrderedId) {
-    const ordered = await db
-      .selectDistinct({ standId: orders.standId })
-      .from(orderLines)
-      .innerJoin(orders, eq(orders.id, orderLines.orderId))
-      .where(and(eq(orders.editionId, editionId), eq(orderLines.categoryId, f.categoryNotOrderedId), inArray(orders.status, ['paid', 'invoiced', 'partially_refunded']), ne(orderLines.fulfilmentStatus, 'cancelled')));
-    const has = new Set(ordered.map((o) => o.standId));
-    rows = rows.filter((r) => !has.has(r.stand.id));
+    const without = await standsWithoutOrderFrom(editionId, f.categoryNotOrderedId);
+    rows = rows.filter((r) => without.has(r.stand.id));
   }
   if (!rows.length) return [];
   const companyIds = [...new Set(rows.map((r) => r.company.id))];
@@ -364,4 +358,49 @@ export async function describeUnsubscribe(token: string) {
   const db = await getDb();
   const [edition] = await db.select({ name: editions.name }).from(editions).where(eq(editions.id, data.d)).limit(1);
   return edition ? { email: data.e, show: edition.name } : null;
+}
+
+// ---------------------------------------------------------------------------
+// Drafts started from other pages
+// ---------------------------------------------------------------------------
+
+/** Starts an email to particular stands (chosen on the exhibitors list or the overview), for the team to finish. */
+export async function draftCampaignForStands(actor: Actor, editionId: string, standIdsRaw: string[]) {
+  await requireEditionPermission(actor, editionId, 'send_emails', { write: true });
+  const standIds = z.array(uuid).min(1, 'Choose at least one exhibitor.').max(5000).parse([...new Set(standIdsRaw)]);
+  const db = await getDb();
+  const found = await db
+    .select({ id: stands.id })
+    .from(stands)
+    .where(and(eq(stands.editionId, editionId), inArray(stands.id, standIds)));
+  if (found.length !== standIds.length) throw invalid('Some of those stands are not in this show.');
+  return createCampaign(actor, editionId, {
+    name: `Email to ${found.length} chosen ${found.length === 1 ? 'stand' : 'stands'}`,
+    subject: 'A message about {{show}}',
+    blocks: [
+      { type: 'paragraph', text: 'Hello {{first_name}},' },
+      { type: 'paragraph', text: 'Write your message here.' },
+      { type: 'button', label: 'Open your exhibitor portal', url: '{{portal_link}}' },
+    ],
+    filter: { standIds, audience: 'main_contacts' },
+  });
+}
+
+/** Starts a reminder about one task to every stand that has not done it yet. */
+export async function draftTaskReminder(actor: Actor, taskId: string) {
+  const db = await getDb();
+  const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+  if (!task) throw notFound();
+  await requireEditionPermission(actor, task.editionId, 'send_emails', { write: true });
+  return createCampaign(actor, task.editionId, {
+    name: `Reminder: ${task.title}`.slice(0, 150),
+    subject: `Reminder: ${task.title}`.slice(0, 250),
+    blocks: [
+      { type: 'paragraph', text: 'Hello {{first_name}},' },
+      { type: 'paragraph', text: `We have not yet had “${task.title}” for stand {{stand}}. Please complete it in your exhibitor portal as soon as you can.` },
+      { type: 'button', label: 'Open your checklist', url: '{{portal_link}}' },
+      { type: 'paragraph', text: 'If you have already done this, thank you, and please ignore this email.' },
+    ],
+    filter: { taskNotDoneId: task.id, audience: 'main_contacts' },
+  });
 }

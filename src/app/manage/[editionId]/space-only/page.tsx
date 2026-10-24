@@ -1,7 +1,8 @@
 import { Badge, Group, Paper, SimpleGrid, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text } from '@mantine/core';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
-import { TextLink } from '@/components/links';
+import { DownloadButton, TextLink } from '@/components/links';
+import { IconDownload } from '@tabler/icons-react';
 import { spaceOnlyQueue } from '@/server/services/space-only';
 import { PACK_STATUS_LABELS } from '@/lib/space-only';
 import { dateShort } from '@/lib/format';
@@ -25,6 +26,11 @@ export default async function SpaceOnlyQueuePage({ params, searchParams }: PageP
       <PageHeader
         title="Space-only approvals"
         description={`Every space-only stand needs its design and safety documents approved before build-up${q.daysToBuild !== null ? ` (${q.daysToBuild > 0 ? `${q.daysToBuild} days away` : 'started'})` : ''}.`}
+        actions={
+          <DownloadButton href={`/manage/${edition.id}/reports/space_only`} variant="default" leftSection={<IconDownload size={16} />}>
+            Download (Excel)
+          </DownloadButton>
+        }
       />
       <SimpleGrid cols={{ base: 2, md: 4 }}>
         <StatCard label="Space-only stands" value={q.counts.total} />

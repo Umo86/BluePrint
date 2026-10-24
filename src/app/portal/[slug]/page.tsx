@@ -140,6 +140,9 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
                   </Badge>
                 ) : null}
               </Group>
+              <Text fz="xs" c="dimmed" mb={4}>
+                {dateLong(a.publishedAt)}
+              </Text>
               <RichHtml html={a.bodyHtml} />
             </Paper>
           ))}

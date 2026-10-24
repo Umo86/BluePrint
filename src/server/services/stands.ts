@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb, type DbLike } from '../db/client';
 import {
@@ -18,6 +18,8 @@ import {
   stands,
   submissions,
   users,
+  orderLines,
+  serviceCategories,
 } from '../db/schema';
 import { getEditionAccess, requireEditionPermission } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
@@ -25,6 +27,7 @@ import { audit } from '../audit';
 import { createInvitation } from '../auth/invitations';
 import { assertRateLimit } from '../security/rate-limit';
 import { companySchema } from './companies';
+import { computeEditionProgress, type EditionProgress } from './progress';
 import type { Actor } from '../auth/actor';
 
 export const standSchema = z.object({
@@ -67,14 +70,59 @@ async function loadStand(standId: string) {
 
 export type InviteState = 'joined' | 'invited' | 'not_sent' | 'no_contact';
 
-export const EXHIBITOR_FILTERS = ['all', 'joined', 'invited', 'not_sent', 'no_contact'] as const;
+export const EXHIBITOR_FILTERS = ['all', 'joined', 'invited', 'not_sent', 'no_contact', 'never_signed_in'] as const;
+/** Checklist filters for the exhibitors list. */
+export const PROGRESS_FILTERS = ['any', 'behind', 'review', 'changes', 'not_started', 'complete'] as const;
+export type ExhibitorListOptions = {
+  q?: string;
+  typeId?: string;
+  hallId?: string;
+  state?: (typeof EXHIBITOR_FILTERS)[number];
+  progress?: (typeof PROGRESS_FILTERS)[number];
+  /** Only companies with a stand that has not done this task yet. */
+  taskNotDoneId?: string;
+  /** Only companies with a stand that can order from this shop category but has not. */
+  notOrderedCategoryId?: string;
+};
+export type CompanySpend = { orders: number; paidPence: number; unpaidPence: number };
+export type CompanyProgress = { required: number; requiredDone: number; overdue: number; awaitingReview: number; changesNeeded: number; nextDeadline: Date | null };
 
 /** Every exhibiting company in an edition with its stands, main contact and invitation state. */
-export async function listExhibitors(
-  actor: Actor,
-  editionId: string,
-  opts: { q?: string; typeId?: string; hallId?: string; state?: (typeof EXHIBITOR_FILTERS)[number] } = {},
-) {
+/**
+ * Active stands that could order from a shop category (their stand type can see it) but have no
+ * paid or invoiced order for it. Used by the exhibitors list and the "has not ordered" emails.
+ */
+export async function standsWithoutOrderFrom(editionId: string, categoryId: string) {
+  const db = await getDb();
+  const [category] = await db
+    .select()
+    .from(serviceCategories)
+    .where(and(eq(serviceCategories.id, categoryId), eq(serviceCategories.editionId, editionId)))
+    .limit(1);
+  if (!category) return new Set<string>();
+  const standRows = await db
+    .select({ id: stands.id, typeId: stands.exhibitorTypeId })
+    .from(stands)
+    .where(and(eq(stands.editionId, editionId), eq(stands.status, 'active')));
+  const ordered = await db
+    .selectDistinct({ standId: orders.standId })
+    .from(orderLines)
+    .innerJoin(orders, eq(orders.id, orderLines.orderId))
+    .where(
+      and(
+        eq(orders.editionId, editionId),
+        eq(orderLines.categoryId, categoryId),
+        inArray(orders.status, ['paid', 'invoiced', 'partially_refunded']),
+        ne(orderLines.fulfilmentStatus, 'cancelled'),
+      ),
+    );
+  const has = new Set(ordered.map((o) => o.standId));
+  return new Set(
+    standRows.filter((r) => (category.visibleToTypes.length === 0 || category.visibleToTypes.includes(r.typeId)) && !has.has(r.id)).map((r) => r.id),
+  );
+}
+
+export async function listExhibitors(actor: Actor, editionId: string, opts: ExhibitorListOptions = {}, precomputed?: EditionProgress) {
   await requireEditionPermission(actor, editionId, 'view');
   const db = await getDb();
   const standRows = await db
@@ -111,14 +159,37 @@ export async function listExhibitors(
         .orderBy(desc(invitations.createdAt))
     : [];
 
+  const progress = precomputed ?? (await computeEditionProgress(editionId));
+  const standProgress = new Map(progress.stands.map((p) => [p.standId, p]));
+  const standIdsAll = standRows.map((r) => r.stand.id);
+  const packs = standIdsAll.length
+    ? await db.select({ standId: spaceOnlyPacks.standId, status: spaceOnlyPacks.status }).from(spaceOnlyPacks).where(inArray(spaceOnlyPacks.standId, standIdsAll))
+    : [];
+  const packByStand = new Map(packs.map((p) => [p.standId, p.status as string]));
+  const orderRows = await db
+    .select({ companyId: orders.companyId, status: orders.status, total: orders.totalPence, refunded: orders.refundedPence })
+    .from(orders)
+    .where(and(eq(orders.editionId, editionId), inArray(orders.status, ['paid', 'invoiced', 'partially_refunded'])));
+  const spendByCompany = new Map<string, CompanySpend>();
+  for (const o of orderRows) {
+    if (!o.companyId) continue;
+    const t = spendByCompany.get(o.companyId) ?? { orders: 0, paidPence: 0, unpaidPence: 0 };
+    t.orders++;
+    if (o.status === 'invoiced') t.unpaidPence += o.total - o.refunded;
+    else t.paidPence += o.total - o.refunded;
+    spendByCompany.set(o.companyId, t);
+  }
+
   type Row = {
     company: typeof companies.$inferSelect;
-    stands: { id: string; number: string; typeId: string; typeName: string; isSpaceOnly: boolean; hallId: string | null; hallName: string | null; sizeSqm: string | null }[];
+    stands: { id: string; number: string; typeId: string; typeName: string; isSpaceOnly: boolean; hallId: string | null; hallName: string | null; sizeSqm: string | null; packStatus: string | null }[];
     mainContact: { id: string; name: string; email: string; lastLoginAt: Date | null } | null;
     memberCount: number;
     lastLoginAt: Date | null;
     invite: { id: string; email: string; sent: boolean; sentAt: Date | null } | null;
     state: InviteState;
+    progress: CompanyProgress;
+    spend: CompanySpend;
   };
   const byCompany = new Map<string, Row>();
   for (const r of standRows) {
@@ -138,6 +209,8 @@ export async function listExhibitors(
         lastLoginAt,
         invite: inv ? { id: inv.id, email: inv.email, sent: Boolean(inv.lastSentAt), sentAt: inv.lastSentAt } : null,
         state,
+        progress: { required: 0, requiredDone: 0, overdue: 0, awaitingReview: 0, changesNeeded: 0, nextDeadline: null },
+        spend: spendByCompany.get(r.company.id) ?? { orders: 0, paidPence: 0, unpaidPence: 0 },
       };
       byCompany.set(r.company.id, row);
     }
@@ -150,7 +223,18 @@ export async function listExhibitors(
       hallId: r.hall?.id ?? null,
       hallName: r.hall?.name ?? null,
       sizeSqm: r.stand.sizeSqm,
+      packStatus: r.type.isSpaceOnly ? (packByStand.get(r.stand.id) ?? 'not_started') : null,
     });
+    const sp = standProgress.get(r.stand.id);
+    if (sp) {
+      const p = row.progress;
+      p.required += sp.required;
+      p.requiredDone += sp.requiredDone;
+      p.overdue += sp.overdue;
+      p.awaitingReview += sp.awaitingReview;
+      p.changesNeeded += sp.changesNeeded;
+      if (sp.nextDeadline && (!p.nextDeadline || sp.nextDeadline < p.nextDeadline)) p.nextDeadline = sp.nextDeadline;
+    }
   }
 
   let rows = [...byCompany.values()].sort((a, b) => a.company.name.localeCompare(b.company.name, 'en-GB'));
@@ -167,7 +251,38 @@ export async function listExhibitors(
   }
   if (opts.typeId) rows = rows.filter((r) => r.stands.some((s) => s.typeId === opts.typeId));
   if (opts.hallId) rows = rows.filter((r) => r.stands.some((s) => s.hallId === opts.hallId));
-  if (opts.state && opts.state !== 'all') rows = rows.filter((r) => r.state === opts.state);
+  if (opts.state === 'never_signed_in') rows = rows.filter((r) => !r.lastLoginAt);
+  else if (opts.state && opts.state !== 'all') rows = rows.filter((r) => r.state === opts.state);
+  if (opts.notOrderedCategoryId) {
+    const without = await standsWithoutOrderFrom(editionId, opts.notOrderedCategoryId);
+    rows = rows.filter((r) => r.stands.some((st) => without.has(st.id)));
+  }
+  switch (opts.progress) {
+    case 'behind':
+      rows = rows.filter((r) => r.progress.overdue > 0);
+      break;
+    case 'review':
+      rows = rows.filter((r) => r.progress.awaitingReview > 0);
+      break;
+    case 'changes':
+      rows = rows.filter((r) => r.progress.changesNeeded > 0);
+      break;
+    case 'not_started':
+      rows = rows.filter((r) => r.progress.required > 0 && r.progress.requiredDone === 0);
+      break;
+    case 'complete':
+      rows = rows.filter((r) => r.progress.required > 0 && r.progress.requiredDone === r.progress.required);
+      break;
+    default:
+      break;
+  }
+  if (opts.taskNotDoneId) {
+    const taskId = opts.taskNotDoneId;
+    rows = rows.filter((r) => r.stands.some((st) => {
+      const state = standProgress.get(st.id)?.states[taskId];
+      return Boolean(state && !state.done);
+    }));
+  }
 
   const all = [...byCompany.values()];
   const summary = {
@@ -176,9 +291,10 @@ export async function listExhibitors(
     invited: all.filter((r) => r.state === 'invited').length,
     notSent: all.filter((r) => r.state === 'not_sent').length,
     noContact: all.filter((r) => r.state === 'no_contact').length,
+    neverSignedIn: all.filter((r) => !r.lastLoginAt).length,
     unassignedStands: standRows.filter((r) => !r.company).length,
   };
-  return { rows, summary };
+  return { rows, summary, progress };
 }
 
 /** Every stand in an edition, including stands with no company yet. */

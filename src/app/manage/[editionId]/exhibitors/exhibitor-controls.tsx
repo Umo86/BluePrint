@@ -23,7 +23,7 @@ import { addExhibitorAction, searchCompaniesAction } from '../../actions';
 
 type Option = { value: string; label: string };
 
-export function ExhibitorFilters({ types, halls, counts }: { types: Option[]; halls: Option[]; counts: Record<string, number> }) {
+export function ExhibitorFilters({ types, halls, tasks, categories, counts }: { types: Option[]; halls: Option[]; tasks: Option[]; categories: Option[]; counts: Record<string, number> }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -48,6 +48,7 @@ export function ExhibitorFilters({ types, halls, counts }: { types: Option[]; ha
           { value: 'invited', label: `Invited (${counts.invited})` },
           { value: 'not_sent', label: `Not sent (${counts.not_sent})` },
           { value: 'no_contact', label: `No contact (${counts.no_contact})` },
+          { value: 'never_signed_in', label: `Never signed in (${counts.never_signed_in})` },
         ]}
         style={{ alignSelf: 'flex-start' }}
       />
@@ -74,6 +75,46 @@ export function ExhibitorFilters({ types, halls, counts }: { types: Option[]; ha
           {halls.length ? <Select aria-label="Hall" placeholder="Any hall" data={halls} value={params.get('hall')} onChange={(v) => update({ hall: v })} clearable w={160} /> : null}
         </Group>
       </form>
+      <Group gap="sm">
+        <Select
+          aria-label="Checklist"
+          placeholder="Any checklist progress"
+          data={[
+            { value: 'behind', label: 'Behind (overdue tasks)' },
+            { value: 'review', label: 'Waiting for your review' },
+            { value: 'changes', label: 'Changes asked for' },
+            { value: 'not_started', label: 'Not started' },
+            { value: 'complete', label: 'All required tasks done' },
+          ]}
+          value={params.get('progress')}
+          onChange={(v) => update({ progress: v })}
+          clearable
+          w={240}
+        />
+        {tasks.length ? (
+          <Select
+            aria-label="Task not done"
+            placeholder="Has not done…"
+            data={tasks}
+            value={params.get('task')}
+            onChange={(v) => update({ task: v })}
+            clearable
+            searchable
+            w={300}
+          />
+        ) : null}
+        {categories.length ? (
+          <Select
+            aria-label="Has not ordered from"
+            placeholder="Has not ordered from…"
+            data={categories}
+            value={params.get('notOrdered')}
+            onChange={(v) => update({ notOrdered: v })}
+            clearable
+            w={260}
+          />
+        ) : null}
+      </Group>
     </Stack>
   );
 }

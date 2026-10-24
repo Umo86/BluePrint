@@ -33,6 +33,9 @@ export default async function OrdersPage({ params, searchParams }: PageProps<'/m
         description="Everything exhibitors have ordered from the shop, how they paid, and refunds."
         actions={
           <Group gap="xs">
+            <ButtonLink href={`${base}/services`} variant="default">
+              Services by stand
+            </ButtonLink>
             <ButtonLink href={`${base}/commission`} variant="default">
               Commission and payouts
             </ButtonLink>

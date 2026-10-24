@@ -9,6 +9,8 @@ import {
   cancelScheduledCampaign,
   createCampaign,
   deleteCampaign,
+  draftCampaignForStands,
+  draftTaskReminder,
   sendCampaign,
   sendCampaignTest,
   updateCampaign,
@@ -100,4 +102,20 @@ export async function cancelCampaignAction(campaignId: string): Promise<ActionRe
     await cancelScheduledCampaign(await requireActor(), id(campaignId));
     refresh();
   }, 'Not sending. It is back in your drafts.');
+}
+
+export async function emailStandsAction(editionId: string, standIds: string[]): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const c = await draftCampaignForStands(await requireActor(), id(editionId), Array.isArray(standIds) ? standIds.map(String) : []);
+    refresh();
+    return { id: c.id };
+  }, 'Email draft created. Write your message, then send it.');
+}
+
+export async function taskReminderAction(taskId: string): Promise<ActionResult<{ id: string; editionId: string }>> {
+  return runAction(async () => {
+    const c = await draftTaskReminder(await requireActor(), id(taskId));
+    refresh();
+    return { id: c.id, editionId: c.editionId };
+  }, 'Reminder email drafted. Check it, then send it.');
 }
