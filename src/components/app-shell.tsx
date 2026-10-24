@@ -33,7 +33,10 @@ type Props = {
   user: { name: string; email: string };
   workspaces: { label: string; href: string; description: string }[];
   viewAs?: { name: string; email: string } | null;
-  accentColor?: string;
+  /** Show branding for the exhibitor portal: header colour and logo. */
+  brand?: { color?: string | null; logoUrl?: string | null } | null;
+  /** Extra controls in the header, such as a stand switcher. */
+  headerExtra?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -43,18 +46,24 @@ function initials(name: string, email: string) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
-export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, children }: Props) {
+export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand, headerExtra, children }: Props) {
+  const branded = Boolean(brand?.color && /^#[0-9a-fA-F]{6}$/.test(brand.color));
   const [opened, { toggle, close }] = useDisclosure();
   const pathname = usePathname();
 
   return (
     <MantineAppShell header={{ height: 60 }} navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="lg">
-      <MantineAppShell.Header>
+      <MantineAppShell.Header bg={branded ? brand!.color! : undefined} c={branded ? 'white' : undefined}>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Open navigation" />
             <Link href="/" aria-label="BluePrint home" style={{ textDecoration: 'none' }}>
-              <BrandMark size="md" />
+              {brand?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={brand.logoUrl} alt="Show logo" style={{ height: 36, maxWidth: 160, objectFit: 'contain', background: 'white', borderRadius: 4, padding: 2 }} />
+              ) : (
+                <BrandMark size="md" />
+              )}
             </Link>
             <Divider orientation="vertical" visibleFrom="sm" />
             <div style={{ minWidth: 0 }}>
@@ -62,17 +71,18 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, child
                 {title}
               </Text>
               {subtitle ? (
-                <Text fz="xs" c="dimmed" truncate>
+                <Text fz="xs" c={branded ? 'rgba(255,255,255,0.8)' : 'dimmed'} truncate>
                   {subtitle}
                 </Text>
               ) : null}
             </div>
           </Group>
           <Group gap="xs" wrap="nowrap">
+            {headerExtra}
             {workspaces.length > 1 ? (
               <Menu position="bottom-end" width={280}>
                 <Menu.Target>
-                  <Button variant="subtle" size="xs" leftSection={<IconSwitchHorizontal size={16} />} visibleFrom="sm">
+                  <Button variant="subtle" size="xs" color={branded ? 'white' : undefined} leftSection={<IconSwitchHorizontal size={16} />} visibleFrom="sm">
                     Switch
                   </Button>
                 </Menu.Target>

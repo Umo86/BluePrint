@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD COLUMN "locks_at_deadline" boolean DEFAULT true NOT NULL;

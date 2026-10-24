@@ -12,6 +12,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${PORT}`,
+    actionTimeout: 15_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

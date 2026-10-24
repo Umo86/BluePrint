@@ -15,6 +15,13 @@
       "when": 1792848076207,
       "tag": "0001_files_verified",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792850877171,
+      "tag": "0002_task_locking",
+      "breakpoints": true
     }
   ]
 }

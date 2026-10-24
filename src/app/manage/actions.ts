@@ -41,6 +41,16 @@ import {
 import { MAX_IMPORT_BYTES, planImport, readSpreadsheet, runImport, type ImportPlan } from '@/server/services/exhibitor-import';
 import { updateCompany, type companySchema } from '@/server/services/companies';
 import { invalid } from '@/server/errors';
+import { copyPageFromLibrary, createPage, deletePage, movePage, savePageToLibrary, updatePage, type pageSchema } from '@/server/services/manual';
+import { copyTaskFromLibrary, createTask, deleteTask, moveTask, saveTaskToLibrary, updateTask, type TaskInput } from '@/server/services/tasks';
+import {
+  extendDeadlineForStand,
+  reopenForStand,
+  reviewSubmission,
+  submissionForStaff,
+  type REVIEW_OUTCOMES,
+} from '@/server/services/submissions';
+import { parseLocalDateTime } from '@/lib/dates';
 
 const refresh = (editionId: string) => revalidatePath(`/manage/${editionId}`, 'layout');
 const id = (v: unknown) => String(v ?? '');
@@ -248,6 +258,148 @@ export async function runImportAction(editionId: string, form: FormData): Promis
     refresh(editionId);
     return {
       summary: `Imported ${r.created} new and ${r.updated} updated stands, ${r.newCompanies} new companies, and ${r.invitations} invitations ${r.invitationsSent ? 'sent' : 'saved to send later'}.${r.skipped.length ? ` ${r.skipped.length} rows with problems were skipped.` : ''}`,
+    };
+  });
+}
+
+// Manual -------------------------------------------------------------------------
+
+export async function savePageAction(editionId: string, pageId: string | null, input: z.input<typeof pageSchema>): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const actor = await requireActor();
+    let pageIdOut: string;
+    if (pageId) {
+      await updatePage(actor, id(pageId), input);
+      pageIdOut = id(pageId);
+    } else {
+      pageIdOut = (await createPage(actor, id(editionId), input)).id;
+    }
+    refresh(editionId);
+    return { id: pageIdOut };
+  }, 'Page saved.');
+}
+
+export async function deletePageAction(editionId: string, pageId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await deletePage(await requireActor(), id(pageId));
+    refresh(editionId);
+  }, 'Page deleted.');
+}
+
+export async function movePageAction(editionId: string, pageId: string, direction: 'up' | 'down'): Promise<ActionResult> {
+  return runAction(async () => {
+    await movePage(await requireActor(), id(pageId), direction === 'up' ? 'up' : 'down');
+    refresh(editionId);
+  });
+}
+
+export async function copyPageFromLibraryAction(editionId: string, itemId: string): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const page = await copyPageFromLibrary(await requireActor(), id(editionId), id(itemId));
+    refresh(editionId);
+    return { id: page.id };
+  }, 'Page copied from the library. Check it, then publish it.');
+}
+
+export async function savePageToLibraryAction(pageId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await savePageToLibrary(await requireActor(), id(pageId));
+  }, 'Saved to the library.');
+}
+
+// Tasks ----------------------------------------------------------------------------
+
+export async function saveTaskAction(editionId: string, taskId: string | null, input: TaskInput): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const actor = await requireActor();
+    let out: string;
+    if (taskId) {
+      await updateTask(actor, id(taskId), input);
+      out = id(taskId);
+    } else {
+      out = (await createTask(actor, id(editionId), input)).id;
+    }
+    refresh(editionId);
+    return { id: out };
+  }, 'Task saved.');
+}
+
+export async function deleteTaskAction(editionId: string, taskId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await deleteTask(await requireActor(), id(taskId));
+    refresh(editionId);
+  }, 'Task deleted.');
+}
+
+export async function moveTaskAction(editionId: string, taskId: string, direction: 'up' | 'down'): Promise<ActionResult> {
+  return runAction(async () => {
+    await moveTask(await requireActor(), id(taskId), direction === 'up' ? 'up' : 'down');
+    refresh(editionId);
+  });
+}
+
+export async function copyTaskFromLibraryAction(editionId: string, itemId: string): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const t = await copyTaskFromLibrary(await requireActor(), id(editionId), id(itemId));
+    refresh(editionId);
+    return { id: t.id };
+  }, 'Task copied from the library. Check it, then publish it.');
+}
+
+export async function saveTaskToLibraryAction(taskId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await saveTaskToLibrary(await requireActor(), id(taskId));
+  }, 'Saved to the library.');
+}
+
+export async function reviewSubmissionAction(
+  editionId: string,
+  taskId: string,
+  standId: string,
+  outcome: (typeof REVIEW_OUTCOMES)[number],
+  note: string | null,
+): Promise<ActionResult> {
+  return runAction(async () => {
+    await reviewSubmission(await requireActor(), id(taskId), id(standId), outcome, note);
+    refresh(editionId);
+  }, 'Decision saved.');
+}
+
+export async function reopenSubmissionAction(editionId: string, taskId: string, standId: string, until: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const at = parseLocalDateTime(until);
+    if (!at) throw invalid('Choose a date.');
+    await reopenForStand(await requireActor(), id(taskId), id(standId), at);
+    refresh(editionId);
+  }, 'Reopened for this stand.');
+}
+
+export async function extendDeadlineAction(editionId: string, taskId: string, standId: string, at: string | null): Promise<ActionResult> {
+  return runAction(async () => {
+    const when = at ? parseLocalDateTime(at) : null;
+    if (at && !when) throw invalid('Choose a date.');
+    await extendDeadlineForStand(await requireActor(), id(taskId), id(standId), when);
+    refresh(editionId);
+  }, at ? 'Deadline extended for this stand.' : 'Deadline put back.');
+}
+
+export async function submissionDetailAction(taskId: string, standId: string) {
+  return runAction(async () => {
+    const d = await submissionForStaff(await requireActor(), id(taskId), id(standId));
+    return {
+      submission: d.submission
+        ? {
+            status: d.submission.status,
+            data: d.submission.data,
+            version: d.submission.version,
+            submittedAt: d.submission.submittedAt?.toISOString() ?? null,
+            reviewNote: d.submission.reviewNote,
+            reopenedUntil: d.submission.reopenedUntil?.toISOString() ?? null,
+            deadlineOverrideAt: d.submission.deadlineOverrideAt?.toISOString() ?? null,
+          }
+        : null,
+      submitter: d.submitter,
+      files: d.files,
     };
   });
 }

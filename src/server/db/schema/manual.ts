@@ -110,6 +110,8 @@ export const tasks = pgTable(
     /** Fixed deadline; used instead of the offset when set. */
     deadlineAt: timestamp('deadline_at', tz),
     requiresApproval: boolean('requires_approval').notNull().default(false),
+    /** Exhibitors cannot change their answers after the deadline unless the team reopens it for them. */
+    locksAtDeadline: boolean('locks_at_deadline').notNull().default(true),
     linkedPageId: uuid('linked_page_id'),
     /** For order tasks: the service category whose paid order completes the task. */
     linkedCategoryId: uuid('linked_category_id'),
