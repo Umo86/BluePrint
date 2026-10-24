@@ -55,7 +55,7 @@ import { createTask } from '@/server/services/tasks';
 import { canReadFile } from '@/server/services/files';
 import { updatePlatformSettings } from '@/server/services/settings';
 import { grossUpCardFee } from '@/lib/pricing';
-import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
+import { actorFor, lastEmailTo, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
 
 let sim: SimulatedPayments;
 
@@ -199,7 +199,7 @@ describe('shop and basket', () => {
     await expect(checkout(actorFor(colleague), shellEx.stand.id, { method: 'card', expectedTotalPence: b.totals.totalPence })).rejects.toThrow(/permission to pay/);
     // Viewing as the exhibitor changes nothing.
     const admin = await makeUser({ isSuperAdmin: true });
-    await expect(addToBasket(actorFor(shellEx.user, { readOnly: true, realUserId: admin.id }), shellEx.stand.id, { productId: chair.id, quantity: 1, options: { Colour: 'White' } })).rejects.toThrow(/viewing as/);
+    await expect(addToBasket(actorFor(shellEx.user, { readOnly: true, realUserId: admin.id, viewAsEditionId: shellEx.stand.editionId }), shellEx.stand.id, { productId: chair.id, quantity: 1, options: { Colour: 'White' } })).rejects.toThrow(/viewing as/);
   });
 });
 
@@ -503,15 +503,17 @@ describe('payment safety', () => {
     const saved = { ...process.env };
     try {
       setPaymentsForTests(null);
-      for (const [url, expected] of [
-        ['https://blueprint.media10.co.uk', null],
-        ['http://localhost:3000', 'simulator'],
-      ] as const) {
-        resetEnvCache();
-        resetPaymentsForTests();
-        Object.assign(process.env, { NODE_ENV: 'production', BLUEPRINT_ALLOW_LOCAL_PRODUCTION: 'true', APP_URL: url, STRIPE_SECRET_KEY: '' });
-        expect(payments()?.kind ?? null).toBe(expected);
-      }
+      Object.assign(process.env, { NODE_ENV: 'production', BLUEPRINT_ALLOW_LOCAL_PRODUCTION: 'true', STRIPE_SECRET_KEY: '' });
+      // On a real address the local-trial switch does nothing: the site will not even start without its settings.
+      process.env.APP_URL = 'https://blueprint.media10.co.uk';
+      resetEnvCache();
+      resetPaymentsForTests();
+      expect(() => payments()).toThrow(/Missing required production settings/);
+      // Only on this computer does the simulator stand in for Stripe.
+      process.env.APP_URL = 'http://localhost:3000';
+      resetEnvCache();
+      resetPaymentsForTests();
+      expect(payments()?.kind).toBe('simulator');
     } finally {
       for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
       Object.assign(process.env, saved);
@@ -574,5 +576,14 @@ describe('refunds confirmed by Stripe', () => {
     // ...and only once.
     await handleStripeEvent({ id: `evt_r2_${orphan.id}`, type: 'refund.updated', data: { object: { id: 're_sim_orphan', status: 'succeeded' } } });
     expect((await db.select().from(orders).where(eq(orders.id, placed.orderId)))[0].refundedPence).toBe(3000);
+
+    // If Stripe later says a refund failed, the orders team is told to repay the exhibitor another way.
+    const ordersTeam = await makeStaff(edition.id, 'show_team', ['manage_orders']);
+    await handleStripeEvent({ id: `evt_rf_${refundId}`, type: 'refund.failed', data: { object: { id: made.stripeRefundId, status: 'failed', metadata: { blueprintRefundId: refundId } } } });
+    const [failed] = await db.select().from(refunds).where(eq(refunds.id, refundId));
+    expect(failed.status).toBe('failed');
+    const alert = await lastEmailTo(ordersTeam.email);
+    expect(alert?.subject).toMatch(/^A card refund failed: ORD-/);
+    expect(alert?.text).toContain('another way');
   });
 });

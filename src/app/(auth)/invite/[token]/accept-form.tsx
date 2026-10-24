@@ -34,7 +34,7 @@ export function AcceptInviteForm({ token, needsEmailCode, existingName, kind }: 
         {needsEmailCode ? (
           <>
             <Text fz="sm" c="dimmed">
-              To protect staff and supplier accounts, confirm your email with a code.
+              To keep your account safe, we will email you a code to confirm this is your address.
             </Text>
             {codeSent ? (
               <TextInput

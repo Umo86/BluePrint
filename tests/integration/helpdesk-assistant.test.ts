@@ -47,7 +47,7 @@ import { setAssistantModelForTests, resetAssistantModelForTests, OfflineModel, t
 import { htmlToParagraphs, searchChunks, splitText, type Chunk } from '@/server/assistant/knowledge';
 import { updatePlatformSettings } from '@/server/services/settings';
 import { consumeRateLimit } from '@/server/security/rate-limit';
-import { beginUpload, completeUpload, receiveLocalUpload } from '@/server/services/files';
+import { beginUpload, canReadFile, completeUpload, getFile, receiveLocalUpload } from '@/server/services/files';
 import { MemoryStorage, setStorageForTests } from '@/server/storage';
 import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
 
@@ -195,6 +195,17 @@ describe('help desk', () => {
     expect(msg.attachments).toEqual([up.fileId]);
     // Someone else's upload cannot be attached.
     await expect(openTicket(actorFor(s.b.user), s.b.stand.id, { subject: 'Not mine', body: 'x', attachments: [up.fileId] })).rejects.toThrow(/could not be found/);
+
+    // A file on the team's internal note stays with the team, even if its address leaks.
+    const deskUser = await makeStaff(s.edition.id, 'show_team', ['helpdesk']);
+    const note = await beginUpload(actorFor(deskUser), { purpose: 'ticket', filename: 'supplier-email.pdf', contentType: 'application/pdf', size: PDF.length, standId: s.a.stand.id });
+    await receiveLocalUpload(actorFor(deskUser), note.fileId, new Uint8Array(PDF));
+    const noteFile = await completeUpload(actorFor(deskUser), note.fileId);
+    expect(await canReadFile(me, noteFile)).toBe(true);
+    await replyAsStaff(actorFor(deskUser), t.id, { body: 'Supplier confirmed by email.', internal: true, attachments: [note.fileId] });
+    const after = (await getFile(note.fileId))!;
+    expect(await canReadFile(me, after)).toBe(false);
+    expect(await canReadFile(actorFor(deskUser), after)).toBe(true);
 
     await consumeRateLimit(`ticket-open:${s.b.user.id}`, 10, 3600, 10);
     await expect(openTicket(actorFor(s.b.user), s.b.stand.id, { subject: 'Eleventh', body: 'x' })).rejects.toThrow(/Too many/);

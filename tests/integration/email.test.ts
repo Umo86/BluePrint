@@ -4,7 +4,7 @@ import { closeDb, getDb, useInMemoryDatabaseForTests } from '@/server/db/client'
 import { companies, companyMembers, editions, emailEvents, emailOutbox, emailSuppressions, loginCodes, reminderLog, sessions, submissions, unsubscribes, users } from '@/server/db/schema';
 import { createInvitation } from '@/server/auth/invitations';
 import { createTask } from '@/server/services/tasks';
-import { listTemplates, resetTemplate, saveTemplate, templateForEdit, emailLog } from '@/server/services/email-admin';
+import { listTemplates, resetTemplate, saveTemplate, templateForEdit, emailDetail, emailLog } from '@/server/services/email-admin';
 import { renderTemplate } from '@/server/email/templates';
 import { sendEmail } from '@/server/email/send';
 import { setEmailProviderForTests } from '@/server/email/provider';
@@ -300,5 +300,55 @@ describe('batch sending', () => {
     } finally {
       setEmailProviderForTests(null);
     }
+  });
+});
+
+describe('codes and personal links in the email record', () => {
+  it('are kept out of the stored copy once really sent, and out of the team’s view', async () => {
+    const { edition, shell } = await makeEdition();
+    const admin = await makeStaff(edition.id, 'show_admin');
+    const { company } = await makeExhibitor(edition.id, shell.id, 'H1');
+    const delivered: { subject: string; html: string }[] = [];
+    setEmailProviderForTests({ name: 'resend-like', send: async (m) => { delivered.push({ subject: m.subject, html: m.html }); return { id: `r_${Math.random()}` }; } });
+    try {
+      const { token } = await createInvitation(actorFor(admin), { kind: 'exhibitor', email: 'secret.link@example.com', editionId: edition.id, companyId: company.id });
+      // The person gets the real link...
+      expect(delivered.at(-1)!.html).toContain(`/invite/${token}`);
+      // ...but the copy BluePrint keeps does not have it.
+      const db = await getDb();
+      const [stored] = await db.select().from(emailOutbox).where(eq(emailOutbox.toEmail, 'secret.link@example.com'));
+      expect(stored.html).not.toContain(token);
+      expect(stored.html).toContain('/invite/[hidden]');
+
+      // Sign-in codes likewise.
+      await sendEmail({ to: 'secret.link@example.com', templateKey: 'sign_in_code', category: 'security', subject: '123456 is your BluePrint sign-in code', html: '<p>Your code is 123456.</p>', text: 'Your code is 123456.' });
+      const [code] = await db.select().from(emailOutbox).where(and(eq(emailOutbox.toEmail, 'secret.link@example.com'), eq(emailOutbox.category, 'security')));
+      expect(code.subject).toBe('•••••• is your BluePrint sign-in code');
+      expect(code.text).not.toContain('123456');
+    } finally {
+      setEmailProviderForTests(null);
+    }
+  });
+
+  it('hides invitation links from the show team even before sending', async () => {
+    const { edition, shell } = await makeEdition();
+    const admin = await makeStaff(edition.id, 'show_admin');
+    const { company } = await makeExhibitor(edition.id, shell.id, 'H2');
+    const { token } = await createInvitation(actorFor(admin), { kind: 'exhibitor', email: 'queued.link@example.com', editionId: edition.id, companyId: company.id });
+    const db = await getDb();
+    const [row] = await db.select().from(emailOutbox).where(eq(emailOutbox.toEmail, 'queued.link@example.com'));
+    // Locally the stored copy is the mailbox, so it keeps the link; the team's view does not show it.
+    expect(row.html).toContain(token);
+    const { mail } = await emailDetail(actorFor(admin), edition.id, row.id);
+    expect(mail.html).not.toContain(token);
+    expect(mail.text).not.toContain(token);
+  });
+
+  it('keeps subjects and reply-to addresses on one line', async () => {
+    await sendEmail({ to: 'lines@example.com', templateKey: 'test', category: 'transactional', subject: 'Hello\r\nBcc: someone@evil.example', html: '<p>x</p>', text: 'x', replyTo: 'team@example.com\r\nBcc: x@evil.example' });
+    const db = await getDb();
+    const [row] = await db.select().from(emailOutbox).where(eq(emailOutbox.toEmail, 'lines@example.com'));
+    expect(row.subject).toBe('Hello Bcc: someone@evil.example');
+    expect(row.replyTo).toBeNull();
   });
 });

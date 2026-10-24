@@ -1,6 +1,6 @@
 import 'server-only';
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { getDb } from '../db/client';
+import { getDb, type Tx } from '../db/client';
 import {
   companies,
   companyMembers,
@@ -38,8 +38,14 @@ import type { Actor } from './actor';
 
 export const INVITE_TTL_MS = 14 * 24 * 3600 * 1000;
 
-/** Invitations that grant staff or payout access need the person to prove they own the mailbox. */
-export const KINDS_NEEDING_EMAIL_CODE: InvitationKind[] = ['super_admin', 'edition_staff', 'supplier'];
+/**
+ * Accepting an invitation signs the person in, so they always prove they own the mailbox with an
+ * emailed code, unless they are already signed in as that address. The link on its own is never
+ * enough: links can be forwarded, and the address may already have an account with other access.
+ */
+function needsEmailCode(invitationEmail: string, signedInEmail?: string | null) {
+  return !(signedInEmail && normaliseEmail(signedInEmail) === invitationEmail);
+}
 
 export type CreateInvitationInput = {
   kind: InvitationKind;
@@ -63,10 +69,19 @@ async function authorize(actor: Actor, input: CreateInvitationInput) {
       await requireShowAdmin(actor, input.editionId);
       if (!EDITION_ROLES.includes(input.role as EditionRole)) throw invalid('Choose a role.');
       return;
-    case 'exhibitor':
+    case 'exhibitor': {
       if (!input.editionId || !input.companyId) throw invalid('Choose the exhibiting company.');
       await requireEditionPermission(actor, input.editionId, 'manage_exhibitors');
+      // Only for companies that exhibit at this show.
+      const db = await getDb();
+      const [here] = await db
+        .select({ id: stands.id })
+        .from(stands)
+        .where(and(eq(stands.editionId, input.editionId), eq(stands.companyId, input.companyId), eq(stands.status, 'active')))
+        .limit(1);
+      if (!here) throw invalid('Give the company a stand at this show first.');
       return;
+    }
     case 'colleague':
     case 'contractor': {
       if (!input.standId) throw invalid('Choose the stand.');
@@ -129,6 +144,10 @@ async function describeInvitation(inv: typeof invitations.$inferSelect) {
 export async function createInvitation(actor: Actor, input: CreateInvitationInput, opts: { send?: boolean; bulk?: boolean } = {}) {
   const email = normaliseEmail(input.email);
   if (!isValidEmail(email)) throw invalid('Enter a valid email address.', { email: 'Enter a valid email address.' });
+  // Nobody adds themselves to an exhibitor or a stand: someone else has to invite them.
+  if (email === normaliseEmail(actor.realEmail) && ['exhibitor', 'colleague', 'contractor'].includes(input.kind)) {
+    throw invalid('You cannot invite yourself.', { email: 'You cannot invite yourself.' });
+  }
   await authorize(actor, input);
   if (!opts.bulk) await assertRateLimit(`invite:${actor.realUserId}`, 300, 3600);
 
@@ -252,8 +271,33 @@ export async function revokeInvitation(actor: Actor, invitationId: string) {
   await audit(actor, 'invitation.revoked', { entityType: 'invitation', entityId: inv.id, editionId: inv.editionId });
 }
 
+/**
+ * Adds someone to a company for one show. A new member acts for the company at that show only;
+ * someone already a member for other shows gets this show added. Members for every show stay so.
+ */
+async function joinCompanyForShow(
+  tx: Tx,
+  m: { companyId: string; userId: string; editionId: string; role: 'main_contact' | 'colleague'; canPay: boolean },
+) {
+  const [existing] = await tx
+    .select()
+    .from(companyMembers)
+    .where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.userId, m.userId)))
+    .limit(1);
+  if (!existing) {
+    await tx.insert(companyMembers).values({ companyId: m.companyId, userId: m.userId, role: m.role, canPay: m.canPay, editionIds: [m.editionId] });
+    return;
+  }
+  if (existing.editionIds && !existing.editionIds.includes(m.editionId)) {
+    await tx
+      .update(companyMembers)
+      .set({ editionIds: [...existing.editionIds, m.editionId] })
+      .where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.userId, m.userId)));
+  }
+}
+
 /** Finds a usable invitation from the token in the link. */
-export async function findInvitation(token: string) {
+export async function findInvitation(token: string, opts: { signedInEmail?: string | null } = {}) {
   if (!token || token.length < 20 || token.length > 100) return null;
   const db = await getDb();
   const [inv] = await db
@@ -263,7 +307,7 @@ export async function findInvitation(token: string) {
     .limit(1);
   if (!inv) return null;
   const [existing] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.email, inv.email)).limit(1);
-  return { invitation: inv, needsEmailCode: KINDS_NEEDING_EMAIL_CODE.includes(inv.kind), existingUser: existing ?? null, ...(await describeInvitation(inv)) };
+  return { invitation: inv, needsEmailCode: needsEmailCode(inv.email, opts.signedInEmail), existingUser: existing ?? null, ...(await describeInvitation(inv)) };
 }
 
 export async function sendInvitationCode(token: string, ctx: RequestContext) {
@@ -277,8 +321,13 @@ export async function sendInvitationCode(token: string, ctx: RequestContext) {
  * Accepts an invitation: creates or activates the account, grants the access it describes and
  * uses the invitation up. Returns the user to sign in.
  */
-export async function acceptInvitation(token: string, input: { name: string; code?: string }, ctx: RequestContext) {
-  const found = await findInvitation(token);
+export async function acceptInvitation(
+  token: string,
+  input: { name: string; code?: string },
+  ctx: RequestContext,
+  opts: { signedInEmail?: string | null } = {},
+) {
+  const found = await findInvitation(token, opts);
   if (!found) throw notFound('This invitation has expired or has already been used.');
   const inv = found.invitation;
   const name = input.name.trim().slice(0, 120);
@@ -325,18 +374,12 @@ export async function acceptInvitation(token: string, input: { name: string; cod
           });
         break;
       case 'exhibitor':
-        await tx
-          .insert(companyMembers)
-          .values({ companyId: inv.companyId!, userId: u.id, role: (inv.role as 'main_contact' | 'colleague') ?? 'main_contact', canPay: true })
-          .onConflictDoNothing();
+        await joinCompanyForShow(tx, { companyId: inv.companyId!, userId: u.id, editionId: inv.editionId!, role: (inv.role as 'main_contact' | 'colleague') ?? 'main_contact', canPay: true });
         break;
       case 'colleague': {
         const [stand] = await tx.select().from(stands).where(eq(stands.id, inv.standId!)).limit(1);
         if (!stand?.companyId) throw notFound();
-        await tx
-          .insert(companyMembers)
-          .values({ companyId: stand.companyId, userId: u.id, role: 'colleague', canPay: inv.permissions.includes('pay') })
-          .onConflictDoNothing();
+        await joinCompanyForShow(tx, { companyId: stand.companyId, userId: u.id, editionId: stand.editionId, role: 'colleague', canPay: inv.permissions.includes('pay') });
         break;
       }
       case 'contractor':

@@ -23,7 +23,8 @@ import { isVisible, type Declaration, type FormField } from '@/lib/forms';
 import { formatBytes } from '@/lib/upload-rules';
 
 type Values = Record<string, unknown>;
-export type FileInfo = Record<string, { name: string; size: number }>;
+/** Names and sizes of uploaded files; `canOpen: false` shows the name without a link. */
+export type FileInfo = Record<string, { name: string; size: number; canOpen?: boolean }>;
 
 type Props = {
   fields: FormField[];
@@ -125,9 +126,13 @@ function FieldInput({ field, value, set, error, readOnly, standId, files, onFile
           {ids.map((id) => (
             <Group key={id} gap="xs">
               <IconFile size={16} />
-              <Anchor href={`/files/${id}?download=1`} fz="sm">
-                {files?.[id]?.name ?? 'Uploaded file'}
-              </Anchor>
+              {files?.[id]?.canOpen === false ? (
+                <Text fz="sm">{files[id].name}</Text>
+              ) : (
+                <Anchor href={`/files/${id}?download=1`} fz="sm">
+                  {files?.[id]?.name ?? 'Uploaded file'}
+                </Anchor>
+              )}
               {files?.[id] ? (
                 <Text fz="xs" c="dimmed">
                   {formatBytes(files[id].size)}

@@ -1,5 +1,5 @@
 import { test, expect, waitForApp } from './fixtures';
-import { expectToast, latestInviteLink, signInStaffFirstTime, signInWithCode, watchForErrors } from './helpers';
+import { expectToast, latestCode, latestInviteLink, signInStaffFirstTime, signInWithCode, watchForErrors } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -32,6 +32,10 @@ test('the contractor joins, prepares the pack and sends it', async ({ page }) =>
   const link = await latestInviteLink(page, builder);
   await page.goto(link);
   await page.getByLabel('Your name').fill('Bob Builder');
+  // The link alone is not enough: the builder confirms the address with an emailed code.
+  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await expect(page.getByLabel('Code from the email')).toBeVisible();
+  await page.getByLabel('Code from the email').fill(await latestCode(page, builder));
   await page.getByRole('button', { name: 'Accept and continue' }).click();
   await page.waitForURL(/\/contractor/);
   await waitForApp(page);

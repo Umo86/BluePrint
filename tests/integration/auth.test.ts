@@ -5,6 +5,7 @@ import { auditLog, invitations, loginCodes, sessions, standContractors, users, c
 import {
   beginTotpEnrollment,
   confirmTotpEnrollment,
+  removePassword,
   requestSignInCode,
   setPassword,
   signInWithPassword,
@@ -78,13 +79,18 @@ describe('sign-in with an emailed code', () => {
 describe('passwords', () => {
   it('signs in with a password and locks after ten failures', async () => {
     const u = await makeUser({ email: 'pw@example.com' });
-    await setPassword(actorFor(u), 'a long and unusual passphrase');
+    await setPassword(actorFor(u), 'a long and unusual passphrase', { id: 'this-browser', createdAt: new Date() });
     expect((await signInWithPassword('pw@example.com', 'a long and unusual passphrase', ctx)).id).toBe(u.id);
     for (let i = 0; i < 9; i++) {
       await expect(signInWithPassword('pw@example.com', 'wrong password here', { ip: `10.1.0.${i}` })).rejects.toThrow(/do not match/);
     }
     await expect(signInWithPassword('pw@example.com', 'wrong password here', { ip: '10.2.0.1' })).rejects.toThrow();
-    await expect(signInWithPassword('pw@example.com', 'a long and unusual passphrase', { ip: '10.3.0.1' })).rejects.toThrow(/Too many wrong passwords/);
+    // Even the right password is refused during the pause, with the same message as a wrong one,
+    // so the pause does not show that the account exists.
+    await expect(signInWithPassword('pw@example.com', 'a long and unusual passphrase', { ip: '10.3.0.1' })).rejects.toThrow(/do not match/);
+    const db = await getDb();
+    const [locked] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(locked.lockedUntil!.getTime()).toBeGreaterThan(Date.now());
   });
 
   it('gives the same answer for unknown emails', async () => {
@@ -93,7 +99,7 @@ describe('passwords', () => {
 
   it('rejects weak passwords', async () => {
     const u = await makeUser();
-    await expect(setPassword(actorFor(u), 'password1234')).rejects.toThrow(/too common/);
+    await expect(setPassword(actorFor(u), 'password1234', { id: 'this-browser', createdAt: new Date() })).rejects.toThrow(/too common/);
   });
 });
 
@@ -141,13 +147,23 @@ describe('sessions', () => {
     expect(await validateSessionToken('not-a-real-token-but-long-enough')).toBeNull();
   });
 
-  it('changing a password signs out other devices', async () => {
+  it('changing a password signs out other devices and tells the person', async () => {
     const u = await makeUser();
     const s1 = await createSession(u.id, ctx);
     const s2 = await createSession(u.id, ctx);
-    await setPassword(actorFor(u), 'another long passphrase here', s2.session.id);
+    await setPassword(actorFor(u), 'another long passphrase here', s2.session);
     expect(await validateSessionToken(s1.token)).toBeNull();
     expect(await validateSessionToken(s2.token)).not.toBeNull();
+    expect((await lastEmailTo(u.email)).subject).toBe('Your BluePrint password was set');
+  });
+
+  it('only lets a recent sign-in set or remove a password', async () => {
+    const u = await makeUser();
+    const { session } = await createSession(u.id, ctx);
+    const old = { ...session, createdAt: new Date(Date.now() - 16 * 60 * 1000) };
+    await expect(setPassword(actorFor(u), 'another long passphrase here', old)).rejects.toThrow(/sign in again/);
+    await expect(setPassword(actorFor(u), 'another long passphrase here', null)).rejects.toThrow(/sign in again/);
+    await expect(removePassword(actorFor(u), old)).rejects.toThrow(/sign in again/);
   });
 });
 
@@ -170,6 +186,22 @@ describe('two-factor', () => {
     expect(await verifySecondFactor(u.id, recovery[0], ctx)).toBe(true);
     expect(await verifySecondFactor(u.id, recovery[0], ctx)).toBe(false);
   });
+
+  it('applies to exhibitors and suppliers who turn it on, and signs out their other devices', async () => {
+    const u = await makeUser();
+    const before = await createSession(u.id, ctx);
+    expect(before.session.twoFactorVerified).toBe(true);
+    const current = await createSession(u.id, ctx);
+    const actor = actorFor(u, { sessionId: current.session.id });
+    const { secret } = await beginTotpEnrollment(actor);
+    await confirmTotpEnrollment(actor, totpCode(secret));
+    // The device that set it up stays signed in; the other one has to sign in again.
+    expect(await validateSessionToken(before.token)).toBeNull();
+    expect(await validateSessionToken(current.token)).not.toBeNull();
+    // From now on a new sign-in is locked until the second factor is passed.
+    const after = await createSession(u.id, ctx);
+    expect(after.session.twoFactorVerified).toBe(false);
+  });
 });
 
 describe('invitations', () => {
@@ -189,8 +221,12 @@ describe('invitations', () => {
     expect(mail.html).toContain(`/invite/${token}`);
 
     const found = await findInvitation(token);
-    expect(found?.needsEmailCode).toBe(false);
-    const user = await acceptInvitation(token, { name: 'New Exhibitor' }, ctx);
+    expect(found?.needsEmailCode).toBe(true);
+    // The link alone is not enough: the person confirms the address with an emailed code.
+    await expect(acceptInvitation(token, { name: 'New Exhibitor' }, ctx)).rejects.toThrow(/Enter the code/);
+    await sendInvitationCode(token, ctx);
+    const code = codeFromEmail((await lastEmailTo('new.exhibitor@example.com')).subject);
+    const user = await acceptInvitation(token, { name: 'New Exhibitor', code }, ctx);
     const db = await getDb();
     const members = await db.select().from(companyMembers).where(eq(companyMembers.userId, user.id));
     expect(members[0]).toMatchObject({ companyId: company.id, role: 'main_contact' });
@@ -233,6 +269,27 @@ describe('invitations', () => {
     expect(row.role).toBe('hs_reviewer');
   });
 
+  it('never lets an invitation link alone sign someone in to an existing account', async () => {
+    const { edition, shell } = await makeEdition();
+    const admin = await makeStaff(edition.id, 'show_admin');
+    const { company } = await makeExhibitor(edition.id, shell.id, 'E10');
+    // Someone who already has an account elsewhere (for example a supplier user).
+    const existing = await makeUser({ email: 'fiona@supplier.example' });
+    const other = await makeUser({ email: 'someone.else@example.com' });
+    const { token } = await createInvitation(actorFor(admin), { kind: 'exhibitor', email: existing.email, editionId: edition.id, companyId: company.id });
+    await expect(acceptInvitation(token, { name: 'Fiona' }, ctx)).rejects.toThrow(/Enter the code/);
+    // Being signed in as somebody else does not count.
+    await expect(acceptInvitation(token, { name: 'Fiona' }, ctx, { signedInEmail: other.email })).rejects.toThrow(/Enter the code/);
+    // A code issued to another address does not work either.
+    await requestSignInCode(other.email, ctx);
+    const otherCode = codeFromEmail((await lastEmailTo(other.email)).subject);
+    await expect(acceptInvitation(token, { name: 'Fiona', code: otherCode }, ctx)).rejects.toThrow(/wrong or has expired/);
+    // The real person, with the code sent to their own mailbox, can accept.
+    await sendInvitationCode(token, ctx);
+    const user = await acceptInvitation(token, { name: 'Fiona', code: codeFromEmail((await lastEmailTo(existing.email)).subject) }, ctx);
+    expect(user.id).toBe(existing.id);
+  });
+
   it('rejects expired invitations', async () => {
     const { edition, shell } = await makeEdition();
     const admin = await makeStaff(edition.id, 'show_admin');
@@ -252,7 +309,8 @@ describe('invitations', () => {
     const { edition, space } = await makeEdition();
     const { stand, user: main, company } = await makeExhibitor(edition.id, space.id, 'S1');
     const { token } = await createInvitation(actorFor(main), { kind: 'colleague', email: 'colleague@example.com', standId: stand.id });
-    const colleague = await acceptInvitation(token, { name: 'Colleague' }, ctx);
+    await sendInvitationCode(token, ctx);
+    const colleague = await acceptInvitation(token, { name: 'Colleague', code: codeFromEmail((await lastEmailTo('colleague@example.com')).subject) }, ctx);
     await expect(
       createInvitation(actorFor(colleague), { kind: 'colleague', email: 'another@example.com', standId: stand.id }),
     ).rejects.toThrow(/main contact/);
@@ -265,7 +323,8 @@ describe('invitations', () => {
       contactEmail: 'builder@example.com',
     });
     const { token: ct } = await createInvitation(actorFor(main), { kind: 'contractor', email: 'builder@example.com', standId: stand.id });
-    const builder = await acceptInvitation(ct, { name: 'Builder' }, ctx);
+    // Already signed in as the invited address: no code needed.
+    const builder = await acceptInvitation(ct, { name: 'Builder' }, ctx, { signedInEmail: 'Builder@Example.com' });
     const [sc] = await db.select().from(standContractors).where(eq(standContractors.standId, stand.id));
     expect(sc).toMatchObject({ userId: builder.id, status: 'active' });
     expect(company.id).toBeTruthy();

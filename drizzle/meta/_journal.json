@@ -50,6 +50,13 @@
       "when": 1792864843023,
       "tag": "0006_assistant_helpdesk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792868492743,
+      "tag": "0007_member_show_scope",
+      "breakpoints": true
     }
   ]
 }

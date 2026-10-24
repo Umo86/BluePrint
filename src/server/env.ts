@@ -1,5 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
+import { R2_JURISDICTIONS } from '@/lib/storage-origin';
+import { isLocalAddress } from '@/lib/local-address';
 
 /**
  * Environment configuration, validated once on first use.
@@ -15,6 +17,8 @@ const schema = z.object({
 
   // 32 random bytes, base64. Encrypts two-factor secrets at rest.
   APP_ENCRYPTION_KEY: z.string().optional(),
+  // Only while changing the key: the old key, so existing secrets can still be read (see docs/security.md).
+  APP_ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
 
   // Email
   EMAIL_PROVIDER: z.enum(['resend', 'outbox']).default('outbox'),
@@ -25,10 +29,16 @@ const schema = z.object({
   // File storage
   STORAGE_PROVIDER: z.enum(['r2', 'local']).default('local'),
   LOCAL_STORAGE_DIR: z.string().default('.data/files'),
-  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCOUNT_ID: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-f]{32}$/i, 'R2_ACCOUNT_ID should be the 32-character Cloudflare account ID')
+    .optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
+  // Set to "eu" for a bucket created with the EU jurisdiction (it has its own address).
+  R2_JURISDICTION: z.preprocess((v) => (typeof v === 'string' && v.trim() ? v.trim().toLowerCase() : undefined), z.enum(R2_JURISDICTIONS).optional()),
 
   // Payments
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -72,12 +82,21 @@ export function env(): Env {
     // Card payments are optional, but once switched on the webhook secret is needed to confirm them.
     if (value.STRIPE_SECRET_KEY && !value.STRIPE_WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET');
     if (value.STRIPE_SECRET_KEY && /^pk_/.test(value.STRIPE_SECRET_KEY)) missing.push('STRIPE_SECRET_KEY (a publishable key was given; use the secret or restricted key)');
-    if (missing.length && process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION !== 'true') {
+    if (missing.length && !localProductionAllowed(value.APP_URL)) {
       throw new Error(`Missing required production settings: ${missing.join(', ')}`);
     }
   }
   cached = value;
   return value;
+}
+
+/**
+ * Trying a production build on your own computer (BLUEPRINT_ALLOW_LOCAL_PRODUCTION=true) relaxes a
+ * few rules: no real email, files or encryption key needed. It only ever applies when the site's
+ * address is this computer and it is not running on Vercel, so a live site can never use it.
+ */
+export function localProductionAllowed(appUrl: string | undefined = process.env.APP_URL) {
+  return process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION === 'true' && !process.env.VERCEL && isLocalAddress(appUrl);
 }
 
 export function isProduction() {

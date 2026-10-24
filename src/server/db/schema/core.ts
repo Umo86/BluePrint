@@ -232,6 +232,11 @@ export const companyMembers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     role: text('role', { enum: COMPANY_ROLES }).notNull().default('colleague'),
     canPay: boolean('can_pay').notNull().default(true),
+    /**
+     * The shows this person acts for the company at. Empty (null) means every show; people invited
+     * by one show's team are added for that show only, so one show cannot open another's records.
+     */
+    editionIds: uuid('edition_ids').array(),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.companyId, t.userId] }), index('company_members_user_idx').on(t.userId)],

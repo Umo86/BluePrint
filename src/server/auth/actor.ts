@@ -10,6 +10,12 @@ export type Actor = {
   isSuperAdmin: boolean;
   /** True while viewing as another user: every write is refused. */
   readOnly: boolean;
+  /**
+   * While an admin views the portal as an exhibitor: the one show they were allowed to view.
+   * The exhibitor's stands in other shows, and any staff, supplier or contractor access the
+   * exhibitor has, stay out of reach.
+   */
+  viewAsEditionId?: string | null;
   /** The person actually signed in. */
   realUserId: string;
   realEmail: string;

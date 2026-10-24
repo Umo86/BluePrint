@@ -7,7 +7,7 @@ import { invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { appUrl } from '../auth/login';
 import { env } from '../env';
-import { sendEmail } from '../email/send';
+import { hideSecrets, sendEmail } from '../email/send';
 import { renderEmail, TEMPLATE_VARIABLES } from '../email/render';
 import {
   EDITABLE_KEYS,
@@ -170,8 +170,10 @@ export async function emailLog(actor: Actor, editionId: string, opts: { filter?:
 export async function emailDetail(actor: Actor, editionId: string, outboxId: string) {
   await requireEditionPermission(actor, editionId, 'send_emails');
   const db = await getDb();
-  const [mail] = await db.select().from(emailOutbox).where(and(eq(emailOutbox.id, outboxId), eq(emailOutbox.editionId, editionId))).limit(1);
-  if (!mail) throw notFound();
-  const events = await db.select().from(emailEvents).where(eq(emailEvents.outboxId, mail.id)).orderBy(desc(emailEvents.at));
+  const [row] = await db.select().from(emailOutbox).where(and(eq(emailOutbox.id, outboxId), eq(emailOutbox.editionId, editionId))).limit(1);
+  if (!row) throw notFound();
+  const events = await db.select().from(emailEvents).where(eq(emailEvents.outboxId, row.id)).orderBy(desc(emailEvents.at));
+  // Invitation and unsubscribe links (and any codes) belong to the recipient, not the show team.
+  const mail = { ...row, subject: hideSecrets(row.subject, row.category), html: hideSecrets(row.html, row.category), text: hideSecrets(row.text, row.category), headers: null };
   return { mail, events };
 }

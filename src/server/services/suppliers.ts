@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
 import { editionStaff, editions, invitations, serviceCategories, supplierUsers, suppliers, users } from '../db/schema';
-import { assertSuperAdmin, assertWritable, requireSupplierMember } from '../authz';
+import { assertSuperAdmin, assertWritable, isViewingAs, requireSupplierMember } from '../authz';
 import { forbidden, notFound } from '../errors';
 import { audit } from '../audit';
 import type { Actor } from '../auth/actor';
@@ -25,6 +25,7 @@ export const supplierCommissionSchema = z.object({
 /** Super admins, and show admins of any edition (they assign suppliers to categories). */
 async function canManageSuppliers(actor: Actor) {
   if (actor.isSuperAdmin && !actor.readOnly) return true;
+  if (isViewingAs(actor)) return false;
   const db = await getDb();
   const [row] = await db
     .select()
@@ -91,9 +92,13 @@ export async function createSupplier(actor: Actor, input: z.input<typeof supplie
   return s;
 }
 
+/**
+ * A supplier's details (including the address its order emails go to) are shared by every show,
+ * so only super admins or the supplier's own people can change them, not one show's team.
+ */
 export async function updateSupplier(actor: Actor, supplierId: string, input: z.input<typeof supplierSchema>) {
   assertWritable(actor);
-  if (!(await canManageSuppliers(actor))) {
+  if (!(actor.isSuperAdmin && !actor.readOnly)) {
     await requireSupplierMember(actor, supplierId, { write: true });
   }
   const data = supplierSchema.parse(input);

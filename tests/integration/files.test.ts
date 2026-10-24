@@ -73,8 +73,15 @@ describe('uploads', () => {
     // Who can read the submitted PDF?
     const otherShowStaff = await makeStaff((await makeEdition()).edition.id, 'show_admin');
     const reviewer = await makeStaff(edition.id, 'hs_reviewer');
+    const exhibitorTeam = await makeStaff(edition.id, 'show_team', ['manage_exhibitors']);
+    const helpDesk = await makeStaff(edition.id, 'show_team', ['helpdesk']);
+    const emailsOnly = await makeStaff(edition.id, 'show_team', ['send_emails']);
     expect(await canReadFile(actorFor(mine.user), file)).toBe(true);
-    expect(await canReadFile(actorFor(viewer), file)).toBe(true);
+    // The show team opens exhibitors' documents only if their permissions cover that work.
+    expect(await canReadFile(actorFor(exhibitorTeam), file)).toBe(true);
+    expect(await canReadFile(actorFor(helpDesk), file)).toBe(true);
+    expect(await canReadFile(actorFor(viewer), file)).toBe(false);
+    expect(await canReadFile(actorFor(emailsOnly), file)).toBe(false);
     expect(await canReadFile(actorFor(theirs.user), file)).toBe(false);
     expect(await canReadFile(actorFor(otherShowStaff), file)).toBe(false);
     expect(await canReadFile(actorFor(reviewer), file)).toBe(false);

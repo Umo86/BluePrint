@@ -4,14 +4,28 @@ import type { ReactNode } from 'react';
 /**
  * Renders the assistant's replies: paragraphs, bullet lists, **bold** and [links](/portal/...).
  * Built from React elements (never HTML strings), and only links into BluePrint or to https
- * websites are made clickable, so a reply cannot inject markup or scripts.
+ * websites are made clickable, so a reply cannot inject markup or scripts. Links to other websites
+ * always show where they really go, so a link labelled with a trusted name cannot hide another site.
  */
 
-function safeHref(url: string): string | null {
+export function safeHref(url: string): string | null {
   const u = url.trim();
-  if (/^\/(portal|files)\//.test(u) && !u.startsWith('//')) return u;
-  if (/^https:\/\/[^\s]+$/i.test(u)) return u;
-  return null;
+  if (/^\/(portal|files)\//.test(u) && !u.startsWith('//') && !u.includes('\\')) return u;
+  if (!/^https:\/\/[^\s]+$/i.test(u)) return null;
+  try {
+    const parsed = new URL(u);
+    if (parsed.username || parsed.password) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** The website a link goes to, shown beside its label unless the label already says it. */
+export function visibleHost(label: string, href: string): string | null {
+  const host = new URL(href).hostname.replace(/^www\./, '');
+  const shown = label.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+  return shown === host || shown.startsWith(`${host}/`) ? null : host;
 }
 
 function inline(text: string, key: string): ReactNode[] {
@@ -34,6 +48,15 @@ function inline(text: string, key: string): ReactNode[] {
           m[1]
         ),
       );
+      const host = external && href ? visibleHost(m[1], href) : null;
+      if (host) {
+        out.push(
+          <Text key={`${key}-${i++}`} span fz="xs" c="dimmed">
+            {' '}
+            ({host})
+          </Text>,
+        );
+      }
     } else if (m[3] !== undefined) {
       out.push(<strong key={`${key}-${i++}`}>{m[3]}</strong>);
     }

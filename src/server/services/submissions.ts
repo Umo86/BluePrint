@@ -15,7 +15,7 @@ import {
   type SubmissionStatus,
   type TaskRequirement,
 } from '../db/schema';
-import { requireEditionPermission, requireStandAccess } from '../authz';
+import { memberCovers, requireEditionPermission, requireStandAccess } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { sendEmail } from '../email/send';
@@ -24,6 +24,7 @@ import { appUrl } from '../auth/login';
 import { validateAnswers, answerToText } from '@/lib/forms';
 import { resolveDeadline } from './editions';
 import { assertEditionOpen } from './portal';
+import { staffMayReadFile } from './files';
 import type { Actor } from '../auth/actor';
 
 export type TaskState =
@@ -257,14 +258,22 @@ export async function submissionForStaff(actor: Actor, taskId: string, standId: 
   const db = await getDb();
   const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
   if (!task) throw notFound();
-  await requireEditionPermission(actor, task.editionId, 'view');
+  const access = await requireEditionPermission(actor, task.editionId, 'view');
   const [stand] = await db.select().from(stands).where(and(eq(stands.id, standId), eq(stands.editionId, task.editionId))).limit(1);
   if (!stand) throw notFound();
   const [sub] = await db.select().from(submissions).where(and(eq(submissions.taskId, taskId), eq(submissions.standId, standId))).limit(1);
   const fileIds = collectFileIds(task.formSchema, sub?.data ?? {});
   const fileRows = fileIds.length ? await db.select({ id: files.id, name: files.originalName, size: files.sizeBytes }).from(files).where(inArray(files.id, fileIds)) : [];
   const [submitter] = sub?.submittedBy ? await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, sub.submittedBy)).limit(1) : [];
-  return { task, stand, submission: sub ?? null, submitter: submitter ?? null, files: Object.fromEntries(fileRows.map((f) => [f.id, { name: f.name, size: f.size }])) };
+  // Team members without exhibitor or help desk rights see what was uploaded, but cannot open it.
+  const canOpen = staffMayReadFile(access, 'submission');
+  return {
+    task,
+    stand,
+    submission: sub ?? null,
+    submitter: submitter ?? null,
+    files: Object.fromEntries(fileRows.map((f) => [f.id, { name: f.name, size: f.size, canOpen }])),
+  };
 }
 
 export const REVIEW_OUTCOMES = ['approved', 'changes_needed', 'rejected', 'not_needed', 'completed'] as const;
@@ -278,7 +287,7 @@ async function notifyCompany(editionId: string, standId: string, subject: string
     .select({ email: users.email, id: users.id, role: companyMembers.role })
     .from(companyMembers)
     .innerJoin(users, eq(users.id, companyMembers.userId))
-    .where(and(eq(companyMembers.companyId, stand.companyId), eq(users.status, 'active')));
+    .where(and(eq(companyMembers.companyId, stand.companyId), eq(users.status, 'active'), memberCovers(editionId)));
   const { html, text } = renderSimpleEmail({
     heading: subject,
     paragraphs,

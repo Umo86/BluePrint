@@ -11,9 +11,10 @@ import {
   verifySecondFactor,
   verifySignInCode,
 } from '@/server/auth/login';
-import { createSession, markSessionTwoFactorVerified } from '@/server/auth/sessions';
+import { createSession, revokeSession } from '@/server/auth/sessions';
 import {
   getCurrentAuth,
+  renewSession,
   requestContext,
   requireActor,
   safeNextPath,
@@ -34,6 +35,9 @@ export async function requestCodeAction(email: string): Promise<ActionResult> {
 
 async function startSessionAndGo(userId: string, next: string | null) {
   const ctx = await requestContext();
+  // A new sign-in replaces whatever session this browser had.
+  const previous = await getCurrentAuth();
+  if (previous) await revokeSession(previous.session.id);
   const { token, expiresAt, session } = await createSession(userId, ctx);
   await setSessionCookie(token, expiresAt);
   const target = safeNextPath(next, '/');
@@ -62,7 +66,7 @@ export async function twoFactorAction(code: string, next: string | null): Promis
     if (!auth) redirect('/sign-in');
     const ok = await verifySecondFactor(auth.user.id, String(code), await requestContext());
     if (!ok) throw invalid('That code did not work. Try the newest code from your app, or a recovery code.');
-    await markSessionTwoFactorVerified(auth.session.id);
+    await renewSession(auth, { twoFactorVerified: true });
     redirect(safeNextPath(next, '/'));
   });
 }
@@ -80,8 +84,8 @@ export async function confirmEnrollmentAction(code: string): Promise<ActionResul
     const auth = await getCurrentAuth();
     if (!auth) redirect('/sign-in');
     const recoveryCodes = await confirmTotpEnrollment(auth.actor, String(code));
-    // Setting up two-factor with a fresh code counts as passing it for this session.
-    await markSessionTwoFactorVerified(auth.session.id);
+    // Setting up two-factor with a fresh code counts as passing it, on a fresh session.
+    await renewSession(auth, { twoFactorVerified: true });
     return { recoveryCodes };
   });
 }
@@ -99,11 +103,20 @@ export async function sendInviteCodeAction(token: string): Promise<ActionResult>
   }, 'We have emailed you a code.');
 }
 
+/** The address of the person fully signed in on this browser (not while viewing as someone else). */
+async function signedInEmail() {
+  const auth = await getCurrentAuth();
+  if (!auth || auth.needsTwoFactorSetup || auth.needsSecondFactor || auth.viewAsUser) return null;
+  return auth.user.email;
+}
+
 export async function acceptInviteAction(token: string, name: string, code: string | null): Promise<ActionResult> {
   return runAction(async () => {
     const found = await findInvitation(String(token));
     if (!found) throw invalid('This invitation has expired or has already been used.');
-    const user = await acceptInvitation(String(token), { name: String(name ?? ''), code: code ?? undefined }, await requestContext());
+    const user = await acceptInvitation(String(token), { name: String(name ?? ''), code: code ?? undefined }, await requestContext(), {
+      signedInEmail: await signedInEmail(),
+    });
     // Any earlier session in this browser belongs to someone else; start fresh.
     await signOutCurrentSession();
     await startSessionAndGo(user.id, '/');

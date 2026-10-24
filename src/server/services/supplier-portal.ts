@@ -96,7 +96,8 @@ export async function refreshStripeStatus(actor: Actor, supplierId: string) {
 }
 
 export async function stripeDashboardLink(actor: Actor, supplierId: string) {
-  await requireSupplierMember(actor, supplierId);
+  // A Stripe login link opens the supplier's payout account, so it counts as a change.
+  await requireSupplierMember(actor, supplierId, { write: true });
   const db = await getDb();
   const [s] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId)).limit(1);
   const p = payments();

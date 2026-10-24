@@ -24,7 +24,7 @@ import {
   type SpaceOnlyRules,
   type SubmissionStatus,
 } from '../db/schema';
-import { getEditionAccess, getMemberships } from '../authz';
+import { getEditionAccess, getMemberships, inViewedEdition, isViewingAs, membershipCovers } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { createInvitation } from '../auth/invitations';
@@ -57,11 +57,12 @@ async function access(actor: Actor, standId: string, opts: { write?: boolean } =
     .where(eq(stands.id, standId))
     .limit(1);
   if (!row || row.stand.status !== 'active' || !row.type.isSpaceOnly || !row.company) throw notFound();
+  if (!inViewedEdition(actor, row.stand.editionId)) throw notFound();
   let role: Role | null = null;
   const memberships = await getMemberships(actor);
-  const membership = memberships.find((m) => m.companyId === row.company!.id);
+  const membership = memberships.find((m) => m.companyId === row.company!.id && membershipCovers(m, row.stand.editionId));
   if (membership) role = membership.role === 'main_contact' ? 'main_contact' : 'exhibitor';
-  if (!role) {
+  if (!role && !isViewingAs(actor)) {
     const [c] = await db
       .select()
       .from(standContractors)
@@ -372,6 +373,7 @@ export async function submitPack(actor: Actor, standId: string) {
 
 /** Space-only stands the actor builds as a contractor, across every show. */
 export async function contractorStands(actor: Actor) {
+  if (isViewingAs(actor)) return [];
   const db = await getDb();
   const rows = await db
     .select({ contractor: standContractors, stand: stands, edition: editions, company: companies, pack: spaceOnlyPacks })

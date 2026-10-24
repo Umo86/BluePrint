@@ -21,7 +21,7 @@ import {
   orderLines,
   serviceCategories,
 } from '../db/schema';
-import { getEditionAccess, requireEditionPermission } from '../authz';
+import { getEditionAccess, memberCovers, requireEditionPermission } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { createInvitation } from '../auth/invitations';
@@ -140,7 +140,7 @@ export async function listExhibitors(actor: Actor, editionId: string, opts: Exhi
         .select({ companyId: companyMembers.companyId, role: companyMembers.role, user: { id: users.id, name: users.name, email: users.email, lastLoginAt: users.lastLoginAt, status: users.status } })
         .from(companyMembers)
         .innerJoin(users, eq(users.id, companyMembers.userId))
-        .where(inArray(companyMembers.companyId, companyIds))
+        .where(and(inArray(companyMembers.companyId, companyIds), memberCovers(editionId)))
     : [];
   const pending = companyIds.length
     ? await db
@@ -342,7 +342,8 @@ export async function getExhibitor(actor: Actor, editionId: string, companyId: s
     .select({ user: users, role: companyMembers.role, canPay: companyMembers.canPay, since: companyMembers.createdAt })
     .from(companyMembers)
     .innerJoin(users, eq(users.id, companyMembers.userId))
-    .where(eq(companyMembers.companyId, companyId))
+    // Only the people who act for the company at this show.
+    .where(and(eq(companyMembers.companyId, companyId), memberCovers(editionId)))
     .orderBy(asc(users.name));
   const standIds = standRows.map((r) => r.stand.id);
   const invites = await db

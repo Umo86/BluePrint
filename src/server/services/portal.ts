@@ -2,7 +2,7 @@ import 'server-only';
 import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { companies, companyMembers, editions, exhibitorTypes, halls, invitations, shows, stands, users } from '../db/schema';
-import { requireStandAccess } from '../authz';
+import { inViewedEdition, membershipCovers, requireStandAccess } from '../authz';
 import { forbidden, notFound } from '../errors';
 import type { Actor } from '../auth/actor';
 
@@ -36,10 +36,12 @@ export async function resolvePortal(actor: Actor, slug: string, chosenStandId?: 
     .limit(1);
   if (!row) throw notFound();
   const { edition, show } = row;
+  // Viewing as an exhibitor covers the one show the admin may view.
+  if (!inViewedEdition(actor, edition.id)) throw notFound();
   // Draft shows are only visible to staff previewing as an exhibitor.
   if (!VISIBLE_STATUSES.includes(edition.status) && !actor.readOnly) throw notFound();
 
-  const memberships = await db.select().from(companyMembers).where(eq(companyMembers.userId, actor.userId));
+  const memberships = (await db.select().from(companyMembers).where(eq(companyMembers.userId, actor.userId))).filter((m) => membershipCovers(m, edition.id));
   if (!memberships.length) throw notFound();
   const standRows = await db
     .select({ stand: stands, type: exhibitorTypes, company: companies, hall: halls })

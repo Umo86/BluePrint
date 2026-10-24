@@ -2,7 +2,7 @@ import 'server-only';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { editionStaff, editions, shows } from '../db/schema';
-import { contractorStandIds, exhibitorEditions, supplierIdsFor } from '../authz';
+import { contractorStandIds, exhibitorEditions, isViewingAs, supplierIdsFor } from '../authz';
 import type { Actor } from '../auth/actor';
 
 export type Workspace = {
@@ -22,13 +22,16 @@ export async function getWorkspaces(actor: Actor): Promise<Workspace[]> {
     out.push({ kind: 'admin', label: 'Super admin', description: 'Every show, user and setting', href: '/admin' });
   }
 
-  const staffRows = await db
-    .select({ edition: editions, show: shows, role: editionStaff.role })
-    .from(editionStaff)
-    .innerJoin(editions, eq(editions.id, editionStaff.editionId))
-    .innerJoin(shows, eq(shows.id, editions.showId))
-    .where(eq(editionStaff.userId, actor.userId))
-    .orderBy(asc(editions.name));
+  // Viewing as an exhibitor shows only that exhibitor's portal, never their staff work.
+  const staffRows = isViewingAs(actor)
+    ? []
+    : await db
+        .select({ edition: editions, show: shows, role: editionStaff.role })
+        .from(editionStaff)
+        .innerJoin(editions, eq(editions.id, editionStaff.editionId))
+        .innerJoin(shows, eq(shows.id, editions.showId))
+        .where(eq(editionStaff.userId, actor.userId))
+        .orderBy(asc(editions.name));
   for (const r of staffRows) {
     if (r.edition.status === 'archived') continue;
     out.push({

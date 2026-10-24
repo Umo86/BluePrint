@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import { getDb, type DbLike } from '../db/client';
 import {
   EDITION_PERMISSIONS,
@@ -30,6 +30,19 @@ export function assertWritable(actor: Actor) {
   if (actor.readOnly) throw readOnly();
 }
 
+/**
+ * True while an admin is viewing the portal as an exhibitor. The view is limited to that exhibitor's
+ * stands in the one show the admin may view (`viewAsEditionId`); everything else they can reach is off.
+ */
+export function isViewingAs(actor: Actor) {
+  return actor.viewAsEditionId !== undefined && actor.viewAsEditionId !== null ? true : actor.userId !== actor.realUserId;
+}
+
+/** Whether exhibitor data in this edition is in reach (always, unless viewing as someone in another show). */
+export function inViewedEdition(actor: Actor, editionId: string) {
+  return !isViewingAs(actor) || (Boolean(actor.viewAsEditionId) && actor.viewAsEditionId === editionId);
+}
+
 export function assertSuperAdmin(actor: Actor) {
   if (!actor.isSuperAdmin || actor.readOnly) throw forbidden();
 }
@@ -37,6 +50,8 @@ export function assertSuperAdmin(actor: Actor) {
 /** What the actor may do in an edition, or null when they have no staff role there. */
 export async function getEditionAccess(actor: Actor, editionId: string, db?: DbLike): Promise<EditionAccess | null> {
   if (actor.isSuperAdmin && !actor.readOnly) return { role: 'super_admin', permissions: ALL_PERMISSIONS };
+  // Viewing as an exhibitor never carries anyone's staff rights.
+  if (isViewingAs(actor)) return null;
   const d = db ?? (await getDb());
   const [row] = await d
     .select()
@@ -92,6 +107,7 @@ export async function editionStaffWith(editionId: string, permission: EditionPer
 /** Editions where the actor is on the staff (all editions for super admins). */
 export async function staffEditionIds(actor: Actor, db?: DbLike): Promise<string[] | 'all'> {
   if (actor.isSuperAdmin && !actor.readOnly) return 'all';
+  if (isViewingAs(actor)) return [];
   const d = db ?? (await getDb());
   const rows = await d.select({ editionId: editionStaff.editionId }).from(editionStaff).where(eq(editionStaff.userId, actor.userId));
   return rows.map((r) => r.editionId);
@@ -102,6 +118,17 @@ export async function staffEditionIds(actor: Actor, db?: DbLike): Promise<string
 // ---------------------------------------------------------------------------
 
 export type Membership = typeof companyMembers.$inferSelect;
+
+/** A membership with no list of shows covers every show the company exhibits at; otherwise only those listed. */
+export function membershipCovers(m: { editionIds: string[] | null }, editionId: string) {
+  return !m.editionIds || m.editionIds.includes(editionId);
+}
+
+/** The same rule as SQL, for queries that join `company_members`. */
+export function memberCovers(editionId: string | SQL | AnyColumn) {
+  const value = typeof editionId === 'string' ? sql`${editionId}::uuid` : editionId;
+  return sql`(${companyMembers.editionIds} is null or ${value} = any(${companyMembers.editionIds}))`;
+}
 
 export async function getMemberships(actor: Actor, db?: DbLike): Promise<Membership[]> {
   const d = db ?? (await getDb());
@@ -122,12 +149,13 @@ export async function requireStandAccess(
   const d = opts.db ?? (await getDb());
   const [stand] = await d.select().from(stands).where(eq(stands.id, standId)).limit(1);
   if (!stand || !stand.companyId || stand.status !== 'active') throw notFound();
+  if (!inViewedEdition(actor, stand.editionId)) throw notFound();
   const [membership] = await d
     .select()
     .from(companyMembers)
     .where(and(eq(companyMembers.companyId, stand.companyId), eq(companyMembers.userId, actor.userId)))
     .limit(1);
-  if (!membership) throw notFound();
+  if (!membership || !membershipCovers(membership, stand.editionId)) throw notFound();
   if (opts.write || opts.pay) assertWritable(actor);
   if (opts.pay && membership.role !== 'main_contact' && !membership.canPay) {
     throw forbidden('Your company has not given you permission to pay. Ask your main contact.');
@@ -137,8 +165,9 @@ export async function requireStandAccess(
 
 /** Stands the actor can act on as an exhibitor in one edition. */
 export async function exhibitorStands(actor: Actor, editionId: string, db?: DbLike) {
+  if (!inViewedEdition(actor, editionId)) return [];
   const d = db ?? (await getDb());
-  const memberships = await getMemberships(actor, d);
+  const memberships = (await getMemberships(actor, d)).filter((m) => membershipCovers(m, editionId));
   if (!memberships.length) return [];
   return d
     .select()
@@ -161,7 +190,7 @@ export async function exhibitorEditions(actor: Actor, db?: DbLike) {
   const memberships = await getMemberships(actor, d);
   if (!memberships.length) return [];
   const rows = await d
-    .selectDistinct({ edition: editions })
+    .selectDistinct({ edition: editions, companyId: stands.companyId })
     .from(stands)
     .innerJoin(editions, eq(editions.id, stands.editionId))
     .where(
@@ -174,7 +203,12 @@ export async function exhibitorEditions(actor: Actor, db?: DbLike) {
         inArray(editions.status, ['live', 'onsite', 'closed']),
       ),
     );
-  return rows.map((r) => r.edition);
+  const out = new Map<string, (typeof rows)[number]['edition']>();
+  for (const r of rows) {
+    const m = memberships.find((x) => x.companyId === r.companyId);
+    if (m && membershipCovers(m, r.edition.id) && inViewedEdition(actor, r.edition.id)) out.set(r.edition.id, r.edition);
+  }
+  return [...out.values()];
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +216,8 @@ export async function exhibitorEditions(actor: Actor, db?: DbLike) {
 // ---------------------------------------------------------------------------
 
 export async function requireContractorStand(actor: Actor, standId: string, opts: { write?: boolean; db?: DbLike } = {}) {
+  // Viewing as covers the exhibitor portal only.
+  if (isViewingAs(actor)) throw notFound();
   const d = opts.db ?? (await getDb());
   const [row] = await d
     .select({ contractor: standContractors, stand: stands })
@@ -195,6 +231,7 @@ export async function requireContractorStand(actor: Actor, standId: string, opts
 }
 
 export async function contractorStandIds(actor: Actor, db?: DbLike) {
+  if (isViewingAs(actor)) return [];
   const d = db ?? (await getDb());
   const rows = await d
     .select({ standId: standContractors.standId })
@@ -204,6 +241,7 @@ export async function contractorStandIds(actor: Actor, db?: DbLike) {
 }
 
 export async function supplierIdsFor(actor: Actor, db?: DbLike) {
+  if (isViewingAs(actor)) return [];
   const d = db ?? (await getDb());
   const rows = await d.select({ supplierId: supplierUsers.supplierId }).from(supplierUsers).where(eq(supplierUsers.userId, actor.userId));
   return rows.map((r) => r.supplierId);

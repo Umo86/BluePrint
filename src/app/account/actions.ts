@@ -21,14 +21,16 @@ export async function setPasswordAction(password: string): Promise<ActionResult>
   return runAction(async () => {
     const actor = await requireActor();
     const auth = await getCurrentAuth();
-    await setPassword(actor, String(password), auth?.session.id);
+    await setPassword(actor, String(password), auth?.session);
     revalidatePath('/account');
   }, 'Password saved. Other devices have been signed out.');
 }
 
 export async function removePasswordAction(): Promise<ActionResult> {
   return runAction(async () => {
-    await removePassword(await requireActor());
+    const actor = await requireActor();
+    const auth = await getCurrentAuth();
+    await removePassword(actor, auth?.session);
     revalidatePath('/account');
   }, 'Password removed. You will sign in with emailed codes.');
 }

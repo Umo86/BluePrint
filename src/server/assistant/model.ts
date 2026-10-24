@@ -1,6 +1,5 @@
 import 'server-only';
-import { env } from '../env';
-import { isLocalAddress } from '../payments/provider';
+import { env, localProductionAllowed } from '../env';
 
 /**
  * The language model behind the exhibitor assistant. In production it is Claude (Anthropic's API);
@@ -165,7 +164,7 @@ export function assistantModel(): AssistantModel | null {
   if (override !== undefined) return override;
   const e = env();
   if (e.ANTHROPIC_API_KEY) return new ClaudeModel(e.ANTHROPIC_API_KEY);
-  const local = process.env.NODE_ENV !== 'production' || (process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION === 'true' && isLocalAddress(e.APP_URL));
+  const local = process.env.NODE_ENV !== 'production' || localProductionAllowed(e.APP_URL);
   return local ? new OfflineModel() : null;
 }
 

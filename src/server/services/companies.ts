@@ -144,6 +144,38 @@ export async function setCompanyArchived(actor: Actor, companyId: string, archiv
   await audit(actor, archived ? 'company.archived' : 'company.restored', { entityType: 'company', entityId: companyId, companyId });
 }
 
+/**
+ * Someone can only be changed or removed by a person whose say covers every show they act at:
+ * super admins, main contacts for every show, or staff who manage exhibitors at each of those shows.
+ * So one show's team, or a contact added for one show, cannot touch the company's people elsewhere.
+ */
+async function assertCanManageMember(actor: Actor, companyId: string, role: 'admin' | 'staff' | 'main_contact', target: { editionIds: string[] | null }) {
+  if (role === 'admin') return;
+  const db = await getDb();
+  const companyEditions = (await db.selectDistinct({ editionId: stands.editionId }).from(stands).where(eq(stands.companyId, companyId))).map((r) => r.editionId);
+  let reach: string[] | 'all';
+  if (role === 'main_contact') {
+    const [me] = await db
+      .select()
+      .from(companyMembers)
+      .where(and(eq(companyMembers.companyId, companyId), eq(companyMembers.userId, actor.userId)))
+      .limit(1);
+    reach = me?.editionIds ?? 'all';
+  } else {
+    reach = [];
+    for (const id of companyEditions) if ((await getEditionAccess(actor, id, db))?.permissions.has('manage_exhibitors')) reach.push(id);
+  }
+  if (reach === 'all') return;
+  if (target.editionIds === null && role === 'main_contact') {
+    throw forbidden('This person acts for your company at every show. Ask the show team to change it.');
+  }
+  const theirs = target.editionIds ?? companyEditions;
+  const mine = reach;
+  if (!theirs.every((e) => mine.includes(e))) {
+    throw forbidden('This person also acts for the company at other shows. Ask a super admin to change it.');
+  }
+}
+
 /** Removes someone from a company. The last main contact can only be removed by staff. */
 export async function removeMember(actor: Actor, companyId: string, userId: string) {
   assertWritable(actor);
@@ -153,6 +185,7 @@ export async function removeMember(actor: Actor, companyId: string, userId: stri
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, companyId));
   const target = members.find((m) => m.userId === userId);
   if (!target) throw notFound();
+  await assertCanManageMember(actor, companyId, role, target);
   if (role === 'main_contact' && userId === actor.userId) throw forbidden('Ask the show team to remove the main contact.');
   const mainContacts = members.filter((m) => m.role === 'main_contact');
   if (target.role === 'main_contact' && mainContacts.length <= 1 && role === 'main_contact') {
@@ -170,6 +203,7 @@ export async function setMemberAccess(actor: Actor, companyId: string, userId: s
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, companyId));
   const target = members.find((m) => m.userId === userId);
   if (!target) throw notFound();
+  await assertCanManageMember(actor, companyId, role, target);
   if (target.role === 'main_contact' && input.role === 'colleague' && members.filter((m) => m.role === 'main_contact').length <= 1) {
     throw conflict('A company needs a main contact. Make someone else the main contact first.');
   }

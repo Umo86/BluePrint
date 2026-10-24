@@ -16,7 +16,7 @@ import {
   unsubscribes,
   users,
 } from '../db/schema';
-import { getEditionAccess, type EditionAccess } from '../authz';
+import { getEditionAccess, memberCovers, type EditionAccess } from '../authz';
 import { forbidden, notFound } from '../errors';
 import { audit } from '../audit';
 import { assertRateLimit } from '../security/rate-limit';
@@ -256,7 +256,7 @@ async function contactsSheets(editionId: string): Promise<SheetSpec[]> {
     .from(companyMembers)
     .innerJoin(users, eq(users.id, companyMembers.userId))
     .innerJoin(companies, eq(companies.id, companyMembers.companyId))
-    .where(inArray(companyMembers.companyId, companyIds))
+    .where(and(inArray(companyMembers.companyId, companyIds), memberCovers(editionId)))
     .orderBy(asc(companies.name), asc(users.name));
   const unsub = people.length
     ? new Set(

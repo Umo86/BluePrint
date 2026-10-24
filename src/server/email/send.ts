@@ -29,6 +29,24 @@ export type SendEmailInput = {
 
 export type SendResult = { outboxId: string; status: 'sent' | 'failed' | 'suppressed' | 'queued' };
 
+const PLAIN_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+
+function oneLine(value: string) {
+  return value.replace(/[\r\n]+/g, ' ').trim();
+}
+
+/**
+ * Sign-in codes and personal links (invitations, unsubscribe) are for the recipient only. Once an
+ * email has gone, the copy BluePrint keeps has them hidden, and staff never see them in the log.
+ */
+export function hideSecrets(value: string, category: string): string {
+  let out = value
+    .replace(/(\/invite\/)[A-Za-z0-9_-]{16,}/g, '$1[hidden]')
+    .replace(/(\/unsubscribe\/)[A-Za-z0-9_.-]{16,}/g, '$1[hidden]');
+  if (category === 'security') out = out.replace(/\b\d{6}\b/g, '••••••');
+  return out;
+}
+
 /**
  * Records every email in the outbox (so it shows on the exhibitor's record), then hands it to
  * the provider. Suppressed addresses (bounced or complained) are skipped, except for security
@@ -45,6 +63,10 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
     from = sender.from;
     replyTo = replyTo ?? sender.replyTo;
   }
+  // Header values are always single lines, and a reply-to is a plain address or nothing.
+  from = oneLine(from);
+  replyTo = replyTo && PLAIN_ADDRESS.test(replyTo.trim()) ? replyTo.trim() : null;
+  const subject = oneLine(input.subject).slice(0, 300);
 
   let suppressedReason: string | null = null;
   if (input.category !== 'security') {
@@ -72,7 +94,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
       category: input.category,
       fromAddress: from,
       replyTo,
-      subject: input.subject,
+      subject,
       html: input.html,
       text: input.text,
       status: suppressedReason ? 'suppressed' : 'queued',
@@ -113,6 +135,17 @@ export async function deliverOutboxEmail(outboxId: string): Promise<SendResult> 
       headers: mail.headers ?? undefined,
     });
     await db.update(emailOutbox).set({ status: 'sent', providerMessageId: result.id, sentAt: new Date(), error: null }).where(eq(emailOutbox.id, outboxId));
+    // With real delivery the stored copy is only a record, so codes and personal links come out of it.
+    // (Locally the stored copy is the mailbox, so it is kept whole.)
+    if (emailProvider().name !== 'outbox') {
+      const hidden = {
+        subject: hideSecrets(mail.subject, mail.category),
+        html: hideSecrets(mail.html, mail.category),
+        text: hideSecrets(mail.text, mail.category),
+        headers: mail.headers ? Object.fromEntries(Object.entries(mail.headers).map(([k, v]) => [k, hideSecrets(v, mail.category)])) : null,
+      };
+      await db.update(emailOutbox).set(hidden).where(eq(emailOutbox.id, outboxId));
+    }
     return { outboxId, status: 'sent' };
   } catch (err) {
     await db

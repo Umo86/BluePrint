@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { base32Decode, base32Encode, hotp, verifyTotp, totpCode, generateRecoveryCodes } from '@/server/security/totp';
-import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256Hex } from '@/server/security/crypto';
+import { decryptSecret, encryptSecret, randomToken, reencryptSecret, safeEqual, sha256Hex } from '@/server/security/crypto';
+import { resetEnvCache } from '@/server/env';
 import { hashPassword, passwordProblems, verifyPassword } from '@/server/security/password';
 
 const RFC_SECRET = base32Encode(Buffer.from('12345678901234567890', 'ascii'));
@@ -65,6 +66,35 @@ describe('secret encryption', () => {
     data[0] ^= 0xff;
     parts[3] = data.toString('base64url');
     expect(() => decryptSecret(parts.join('.'))).toThrow();
+  });
+
+  it('rotates to a new key: old secrets still open, and can be re-encrypted under the new key', () => {
+    const oldKey = process.env.APP_ENCRYPTION_KEY!;
+    const newKey = Buffer.alloc(32, 7).toString('base64');
+    const underOld = encryptSecret('JBSWY3DPEHPK3PXP');
+    try {
+      // The new key alone cannot read secrets written under the old one.
+      process.env.APP_ENCRYPTION_KEY = newKey;
+      resetEnvCache();
+      expect(() => decryptSecret(underOld)).toThrow();
+
+      // During the change-over the old key is kept as the previous key.
+      process.env.APP_ENCRYPTION_KEY_PREVIOUS = oldKey;
+      resetEnvCache();
+      expect(decryptSecret(underOld)).toBe('JBSWY3DPEHPK3PXP');
+      const moved = reencryptSecret(underOld);
+      expect(moved).not.toBeNull();
+      expect(reencryptSecret(moved!)).toBeNull();
+
+      // Once everything is moved, the previous key can go.
+      delete process.env.APP_ENCRYPTION_KEY_PREVIOUS;
+      resetEnvCache();
+      expect(decryptSecret(moved!)).toBe('JBSWY3DPEHPK3PXP');
+    } finally {
+      process.env.APP_ENCRYPTION_KEY = oldKey;
+      delete process.env.APP_ENCRYPTION_KEY_PREVIOUS;
+      resetEnvCache();
+    }
   });
 });
 

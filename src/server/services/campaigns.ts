@@ -18,7 +18,7 @@ import {
   users,
   type CampaignFilter,
 } from '../db/schema';
-import { requireEditionPermission } from '../authz';
+import { memberCovers, requireEditionPermission } from '../authz';
 import { conflict, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { appUrl } from '../auth/login';
@@ -90,7 +90,7 @@ export async function recipientsFor(editionId: string, raw: CampaignFilter | Cam
   }
   if (!rows.length) return [];
   const companyIds = [...new Set(rows.map((r) => r.company.id))];
-  const memberConds = [inArray(companyMembers.companyId, companyIds), eq(users.status, 'active')];
+  const memberConds = [inArray(companyMembers.companyId, companyIds), eq(users.status, 'active'), memberCovers(editionId)];
   if (f.audience === 'main_contacts') memberConds.push(eq(companyMembers.role, 'main_contact'));
   if (f.neverSignedIn) memberConds.push(isNull(users.lastLoginAt));
   const people = await db
@@ -228,7 +228,8 @@ async function renderForRecipients(edition: EditionRow, c: { subject: string; bl
       unsubscribe_url: unsubscribeUrl(r.email, edition.id),
     };
     const fill = (s: string, esc: boolean) => s.replace(/⁣([a-z_]+)⁣/g, (_, k: string) => (esc ? escapeHtml(values[k] ?? '') : (values[k] ?? '')));
-    return { subject: fill(rendered.subject, false), html: fill(rendered.html, true), text: fill(rendered.text, false), unsubscribe: values.unsubscribe_url };
+    // Names can contain line breaks; a subject never may.
+    return { subject: fill(rendered.subject, false).replace(/[\r\n]+/g, ' ').slice(0, 250), html: fill(rendered.html, true), text: fill(rendered.text, false), unsubscribe: values.unsubscribe_url };
   };
 }
 

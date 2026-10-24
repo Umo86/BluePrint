@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { closeDb, getDb, useInMemoryDatabaseForTests } from '@/server/db/client';
 import { editions, emailOutbox, files, invitations, standContractors, submissions } from '@/server/db/schema';
-import { acceptInvitation } from '@/server/auth/invitations';
+import { acceptInvitation, sendInvitationCode } from '@/server/auth/invitations';
 import { createTask } from '@/server/services/tasks';
 import { beginUpload, completeUpload, receiveLocalUpload, canReadFile } from '@/server/services/files';
 import {
@@ -18,7 +18,7 @@ import {
 import { MemoryStorage, setStorageForTests } from '@/server/storage';
 import { checkPack } from '@/lib/space-only';
 import { randomToken, sha256Hex } from '@/server/security/crypto';
-import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
+import { actorFor, codeFromEmail, lastEmailTo, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
 
 const PDF = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
 const RULES = { maxHeightM: 4, maxPlatformMm: 599, stepsMakeComplex: true, minInsuranceGbp: 5_000_000, requiredDocs: ['drawings', 'risk_assessment'], complexDocs: ['structural_calculations'] };
@@ -73,7 +73,8 @@ describe('space-only approvals', () => {
     const [inv] = await db.select().from(invitations).where(and(eq(invitations.standId, ex.stand.id), eq(invitations.kind, 'contractor')));
     const token = randomToken(32);
     await db.update(invitations).set({ tokenHash: sha256Hex(token) }).where(eq(invitations.id, inv.id));
-    await acceptInvitation(token, { name: 'Bob Builder' }, {});
+    await sendInvitationCode(token, {});
+    await acceptInvitation(token, { name: 'Bob Builder', code: codeFromEmail((await lastEmailTo('bob@buildco.example')).subject) }, {});
     const [c] = await db.select().from(standContractors).where(eq(standContractors.standId, ex.stand.id));
     expect(c.status).toBe('active');
     const bob = actorFor({ ...ex.user, id: c.userId!, email: 'bob@buildco.example', isSuperAdmin: false });
@@ -141,7 +142,7 @@ describe('space-only approvals', () => {
     await expect(packForReview(actorFor(outsider), ex.stand.id)).rejects.toThrow();
     // Viewing as the exhibitor is read-only.
     const admin = await makeUser({ isSuperAdmin: true });
-    await expect(nominateContractor(actorFor(ex.user, { readOnly: true, realUserId: admin.id }), ex.stand.id, { selfBuild: true })).rejects.toThrow(/viewing as/);
+    await expect(nominateContractor(actorFor(ex.user, { readOnly: true, realUserId: admin.id, viewAsEditionId: ex.stand.editionId }), ex.stand.id, { selfBuild: true })).rejects.toThrow(/viewing as/);
     // Building it yourself makes you the contractor straight away.
     await nominateContractor(actorFor(ex.user), ex.stand.id, { selfBuild: true });
     const view = await packView(actorFor(ex.user), ex.stand.id);

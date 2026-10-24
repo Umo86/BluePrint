@@ -3,8 +3,20 @@ import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
-import { files, standContractors, stands, type FILE_PURPOSES } from '../db/schema';
-import { assertWritable, getEditionAccess, getMemberships, requireContractorStand, requireEditionPermission, requireStandAccess, supplierIdsFor } from '../authz';
+import { files, standContractors, stands, type EditionPermission, type FILE_PURPOSES } from '../db/schema';
+import {
+  assertWritable,
+  getEditionAccess,
+  getMemberships,
+  inViewedEdition,
+  isViewingAs,
+  membershipCovers,
+  requireContractorStand,
+  requireEditionPermission,
+  requireStandAccess,
+  supplierIdsFor,
+  type EditionAccess,
+} from '../authz';
 import { forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { assertRateLimit } from '../security/rate-limit';
@@ -247,6 +259,30 @@ export async function storeGeneratedFile(input: {
   return row;
 }
 
+/**
+ * Which uploads a show team member may open: only those that belong to work their permissions cover.
+ * Branding, manual downloads, product photos and logos are open to the whole team.
+ */
+export function staffMayReadFile(staff: EditionAccess, purpose: FilePurpose) {
+  const has = (p: EditionPermission) => staff.permissions.has(p);
+  switch (purpose) {
+    case 'submission':
+      return has('manage_exhibitors') || has('helpdesk');
+    case 'space_only':
+    case 'certificate':
+      return has('review_space_only') || has('manage_exhibitors');
+    case 'ticket':
+      return has('helpdesk') || has('manage_exhibitors');
+    case 'invoice':
+      return has('manage_orders') || has('view_reports');
+    case 'manual':
+    case 'branding':
+    case 'product':
+    case 'company_logo':
+      return staff.role !== 'hs_reviewer' || purpose === 'manual';
+  }
+}
+
 /** Whether the actor may download a file. Public files (branding, logos, product photos) are open to all. */
 export async function canReadFile(actor: Actor | null, file: FileRow): Promise<boolean> {
   if (!file.verifiedAt || file.deletedAt) return false;
@@ -258,14 +294,12 @@ export async function canReadFile(actor: Actor | null, file: FileRow): Promise<b
   const db = await getDb();
   if (file.editionId) {
     const staff = await getEditionAccess(actor, file.editionId);
-    if (staff) {
-      if (staff.role === 'hs_reviewer') return file.purpose === 'space_only' || file.purpose === 'certificate' || file.purpose === 'manual';
-      if (file.purpose === 'invoice') return staff.permissions.has('manage_orders') || staff.permissions.has('view_reports');
-      if (file.purpose === 'ticket') return staff.permissions.has('helpdesk') || staff.permissions.has('manage_exhibitors');
-      return true;
-    }
+    if (staff) return staffMayReadFile(staff, file.purpose);
   }
-  const memberships = await getMemberships(actor);
+  // Viewing as an exhibitor reaches only the show the admin may view.
+  if (file.editionId && !inViewedEdition(actor, file.editionId)) return false;
+  // Company files that belong to a show are open to the people who act for the company at that show.
+  const memberships = (await getMemberships(actor)).filter((m) => !file.editionId || membershipCovers(m, file.editionId));
   const companyIds = new Set(memberships.map((m) => m.companyId));
   if (file.purpose === 'manual' && file.editionId) {
     // Anyone exhibiting or building at the show can read its manual downloads.
@@ -277,6 +311,7 @@ export async function canReadFile(actor: Actor | null, file: FileRow): Promise<b
         .limit(1);
       if (own.length) return true;
     }
+    if (isViewingAs(actor)) return false;
     const contractorStands = await db
       .select({ editionId: stands.editionId })
       .from(standContractors)
@@ -287,7 +322,7 @@ export async function canReadFile(actor: Actor | null, file: FileRow): Promise<b
   if (file.companyId && companyIds.has(file.companyId)) {
     return ['submission', 'space_only', 'certificate', 'invoice', 'ticket', 'company_logo'].includes(file.purpose);
   }
-  if (file.standId && (file.purpose === 'space_only' || file.purpose === 'certificate')) {
+  if (file.standId && (file.purpose === 'space_only' || file.purpose === 'certificate') && !isViewingAs(actor)) {
     const [c] = await db
       .select()
       .from(standContractors)

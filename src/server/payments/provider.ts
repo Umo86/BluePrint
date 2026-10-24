@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { env } from '../env';
+import { env, localProductionAllowed } from '../env';
 
 /**
  * Card payments and supplier payouts. In production this is Stripe Connect with separate charges
@@ -250,17 +250,11 @@ export function payments(): PaymentsProvider | null {
   if (instance) return instance;
   const e = env();
   if (e.STRIPE_SECRET_KEY) instance = new StripeProvider();
-  else if (e.NODE_ENV !== 'production' || (process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION === 'true' && isLocalAddress(e.APP_URL))) instance = new SimulatedPayments();
+  else if (e.NODE_ENV !== 'production' || localProductionAllowed(e.APP_URL)) instance = new SimulatedPayments();
   return instance;
 }
 
-export function isLocalAddress(url: string) {
-  try {
-    return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
+export { isLocalAddress } from '@/lib/local-address';
 
 export function setPaymentsForTests(p: PaymentsProvider | null) {
   override = p;

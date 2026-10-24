@@ -26,10 +26,11 @@ export async function isStaffUser(userId: string): Promise<boolean> {
 
 export async function createSession(
   userId: string,
-  opts: { ip?: string | null; userAgent?: string | null },
+  opts: { ip?: string | null; userAgent?: string | null; twoFactorVerified?: boolean },
 ): Promise<{ token: string; expiresAt: Date; session: SessionRow }> {
   const db = await getDb();
   const staff = await isStaffUser(userId);
+  const [owner] = await db.select({ totpEnabledAt: users.totpEnabledAt }).from(users).where(eq(users.id, userId)).limit(1);
   const token = randomToken(32);
   const now = Date.now();
   const expiresAt = new Date(now + (staff ? STAFF_MAX_SECONDS : MEMBER_MAX_SECONDS) * 1000);
@@ -40,8 +41,8 @@ export async function createSession(
       userId,
       expiresAt,
       idleTimeoutSeconds: staff ? STAFF_IDLE_SECONDS : MEMBER_IDLE_SECONDS,
-      // Staff must pass a two-factor check before the session unlocks anything.
-      twoFactorVerified: !staff,
+      // Staff, and anyone who has turned two-factor on, must pass the check before the session unlocks anything.
+      twoFactorVerified: opts.twoFactorVerified ?? (!staff && !owner?.totpEnabledAt),
       ip: opts.ip ?? null,
       userAgent: opts.userAgent?.slice(0, 300) ?? null,
     })
@@ -97,10 +98,6 @@ export async function revokeAllSessions(userId: string, exceptSessionId?: string
   await db.update(sessions).set({ revokedAt: new Date() }).where(where);
 }
 
-export async function markSessionTwoFactorVerified(sessionId: string) {
-  const db = await getDb();
-  await db.update(sessions).set({ twoFactorVerified: true }).where(eq(sessions.id, sessionId));
-}
 
 export async function listActiveSessions(userId: string) {
   const db = await getDb();

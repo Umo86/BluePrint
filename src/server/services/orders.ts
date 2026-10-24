@@ -22,7 +22,7 @@ import {
   users,
   type OrderStatus,
 } from '../db/schema';
-import { getEditionAccess, requireEditionPermission, requireStandAccess, supplierIdsFor } from '../authz';
+import { editionStaffWith, getEditionAccess, memberCovers, requireEditionPermission, requireStandAccess, supplierIdsFor } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { SYSTEM_ACTOR, type Actor } from '../auth/actor';
@@ -247,13 +247,40 @@ async function ensureCreditNote(refund: RefundRow) {
 // Notifications
 // ---------------------------------------------------------------------------
 
+/**
+ * A card refund Stripe accepted can still fail later (for example, an expired card). The order
+ * already shows the refund, so the people who handle orders are told straight away to repay the
+ * exhibitor another way.
+ */
+async function alertFailedRefund(orderId: string, amountPence: number, alreadyShown: boolean) {
+  const db = await getDb();
+  const [o] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!o) return;
+  const team = await editionStaffWith(o.editionId, 'manage_orders');
+  const amount = `£${(amountPence / 100).toFixed(2)}`;
+  const { html, text } = renderSimpleEmail({
+    heading: `A card refund failed: ${o.number}`,
+    paragraphs: [
+      `Stripe could not complete the ${amount} card refund on order ${o.number}.`,
+      alreadyShown
+        ? 'The order and its credit note already show this refund, so the exhibitor is expecting the money. Refund them another way (for example by bank transfer) and note it on the order.'
+        : 'Refund the exhibitor another way (for example by bank transfer) and note it on the order.',
+    ],
+    button: { label: 'Open the order', url: appUrl(`/manage/${o.editionId}/orders/${o.id}`) },
+    footer: 'BluePrint, the Media10 exhibitor manual.',
+  });
+  for (const p of team) {
+    await sendEmail({ to: p.email, toUserId: p.id, editionId: o.editionId, templateKey: 'refund_failed', category: 'transactional', subject: `A card refund failed: ${o.number}`, html, text });
+  }
+}
+
 async function exhibitorRecipients(db: DbLike, order: OrderRow) {
   if (!order.companyId) return [];
   const rows = await db
     .select({ id: users.id, email: users.email, role: companyMembers.role })
     .from(companyMembers)
     .innerJoin(users, eq(users.id, companyMembers.userId))
-    .where(and(eq(companyMembers.companyId, order.companyId), eq(users.status, 'active')));
+    .where(and(eq(companyMembers.companyId, order.companyId), eq(users.status, 'active'), memberCovers(order.editionId)));
   return rows.filter((r) => r.role === 'main_contact' || r.id === order.placedBy);
 }
 
@@ -1383,6 +1410,7 @@ export async function handleStripeEvent(event: WebhookEvent) {
         if ((status === 'failed' || status === 'canceled') && r.status !== 'failed') {
           await db.update(refunds).set({ status: 'failed', error: `Stripe reported the refund ${status}. Contact the exhibitor and refund them another way.` }).where(eq(refunds.id, r.id));
           await audit(SYSTEM_ACTOR, 'shop.refund_failed', { entityType: 'order', entityId: r.orderId, details: { refundId: r.id, status } });
+          await alertFailedRefund(r.orderId, r.amountPence, Boolean(r.appliedAt));
         }
         break;
       }

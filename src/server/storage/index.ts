@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { r2Origin } from '@/lib/storage-origin';
 import { env } from '../env';
 
 /**
@@ -92,9 +93,11 @@ class R2Storage implements Storage {
     if (!this.clientPromise) {
       this.clientPromise = import('@aws-sdk/client-s3').then(({ S3Client }) => {
         const e = env();
+        const endpoint = r2Origin(e.R2_ACCOUNT_ID, e.R2_JURISDICTION);
+        if (!endpoint) throw new Error('R2_ACCOUNT_ID (and R2_JURISDICTION, if set) are not valid');
         return new S3Client({
           region: 'auto',
-          endpoint: `https://${e.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+          endpoint,
           credentials: { accessKeyId: e.R2_ACCESS_KEY_ID!, secretAccessKey: e.R2_SECRET_ACCESS_KEY! },
         });
       });

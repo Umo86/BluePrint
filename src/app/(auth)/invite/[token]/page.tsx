@@ -2,13 +2,16 @@ import type { Metadata } from 'next';
 import { Alert, Anchor, Text } from '@mantine/core';
 import { AuthCard } from '@/components/auth-card';
 import { findInvitation } from '@/server/auth/invitations';
+import { getCurrentAuth } from '@/server/auth/current';
 import { AcceptInviteForm } from './accept-form';
 
 export const metadata: Metadata = { title: 'Accept invitation' };
 
 export default async function InvitePage({ params }: PageProps<'/invite/[token]'>) {
   const { token } = await params;
-  const found = await findInvitation(token);
+  const auth = await getCurrentAuth();
+  const signedIn = auth && !auth.needsTwoFactorSetup && !auth.needsSecondFactor && !auth.viewAsUser ? auth.user.email : null;
+  const found = await findInvitation(token, { signedInEmail: signedIn });
   if (!found) {
     return (
       <AuthCard title="This invitation no longer works">

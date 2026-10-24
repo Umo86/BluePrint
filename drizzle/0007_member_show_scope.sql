@@ -1,0 +1,1 @@
+ALTER TABLE "company_members" ADD COLUMN "edition_ids" uuid[];

@@ -14,7 +14,7 @@ import {
   tasks,
   users,
 } from '../db/schema';
-import { editionStaffWith } from '../authz';
+import { editionStaffWith, memberCovers } from '../authz';
 import { appUrl } from '../auth/login';
 import { sendEmail } from '../email/send';
 import { renderEmail, type DueItem } from '../email/render';
@@ -109,7 +109,7 @@ async function remindersForEdition(edition: EditionRow, defaultOffsets: number[]
       .select({ id: users.id, email: users.email, name: users.name })
       .from(companyMembers)
       .innerJoin(users, eq(users.id, companyMembers.userId))
-      .where(and(eq(companyMembers.companyId, company.id), eq(companyMembers.role, 'main_contact'), eq(users.status, 'active')));
+      .where(and(eq(companyMembers.companyId, company.id), eq(companyMembers.role, 'main_contact'), eq(users.status, 'active'), memberCovers(edition.id)));
     if (!people.length) continue;
     for (const o of outstanding) {
       const step = reminderStep(o.deadline, o.task.reminderOffsets ?? defaultOffsets, now);

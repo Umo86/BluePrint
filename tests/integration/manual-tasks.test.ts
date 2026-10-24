@@ -198,7 +198,7 @@ describe('tasks and the exhibitor checklist', () => {
     await completeUpload(actorFor(a.user), own.fileId);
     await saveAnswers(actorFor(a.user), a.stand.id, t.id, { doc: [own.fileId] }, { submit: true });
 
-    await expect(saveAnswers(actorFor(a.user, { readOnly: true, realUserId: editor.id }), a.stand.id, t.id, { doc: [own.fileId] }, { submit: true })).rejects.toThrow();
+    await expect(saveAnswers(actorFor(a.user, { readOnly: true, realUserId: editor.id, viewAsEditionId: a.stand.editionId }), a.stand.id, t.id, { doc: [own.fileId] }, { submit: true })).rejects.toThrow();
     const db = await getDb();
     await db.update(editions).set({ status: 'closed' }).where(eq(editions.id, edition.id));
     await expect(saveAnswers(actorFor(a.user), a.stand.id, t.id, { doc: [own.fileId] }, { submit: true })).rejects.toThrow(/not open/);

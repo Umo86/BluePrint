@@ -3,7 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
 import { editionStaff, libraryItems } from '../db/schema';
-import { assertSuperAdmin } from '../authz';
+import { assertSuperAdmin, isViewingAs } from '../authz';
 import { forbidden, notFound } from '../errors';
 import { audit } from '../audit';
 import { sanitizeRichText } from '../security/sanitize';
@@ -39,6 +39,7 @@ export async function listLibrary(actor: Actor, kind?: LibraryKind) {
   // Show staff read the library to pull templates into their show; only super admins change it.
   const db = await getDb();
   if (!(actor.isSuperAdmin && !actor.readOnly)) {
+    if (isViewingAs(actor)) throw forbidden();
     const [staff] = await db.select().from(editionStaff).where(eq(editionStaff.userId, actor.userId)).limit(1);
     if (!staff) throw forbidden();
   }

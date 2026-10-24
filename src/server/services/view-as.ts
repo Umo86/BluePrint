@@ -4,7 +4,7 @@ import { getDb } from '../db/client';
 import { companyMembers, editions, stands, users } from '../db/schema';
 import { forbidden, notFound } from '../errors';
 import { audit } from '../audit';
-import { requireShowAdmin } from '../authz';
+import { memberCovers, requireShowAdmin } from '../authz';
 import type { Actor } from '../auth/actor';
 
 /**
@@ -25,8 +25,8 @@ export async function authorizeViewAs(actor: Actor, targetUserId: string, editio
   const [link] = await db
     .select({ standId: stands.id })
     .from(companyMembers)
-    .innerJoin(stands, and(eq(stands.companyId, companyMembers.companyId), eq(stands.editionId, editionId)))
-    .where(eq(companyMembers.userId, targetUserId))
+    .innerJoin(stands, and(eq(stands.companyId, companyMembers.companyId), eq(stands.editionId, editionId), eq(stands.status, 'active')))
+    .where(and(eq(companyMembers.userId, targetUserId), memberCovers(editionId)))
     .limit(1);
   if (!link) throw notFound('That person is not an exhibitor at this show.');
   await audit(actor, 'view_as.start', { entityType: 'user', entityId: targetUserId, editionId, details: { target: target.email } });

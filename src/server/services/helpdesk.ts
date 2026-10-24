@@ -332,7 +332,12 @@ export async function replyAsStaff(actor: Actor, ticketId: string, raw: z.input<
   await assertRateLimit(`ticket-staff-reply:${actor.realUserId}`, 300, 3600);
   await checkAttachments(actor, data.attachments, t.standId);
   const db = await getDb();
-  await db.insert(ticketMessages).values({ ticketId, authorId: actor.userId, body: data.body, internal: data.internal, attachments: data.internal ? data.attachments : data.attachments });
+  await db.insert(ticketMessages).values({ ticketId, authorId: actor.userId, body: data.body, internal: data.internal, attachments: data.attachments });
+  if (data.internal && data.attachments.length) {
+    // Files on an internal note belong to the team only: unlink them from the exhibitor's company so
+    // nobody there can open them, even with the file's address.
+    await db.update(files).set({ companyId: null, standId: null }).where(inArray(files.id, data.attachments));
+  }
   if (data.internal) {
     if (data.status) await db.update(tickets).set({ status: data.status }).where(eq(tickets.id, ticketId));
     else await db.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, ticketId));

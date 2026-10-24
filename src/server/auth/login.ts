@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 import QRCode from 'qrcode';
 import { getDb } from '../db/client';
 import { loginCodes, users } from '../db/schema';
@@ -13,6 +13,7 @@ import { sendEmail } from '../email/send';
 import { renderSimpleEmail } from '../email/simple';
 import { env } from '../env';
 import { revokeAllSessions } from './sessions';
+import { afterResponse } from '../after-response';
 import type { Actor } from './actor';
 
 export const CODE_TTL_MS = 10 * 60 * 1000;
@@ -21,7 +22,8 @@ export const MAX_PASSWORD_FAILURES = 10;
 export const PASSWORD_LOCK_MS = 15 * 60 * 1000;
 
 const GENERIC_CODE_ERROR = 'That code is wrong or has expired. Request a new one and try again.';
-const GENERIC_PASSWORD_ERROR = 'That email and password do not match.';
+const GENERIC_PASSWORD_ERROR =
+  'That email and password do not match. After several wrong tries password sign-in pauses for 15 minutes, but you can always sign in with an emailed code.';
 
 export type RequestContext = { ip?: string | null; userAgent?: string | null };
 
@@ -105,7 +107,9 @@ export async function issueEmailCode(email: string, opts: { userId?: string | nu
 export async function consumeEmailCode(email: string, codeRaw: string, ctx: RequestContext) {
   const code = codeRaw.replace(/\s/g, '');
   await assertRateLimit(`email-code-verify:email:${email}`, 10, 15 * 60);
-  await assertRateLimit(`email-code-verify:ip:${ctx.ip ?? 'unknown'}`, 50, 15 * 60);
+  // A ceiling per day as well, so guessing cannot simply carry on window after window.
+  await assertRateLimit(`email-code-verify:email-day:${email}`, 40, 24 * 3600);
+  await assertRateLimit(`email-code-verify:ip:${ctx.ip ?? 'unknown'}`, 200, 15 * 60);
   if (!/^\d{6}$/.test(code)) throw invalid(GENERIC_CODE_ERROR);
 
   const db = await getDb();
@@ -117,17 +121,28 @@ export async function consumeEmailCode(email: string, codeRaw: string, ctx: Requ
     .limit(1);
   if (!row) throw invalid(GENERIC_CODE_ERROR);
 
-  if (row.attempts >= MAX_CODE_ATTEMPTS) {
+  // Count the attempt in one step, so guesses sent at the same moment cannot all see the same count.
+  const [counted] = await db
+    .update(loginCodes)
+    .set({ attempts: sql`${loginCodes.attempts} + 1` })
+    .where(and(eq(loginCodes.id, row.id), isNull(loginCodes.consumedAt), lt(loginCodes.attempts, MAX_CODE_ATTEMPTS)))
+    .returning({ id: loginCodes.id });
+  if (!counted) {
     await db.update(loginCodes).set({ consumedAt: new Date() }).where(eq(loginCodes.id, row.id));
     throw invalid(GENERIC_CODE_ERROR);
   }
-  await db.update(loginCodes).set({ attempts: row.attempts + 1 }).where(eq(loginCodes.id, row.id));
 
   if (!safeEqual(row.codeHash, codeHash(email, code))) {
     await audit(anonymousActor(email, ctx), 'auth.code_failed', { details: { email } });
     throw invalid(GENERIC_CODE_ERROR);
   }
-  await db.update(loginCodes).set({ consumedAt: new Date() }).where(eq(loginCodes.id, row.id));
+  // Use the code up; if the right code arrives twice at once, only one wins.
+  const [used] = await db
+    .update(loginCodes)
+    .set({ consumedAt: new Date() })
+    .where(and(eq(loginCodes.id, row.id), isNull(loginCodes.consumedAt)))
+    .returning({ id: loginCodes.id });
+  if (!used) throw invalid(GENERIC_CODE_ERROR);
 }
 
 /**
@@ -138,16 +153,22 @@ export async function requestSignInCode(emailRaw: string, ctx: RequestContext): 
   const email = normaliseEmail(emailRaw);
   if (!isValidEmail(email)) throw invalid('Enter a valid email address.', { email: 'Enter a valid email address.' });
   await assertRateLimit(`signin-code:email:${email}`, 5, 15 * 60);
-  await assertRateLimit(`signin-code:ip:${ctx.ip ?? 'unknown'}`, 30, 15 * 60);
+  // Generous per network, because a whole venue or office can share one internet address.
+  await assertRateLimit(`signin-code:ip:${ctx.ip ?? 'unknown'}`, 100, 15 * 60);
 
   const db = await getDb();
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (!user || user.status !== 'active' || user.anonymisedAt) {
-    await audit(anonymousActor(email, ctx), 'auth.code_requested_no_account', { details: { email } });
-    return;
-  }
-  await issueEmailCode(email, { userId: user.id, purpose: 'sign_in', ctx });
-  await audit(userActor(user, ctx), 'auth.code_requested', { entityType: 'user', entityId: user.id });
+  const known = user && user.status === 'active' && !user.anonymisedAt ? user : null;
+  // The slow part (sending the email) happens after the reply either way, so the answer takes
+  // the same time whether or not the address has an account.
+  await afterResponse(async () => {
+    if (!known) {
+      await audit(anonymousActor(email, ctx), 'auth.code_requested_no_account', { details: { email } });
+      return;
+    }
+    await issueEmailCode(email, { userId: known.id, purpose: 'sign_in', ctx });
+    await audit(userActor(known, ctx), 'auth.code_requested', { entityType: 'user', entityId: known.id });
+  });
 }
 
 /** Checks a sign-in code. Returns the user on success. */
@@ -180,7 +201,9 @@ export async function signInWithPassword(emailRaw: string, password: string, ctx
     throw invalid(GENERIC_PASSWORD_ERROR);
   }
   if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-    throw invalid('Too many wrong passwords. Wait 15 minutes, or sign in with an email code instead.');
+    // The same message as a wrong password, so the pause does not reveal that the account exists.
+    await verifyPassword(await getDummyHash(), password);
+    throw invalid(GENERIC_PASSWORD_ERROR);
   }
   const ok = await verifyPassword(user.passwordHash, password);
   if (!ok) {
@@ -203,8 +226,28 @@ export async function signInWithPassword(emailRaw: string, password: string, ctx
   return user;
 }
 
-export async function setPassword(actor: Actor, newPassword: string, currentSessionId?: string) {
+/** Password changes need a sign-in from the last few minutes, so a borrowed or stolen session cannot make one. */
+export const RECENT_SIGN_IN_MS = 15 * 60 * 1000;
+
+function assertRecentSignIn(session: { createdAt: Date } | null | undefined) {
+  if (!session || Date.now() - session.createdAt.getTime() > RECENT_SIGN_IN_MS) {
+    throw invalid('For your security, sign out and sign in again, then change your password within 15 minutes.');
+  }
+}
+
+/** Tells the person about a change to how they sign in, in case it was not them. */
+async function sendSecurityNotice(actor: Actor, heading: string, what: string) {
+  const { html, text } = renderSimpleEmail({
+    heading,
+    paragraphs: [what, 'If this was not you, sign in with an emailed code straight away and contact the Media10 show team.'],
+    footer: 'BluePrint, the Media10 exhibitor manual.',
+  });
+  await sendEmail({ to: actor.email, toUserId: actor.userId, templateKey: 'security_notice', category: 'security', subject: heading, html, text });
+}
+
+export async function setPassword(actor: Actor, newPassword: string, currentSession?: { id: string; createdAt: Date } | null) {
   if (actor.readOnly) throw invalid('Changes are switched off while viewing as someone else.');
+  assertRecentSignIn(currentSession);
   const problem = passwordProblems(newPassword, actor.email);
   if (problem) throw invalid(problem, { password: problem });
   const db = await getDb();
@@ -213,15 +256,18 @@ export async function setPassword(actor: Actor, newPassword: string, currentSess
     .set({ passwordHash: await hashPassword(newPassword), failedPasswordAttempts: 0, lockedUntil: null })
     .where(eq(users.id, actor.userId));
   // Changing a password signs out every other device.
-  await revokeAllSessions(actor.userId, currentSessionId);
+  await revokeAllSessions(actor.userId, currentSession?.id);
   await audit(actor, 'auth.password_set', { entityType: 'user', entityId: actor.userId });
+  await sendSecurityNotice(actor, 'Your BluePrint password was set', 'A password was just set for your BluePrint account, and your other devices were signed out.');
 }
 
-export async function removePassword(actor: Actor) {
+export async function removePassword(actor: Actor, currentSession?: { id: string; createdAt: Date } | null) {
   if (actor.readOnly) throw invalid('Changes are switched off while viewing as someone else.');
+  assertRecentSignIn(currentSession);
   const db = await getDb();
   await db.update(users).set({ passwordHash: null }).where(eq(users.id, actor.userId));
   await audit(actor, 'auth.password_removed', { entityType: 'user', entityId: actor.userId });
+  await sendSecurityNotice(actor, 'Your BluePrint password was removed', 'The password on your BluePrint account was just removed. You will sign in with emailed codes.');
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +275,7 @@ export async function removePassword(actor: Actor) {
 // ---------------------------------------------------------------------------
 
 export async function beginTotpEnrollment(actor: Actor) {
+  if (actor.readOnly) throw invalid('Changes are switched off while viewing as someone else.');
   const db = await getDb();
   const [user] = await db.select().from(users).where(eq(users.id, actor.userId)).limit(1);
   if (!user) throw invalid('Account not found.');
@@ -246,6 +293,7 @@ export async function beginTotpEnrollment(actor: Actor) {
 }
 
 export async function confirmTotpEnrollment(actor: Actor, code: string): Promise<string[]> {
+  if (actor.readOnly) throw invalid('Changes are switched off while viewing as someone else.');
   await assertRateLimit(`totp-enrol:${actor.userId}`, 10, 15 * 60);
   const db = await getDb();
   const [user] = await db.select().from(users).where(eq(users.id, actor.userId)).limit(1);
@@ -258,13 +306,17 @@ export async function confirmTotpEnrollment(actor: Actor, code: string): Promise
     .update(users)
     .set({ totpEnabledAt: new Date(), totpLastStep: step, recoveryCodeHashes: recovery.map((c) => sha256Hex(c)) })
     .where(eq(users.id, user.id));
+  // Other devices signed in without two-factor; they must sign in again with it.
+  await revokeAllSessions(user.id, actor.sessionId);
   await audit(actor, 'auth.2fa_enabled', { entityType: 'user', entityId: user.id });
+  await sendSecurityNotice(actor, 'Two-factor sign-in is on', 'Two-factor sign-in was just turned on for your BluePrint account. Other devices were signed out.');
   return recovery;
 }
 
 /** Checks a TOTP or recovery code for the signed-in user. Returns true when it matches. */
 export async function verifySecondFactor(userId: string, codeRaw: string, ctx: RequestContext): Promise<boolean> {
   await assertRateLimit(`2fa:${userId}`, 10, 15 * 60);
+  await assertRateLimit(`2fa-day:${userId}`, 40, 24 * 3600);
   const db = await getDb();
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user?.totpSecretEnc || !user.totpEnabledAt) return false;
@@ -298,7 +350,6 @@ export async function verifySecondFactor(userId: string, codeRaw: string, ctx: R
   return false;
 }
 
-/** Super admin support action: clears a user's two-factor so they can set it up again. */
 /** Super admins only: clears someone's two-factor set-up after checking who they are. */
 export async function resetTwoFactor(actor: Actor, userId: string) {
   if (!actor.isSuperAdmin || actor.readOnly) throw forbidden();

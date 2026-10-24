@@ -2,13 +2,15 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '../db/client';
-import { sessions } from '../db/schema';
+import { companyMembers, editionStaff, sessions, stands } from '../db/schema';
 import { env } from '../env';
+import { localPath } from '@/lib/safe-redirect';
+import { memberCovers } from '../authz';
 import { AppError } from '../errors';
 import type { Actor } from './actor';
-import { isStaffUser, revokeSession, validateSessionToken, type SessionRow, type SessionUser } from './sessions';
+import { createSession, isStaffUser, revokeSession, validateSessionToken, type SessionRow, type SessionUser } from './sessions';
 import type { RequestContext } from './login';
 
 const COOKIE_NAME_PROD = '__Host-bp_session';
@@ -48,6 +50,16 @@ export async function clearSessionCookie() {
   store.set(cookieName(), '', { httpOnly: true, secure: secureCookies(), sameSite: 'lax', path: '/', maxAge: 0 });
 }
 
+/**
+ * Swaps this browser's session for a brand-new one (a new token), for example once two-factor has
+ * been passed, so a token seen before that point is worthless.
+ */
+export async function renewSession(auth: CurrentAuth, opts: { twoFactorVerified: boolean }) {
+  const { token, expiresAt } = await createSession(auth.user.id, { ...(await requestContext()), twoFactorVerified: opts.twoFactorVerified });
+  await revokeSession(auth.session.id);
+  await setSessionCookie(token, expiresAt);
+}
+
 export type CurrentAuth = {
   session: SessionRow;
   /** The person actually signed in. */
@@ -60,17 +72,47 @@ export type CurrentAuth = {
   needsSecondFactor: boolean;
 };
 
+/**
+ * Viewing as someone is re-checked on every request: the admin must still run that show (or be a
+ * super admin) and the person must still exhibit there. Otherwise the view simply ends.
+ */
+async function viewAsStillAllowed(real: SessionUser, target: SessionUser, editionId: string | null) {
+  if (!editionId || target.isSuperAdmin || target.id === real.id) return false;
+  const db = await getDb();
+  if (!real.isSuperAdmin) {
+    const [staff] = await db
+      .select({ role: editionStaff.role })
+      .from(editionStaff)
+      .where(and(eq(editionStaff.editionId, editionId), eq(editionStaff.userId, real.id)))
+      .limit(1);
+    if (staff?.role !== 'show_admin') return false;
+  }
+  const [link] = await db
+    .select({ id: stands.id })
+    .from(companyMembers)
+    .innerJoin(stands, and(eq(stands.companyId, companyMembers.companyId), eq(stands.editionId, editionId), eq(stands.status, 'active')))
+    .where(and(eq(companyMembers.userId, target.id), memberCovers(editionId)))
+    .limit(1);
+  return Boolean(link);
+}
+
 /** The signed-in person for this request (memoised per request). */
 export const getCurrentAuth = cache(async (): Promise<CurrentAuth | null> => {
   const store = await cookies();
   const token = store.get(cookieName())?.value;
   const valid = await validateSessionToken(token);
   if (!valid) return null;
-  const { session, user, viewAsUser } = valid;
+  const { session, user } = valid;
+  let { viewAsUser } = valid;
+  if (viewAsUser && !(await viewAsStillAllowed(user, viewAsUser, session.viewAsEditionId))) {
+    await setViewAs(session.id, null, null);
+    viewAsUser = null;
+  }
   const ctx = await requestContext();
   const isStaff = await isStaffUser(user.id);
   const needsTwoFactorSetup = isStaff && !user.totpEnabledAt;
-  const needsSecondFactor = isStaff && Boolean(user.totpEnabledAt) && !session.twoFactorVerified;
+  // Anyone with two-factor turned on must pass it, staff or not.
+  const needsSecondFactor = Boolean(user.totpEnabledAt) && !session.twoFactorVerified;
 
   const actor: Actor = viewAsUser
     ? {
@@ -80,6 +122,8 @@ export const getCurrentAuth = cache(async (): Promise<CurrentAuth | null> => {
         // Viewing as someone never carries super admin rights, and nothing can be changed.
         isSuperAdmin: false,
         readOnly: true,
+        // Only the show the admin was allowed to view (an empty value matches nothing).
+        viewAsEditionId: session.viewAsEditionId ?? '',
         realUserId: user.id,
         realEmail: user.email,
         sessionId: session.id,
@@ -101,13 +145,14 @@ export const getCurrentAuth = cache(async (): Promise<CurrentAuth | null> => {
   return { session, user, actor, viewAsUser, isStaff, needsTwoFactorSetup, needsSecondFactor };
 });
 
+/** Whether two-factor was turned on in the last few minutes (while the person saves their recovery codes). */
+export function twoFactorJustTurnedOn(user: { totpEnabledAt: Date | null }) {
+  return Boolean(user.totpEnabledAt && Date.now() - user.totpEnabledAt.getTime() < 10 * 60 * 1000);
+}
+
 /** Only relative paths inside the app, so the sign-in page cannot be used as an open redirect. */
 export function safeNextPath(next: string | null | undefined, fallback = '/'): string {
-  if (!next || typeof next !== 'string') return fallback;
-  if (!next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\') || next.includes('\n') || next.length > 500) {
-    return fallback;
-  }
-  return next;
+  return localPath(next) ?? fallback;
 }
 
 async function currentPath() {
