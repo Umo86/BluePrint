@@ -1,0 +1,2 @@
+ALTER TABLE "space_only_packs" ADD COLUMN "draft_documents" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "space_only_packs" ADD COLUMN "submitted_at" timestamp with time zone;

@@ -98,3 +98,30 @@ export function watchForErrors(page: Page) {
 export async function expectToast(page: Page, text: string | RegExp) {
   await expect(page.locator('.mantine-Notification-root', { hasText: text }).first()).toBeVisible();
 }
+
+/** Finds the invitation link in the newest email to `email` in the development mailbox. */
+export async function latestInviteLink(page: Page, email: string): Promise<string> {
+  const mailbox = await page.context().newPage();
+  await mailbox.goto('/dev/mailbox');
+  const row = mailbox.locator('tr', { hasText: email }).first();
+  await expect(row).toBeVisible();
+  const href = await row.getByTestId('mail-subject').getAttribute('href');
+  const res = await mailbox.request.get(href!);
+  const html = await res.text();
+  await mailbox.close();
+  const m = html.match(/href="(https?:\/\/[^"]*\/invite\/[A-Za-z0-9_-]+)"/);
+  if (!m) throw new Error(`No invitation link in the latest email to ${email}`);
+  return new URL(m[1]).pathname;
+}
+
+/** First sign-in for a staff member without two-factor yet: email code, then authenticator set-up. */
+export async function signInStaffFirstTime(page: Page, email: string) {
+  await signInWithCode(page, email);
+  await expect(page).toHaveURL(/two-factor-setup/);
+  const keyText = await page.getByText(/^Key:/).innerText();
+  const secret = keyText.replace('Key:', '').replace(/\s/g, '');
+  await page.getByLabel('Six-digit code').fill(totp(secret));
+  await page.getByRole('button', { name: 'Turn on two-factor sign-in' }).click();
+  await page.getByRole('button', { name: 'I have saved my codes' }).click();
+  return secret;
+}

@@ -224,6 +224,9 @@ export const spaceOnlyPacks = pgTable(
     insuranceExpiresOn: date('insurance_expires_on'),
     insuranceCoverGbp: integer('insurance_cover_gbp'),
     conditions: text('conditions'),
+    /** Documents uploaded but not yet sent for review (document type to file ids). */
+    draftDocuments: jsonb('draft_documents').$type<Partial<Record<string, string[]>>>().notNull().default({}),
+    submittedAt: timestamp('submitted_at', tz),
     decidedAt: timestamp('decided_at', tz),
     decidedBy: uuid('decided_by'),
     certificateFileId: uuid('certificate_file_id'),

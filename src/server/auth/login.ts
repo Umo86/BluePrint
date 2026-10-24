@@ -7,7 +7,7 @@ import { decryptSecret, encryptSecret, numericCode, safeEqual, sha256Hex } from 
 import { hashPassword, passwordProblems, verifyPassword } from '../security/password';
 import { assertRateLimit } from '../security/rate-limit';
 import { generateRecoveryCodes, generateTotpSecret, otpauthUri, verifyTotp } from '../security/totp';
-import { invalid } from '../errors';
+import { forbidden, invalid } from '../errors';
 import { audit } from '../audit';
 import { sendEmail } from '../email/send';
 import { renderSimpleEmail } from '../email/simple';
@@ -233,8 +233,13 @@ export async function beginTotpEnrollment(actor: Actor) {
   const [user] = await db.select().from(users).where(eq(users.id, actor.userId)).limit(1);
   if (!user) throw invalid('Account not found.');
   if (user.totpEnabledAt) throw invalid('Two-factor sign-in is already set up.');
-  const secret = generateTotpSecret();
-  await db.update(users).set({ totpSecretEnc: encryptSecret(secret), totpLastStep: null }).where(eq(users.id, user.id));
+  // Reuse a set-up that was started but not finished (for example after a page refresh), so the
+  // code the person already added to their app keeps working.
+  let secret = user.totpSecretEnc ? decryptSecret(user.totpSecretEnc) : null;
+  if (!secret) {
+    secret = generateTotpSecret();
+    await db.update(users).set({ totpSecretEnc: encryptSecret(secret), totpLastStep: null }).where(eq(users.id, user.id));
+  }
   const uri = otpauthUri(secret, user.email);
   const qrDataUrl = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
   return { secret, uri, qrDataUrl };
@@ -294,7 +299,10 @@ export async function verifySecondFactor(userId: string, codeRaw: string, ctx: R
 }
 
 /** Super admin support action: clears a user's two-factor so they can set it up again. */
+/** Super admins only: clears someone's two-factor set-up after checking who they are. */
 export async function resetTwoFactor(actor: Actor, userId: string) {
+  if (!actor.isSuperAdmin || actor.readOnly) throw forbidden();
+  if (userId === actor.realUserId) throw forbidden('Ask another super admin to reset your two-factor sign-in.');
   const db = await getDb();
   await db
     .update(users)

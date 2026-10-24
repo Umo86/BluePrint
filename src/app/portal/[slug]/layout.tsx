@@ -1,4 +1,4 @@
-import { IconBook2, IconBuildingStore, IconChecklist, IconHome } from '@tabler/icons-react';
+import { IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconHome } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth } from '@/server/auth/current';
@@ -18,6 +18,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
   const nav: NavItem[] = [
     { label: 'Home', href: base, exact: true, icon: <IconHome size={18} /> },
     { label: 'Your checklist', href: `${base}/checklist`, icon: <IconChecklist size={18} />, badge: toDo || null },
+    ...(ctx.stand.isSpaceOnly ? [{ label: 'Stand approval', href: `${base}/space-only`, icon: <IconCrane size={18} /> }] : []),
     { label: 'Exhibitor manual', href: `${base}/manual`, icon: <IconBook2 size={18} /> },
     { label: 'Your company and team', href: `${base}/company`, icon: <IconBuildingStore size={18} /> },
   ];

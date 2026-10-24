@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Center, Code, CopyButton, Image, List, Loader, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 import { useAction } from '@/lib/use-action';
@@ -14,7 +14,10 @@ export function EnrollForm() {
   const begin = useAction(beginEnrollmentAction, { onSuccess: (d) => d && setSetup(d) });
   const confirm = useAction(confirmEnrollmentAction, { onSuccess: (d) => d && setRecovery(d.recoveryCodes) });
 
+  const started = useRef(false);
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     void begin.run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

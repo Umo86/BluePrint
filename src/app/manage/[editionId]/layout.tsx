@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { IconAddressBook, IconBook2, IconChecklist, IconLayoutDashboard, IconLayoutGrid, IconSettings, IconUsersGroup } from '@tabler/icons-react';
+import { IconAddressBook, IconBook2, IconChecklist, IconCrane, IconLayoutDashboard, IconLayoutGrid, IconSettings, IconUsersGroup } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth, requireActor } from '@/server/auth/current';
@@ -33,6 +33,9 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
     nav.push({ label: 'Stands', href: `${base}/stands`, icon: <IconLayoutGrid size={18} />, section: 'Exhibitors' });
     nav.push({ label: 'Tasks and forms', href: `${base}/tasks`, icon: <IconChecklist size={18} />, section: 'Exhibitor manual' });
     nav.push({ label: 'Manual pages', href: `${base}/manual`, icon: <IconBook2 size={18} />, section: 'Exhibitor manual' });
+  }
+  if (p.has('review_space_only') || p.has('manage_exhibitors')) {
+    nav.push({ label: 'Space-only approvals', href: `${base}/space-only`, icon: <IconCrane size={18} />, section: 'Exhibitors' });
   }
   if (isAdmin || p.has('edit_content') || p.has('manage_exhibitors')) {
     nav.push({ label: 'Show settings', href: `${base}/settings`, icon: <IconSettings size={18} />, section: 'Set-up' });

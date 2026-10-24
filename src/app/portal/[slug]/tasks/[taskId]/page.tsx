@@ -79,7 +79,9 @@ export default async function TaskPage({ params }: PageProps<'/portal/[slug]/tas
       ) : null}
       {t.task.kind === 'order' ? <Alert color="blue">Order the services you need from the shop. This task is completed when your order is paid.</Alert> : null}
       {t.task.kind === 'contractor_nomination' || t.task.kind === 'space_only_pack' ? (
-        <Alert color="blue">This is done on your space-only stand page, where you nominate your contractor and send your stand pack.</Alert>
+        <Alert color="blue">
+          This is done on your <TextLink href={`${base}/space-only`}>stand approval page</TextLink>, where you nominate your contractor and send your stand pack.
+        </Alert>
       ) : null}
       {t.requirement !== 'required' && !t.done && t.task.kind !== 'info' ? (
         <TaskMarkButtons slug={ctx.edition.slug} standId={ctx.stand.id} taskId={t.task.id} mode="not_needed" done={false} editable={editable} />
