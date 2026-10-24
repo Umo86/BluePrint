@@ -25,6 +25,8 @@ export function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Lets server components send people back to the page they asked for after signing in.
+  requestHeaders.set('x-pathname', request.nextUrl.pathname + request.nextUrl.search);
   requestHeaders.set('Content-Security-Policy', csp);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
