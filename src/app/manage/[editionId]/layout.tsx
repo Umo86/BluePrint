@@ -1,5 +1,18 @@
 import { notFound } from 'next/navigation';
-import { IconAddressBook, IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconLayoutDashboard, IconLayoutGrid, IconMail, IconReceipt, IconSettings, IconUsersGroup } from '@tabler/icons-react';
+import {
+  IconAddressBook,
+  IconBook2,
+  IconBuildingStore,
+  IconChecklist,
+  IconCrane,
+  IconLayoutDashboard,
+  IconLayoutGrid,
+  IconMail,
+  IconReceipt,
+  IconSettings,
+  IconSpeakerphone,
+  IconUsersGroup,
+} from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth, requireActor } from '@/server/auth/current';
@@ -40,6 +53,7 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
   if (p.has('view')) {
     nav.push({ label: 'Tasks and forms', href: `${base}/tasks`, icon: <IconChecklist size={18} />, section: 'Exhibitor manual' });
     nav.push({ label: 'Manual pages', href: `${base}/manual`, icon: <IconBook2 size={18} />, section: 'Exhibitor manual' });
+    nav.push({ label: 'Announcements', href: `${base}/announcements`, icon: <IconSpeakerphone size={18} />, section: 'Exhibitor manual' });
   }
   if (p.has('manage_orders')) nav.push({ label: 'Shop catalogue', href: `${base}/shop`, icon: <IconBuildingStore size={18} />, section: 'Shop' });
   if (p.has('manage_orders') || p.has('view_reports')) nav.push({ label: 'Orders', href: `${base}/orders`, icon: <IconReceipt size={18} />, section: 'Shop' });

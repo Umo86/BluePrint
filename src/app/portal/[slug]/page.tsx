@@ -15,7 +15,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
   const [checklist, pages, news] = await Promise.all([
     checklistForStand(ctx.actor, ctx.stand.id),
     pagesForType(ctx.edition.id, ctx.stand.typeId),
-    announcementsForType(ctx.edition.id, ctx.stand.typeId),
+    announcementsForType(ctx.edition.id, ctx.stand.typeId, 6),
   ]);
   const base = `/portal/${ctx.edition.slug}`;
   const p = checklist.progress;
@@ -128,7 +128,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
           ) : null}
         </Paper>
         <Stack>
-          {news.map((a) => (
+          {news.slice(0, 5).map((a) => (
             <Paper key={a.id} withBorder p="md">
               <Group gap="xs" mb={4}>
                 <Title order={3} fz="md">
@@ -143,6 +143,11 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
               <RichHtml html={a.bodyHtml} />
             </Paper>
           ))}
+          {news.length > 5 ? (
+            <TextLink href={`${base}/announcements`} fz="sm">
+              See all announcements
+            </TextLink>
+          ) : null}
           <Paper withBorder p="md">
             <Title order={2} fz="md" mb="sm">
               Useful pages
