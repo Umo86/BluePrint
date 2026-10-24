@@ -10,7 +10,7 @@ export async function waitForApp(page: Page) {
  * Pages that are plain responses (404s, downloads) are returned as soon as they load.
  */
 export const test = base.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, provide) => {
     const goto = page.goto.bind(page);
     const reload = page.reload.bind(page);
     page.goto = async (url, options) => {
@@ -23,7 +23,7 @@ export const test = base.extend({
       if (res && res.ok()) await waitForApp(page);
       return res;
     };
-    await use(page);
+    await provide(page);
   },
 });
 
