@@ -29,6 +29,8 @@ export const suppliers = pgTable(
     stripeDetailsSubmitted: boolean('stripe_details_submitted').notNull().default(false),
     commissionType: text('commission_type', { enum: COMMISSION_TYPES }),
     commissionValue: integer('commission_value'),
+    /** VAT-registered suppliers are paid VAT on their share; others are paid their share only. */
+    vatRegistered: boolean('vat_registered').notNull().default(true),
     status: text('status', { enum: ['active', 'disabled'] }).notNull().default('active'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -173,6 +175,10 @@ export const orders = pgTable(
     totalPence: integer('total_pence').notNull(),
     refundedPence: integer('refunded_pence').notNull().default(0),
     poNumber: text('po_number'),
+    /** Invoice orders: when payment is due. */
+    dueAt: timestamp('due_at', tz),
+    /** Invoice orders: the bank reference finance recorded when marking it paid. */
+    paymentReference: text('payment_reference'),
     stripeCheckoutSessionId: text('stripe_checkout_session_id'),
     stripePaymentIntentId: text('stripe_payment_intent_id'),
     stripeChargeId: text('stripe_charge_id'),
@@ -214,6 +220,8 @@ export const orderLines = pgTable(
     details: jsonb('details').$type<Record<string, unknown>>().notNull().default({}),
     fulfilmentStatus: text('fulfilment_status', { enum: FULFILMENT_STATUSES }).notNull().default('received'),
     refundedPence: integer('refunded_pence').notNull().default(0),
+    /** The basket item this line came from, so only those items are cleared once paid. */
+    cartItemId: uuid('cart_item_id'),
   },
   (t) => [index('order_lines_order_idx').on(t.orderId), index('order_lines_supplier_idx').on(t.supplierId)],
 );
@@ -235,10 +243,13 @@ export const supplierTransfers = pgTable(
       .notNull()
       .default('pending'),
     error: text('error'),
+    /** Manual payouts (invoice orders): when finance paid the supplier, and their reference. */
+    settledAt: timestamp('settled_at', tz),
+    reference: text('reference'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex('supplier_transfers_unique').on(t.orderId, t.supplierId)],
+  (t) => [uniqueIndex('supplier_transfers_unique').on(t.orderId, t.supplierId), index('supplier_transfers_supplier_idx').on(t.supplierId)],
 );
 
 export const refunds = pgTable(
@@ -250,6 +261,12 @@ export const refunds = pgTable(
       .references(() => orders.id, { onDelete: 'cascade' }),
     orderLineId: uuid('order_line_id'),
     amountPence: integer('amount_pence').notNull(),
+    /** How the refund splits across order lines (line id to pence), and any card fee returned. */
+    lineAmounts: jsonb('line_amounts').$type<Record<string, number>>().notNull().default({}),
+    cardFeePence: integer('card_fee_pence').notNull().default(0),
+    error: text('error'),
+    /** When the refund was applied to the order, its lines and the supplier payouts (exactly once). */
+    appliedAt: timestamp('applied_at', tz),
     reason: text('reason'),
     stripeRefundId: text('stripe_refund_id'),
     status: text('status', { enum: ['pending', 'succeeded', 'failed', 'manual'] }).notNull().default('pending'),
@@ -268,11 +285,13 @@ export const invoices = pgTable(
       .notNull()
       .references(() => orders.id, { onDelete: 'cascade' }),
     kind: text('kind', { enum: ['invoice', 'receipt', 'credit_note'] }).notNull(),
+    /** Credit notes: the refund they record (one credit note per refund). */
+    refundId: uuid('refund_id'),
     totalPence: integer('total_pence').notNull(),
     fileId: uuid('file_id'),
     issuedAt: timestamp('issued_at', tz).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('invoices_number_unique').on(t.number), index('invoices_order_idx').on(t.orderId)],
+  (t) => [uniqueIndex('invoices_number_unique').on(t.number), index('invoices_order_idx').on(t.orderId), uniqueIndex('invoices_refund_unique').on(t.refundId)],
 );
 
 /** Stripe webhook events already processed, so a retried event is never applied twice. */

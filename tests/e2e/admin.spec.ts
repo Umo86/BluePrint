@@ -108,8 +108,15 @@ test('super admin dashboard: every page works and changes are saved', async ({ p
     await page.getByRole('link', { name: 'PowerOn Electrical' }).click();
     await page.getByText('Percentage').click();
     await page.getByRole('textbox', { name: 'Percent' }).fill('12.5');
-    await page.getByRole('button', { name: 'Save commission' }).click();
-    await expectToast(page, 'Commission saved.');
+    // PowerOn is not VAT registered, so it is paid its share without VAT.
+    await page.getByLabel('VAT registered').uncheck();
+    await page.getByRole('button', { name: 'Save commission and VAT' }).click();
+    await expectToast(page, 'Commission and VAT saved.');
+    await page.reload();
+    await expect(page.getByLabel('VAT registered')).not.toBeChecked();
+    await page.getByLabel('VAT registered').check();
+    await page.getByRole('button', { name: 'Save commission and VAT' }).click();
+    await expectToast(page, 'Commission and VAT saved.');
     await page.getByLabel('Invite someone from this supplier').fill(`new.${stamp}@poweron.test`);
     await page.getByRole('button', { name: 'Send invitation' }).click();
     await expectToast(page, 'Invitation sent.');

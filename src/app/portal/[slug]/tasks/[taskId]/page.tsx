@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Alert, Badge, Group, Paper, Stack, Text, Title } from '@mantine/core';
-import { TextLink } from '@/components/links';
+import { ButtonLink, TextLink } from '@/components/links';
 import { RichHtml } from '@/components/rich-html';
 import { taskForStand } from '@/server/services/submissions';
 import { AppError } from '@/server/errors';
@@ -77,7 +77,18 @@ export default async function TaskPage({ params }: PageProps<'/portal/[slug]/tas
       {t.task.kind === 'info' ? (
         <TaskMarkButtons slug={ctx.edition.slug} standId={ctx.stand.id} taskId={t.task.id} mode="info" done={t.state === 'completed'} editable={editable} />
       ) : null}
-      {t.task.kind === 'order' ? <Alert color="blue">Order the services you need from the shop. This task is completed when your order is paid.</Alert> : null}
+      {t.task.kind === 'order' ? (
+        <Alert color="blue">
+          <Stack gap="xs">
+            <Text fz="sm">Order the services you need from the shop. This task is completed as soon as your order is paid (or placed on invoice).</Text>
+            <Group>
+              <ButtonLink href={`/portal/${ctx.edition.slug}/shop`} size="xs">
+                Go to the shop
+              </ButtonLink>
+            </Group>
+          </Stack>
+        </Alert>
+      ) : null}
       {t.task.kind === 'contractor_nomination' || t.task.kind === 'space_only_pack' ? (
         <Alert color="blue">
           This is done on your <TextLink href={`${base}/space-only`}>stand approval page</TextLink>, where you nominate your contractor and send your stand pack.

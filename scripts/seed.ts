@@ -7,11 +7,14 @@
  */
 import { eq } from 'drizzle-orm';
 import { getDb, closeDb } from '../src/server/db/client';
-import { companies, companyMembers, editionStaff, exhibitorTypes, halls, stands, supplierUsers, users } from '../src/server/db/schema';
+import { companies, companyMembers, editionStaff, exhibitorTypes, halls, stands, supplierUsers, suppliers as suppliersTable, users } from '../src/server/db/schema';
 import { encryptSecret } from '../src/server/security/crypto';
 import { generateTotpSecret } from '../src/server/security/totp';
 import { createEdition, createShow } from '../src/server/services/editions';
 import { createSupplier } from '../src/server/services/suppliers';
+import { createCategory, createProduct } from '../src/server/services/catalogue';
+import { createTask } from '../src/server/services/tasks';
+import { updatePlatformSettings } from '../src/server/services/settings';
 import type { Actor } from '../src/server/auth/actor';
 
 const DEMO_ADMIN = 'admin@blueprint.test';
@@ -129,16 +132,96 @@ async function main() {
     { name: 'PowerOn Electrical', email: 'orders@poweron.test', user: ['Pete Power', 'pete@poweron.test'] },
     { name: 'ShowSound AV', email: 'orders@showsound.test', user: ['Sophie Sound', 'sophie@showsound.test'] },
   ];
+  const supplierIds: Record<string, string> = {};
   for (const s of suppliers) {
     const sup = await createSupplier(actor, { name: s.name, email: s.email });
+    supplierIds[s.name] = sup.id;
     const [u] = await db.insert(users).values({ email: s.user[1], name: s.user[0], status: 'active' }).returning();
     await db.insert(supplierUsers).values({ supplierId: sup.id, userId: u.id });
   }
+  // Expo Furniture Hire has finished payout set-up (in the local payment simulator); the others have not.
+  await db
+    .update(suppliersTable)
+    .set({ stripeAccountId: 'acct_simdemofurniture', stripePayoutsEnabled: true, stripeChargesEnabled: true, stripeDetailsSubmitted: true })
+    .where(eq(suppliersTable.id, supplierIds['Expo Furniture Hire']));
+
+  // Shop ------------------------------------------------------------------------
+  const furniture = await createCategory(actor, london.id, {
+    name: 'Furniture',
+    description: 'Delivered to your stand before build-up ends and collected after the show.',
+    supplierId: supplierIds['Expo Furniture Hire'],
+    orderByOffsetDays: 21,
+    commissionType: 'percent',
+    commissionValue: 1500,
+  });
+  const electrics = await createCategory(actor, london.id, {
+    name: 'Electrics',
+    description: 'Every stand needs its electrics ordered in advance. Space-only stands must order a mains supply.',
+    supplierId: supplierIds['PowerOn Electrical'],
+    orderByOffsetDays: 28,
+    commissionType: 'percent',
+    commissionValue: 1000,
+  });
+  const av = await createCategory(actor, london.id, { name: 'Audio visual', supplierId: supplierIds['ShowSound AV'], orderByOffsetDays: 14 });
+  const cleaning = await createCategory(actor, london.id, { name: 'Stand cleaning', description: 'Provided by the organiser.', orderByOffsetDays: 7, visibleToTypes: [shell.id] });
+  const product = (categoryId: string, p: Omit<Parameters<typeof createProduct>[2], 'categoryId'>) => createProduct(actor, london.id, { categoryId, ...p });
+  await product(furniture.id, { name: 'Folding chair', description: 'Padded seat, stackable.', pricePence: 1800, vatRateBps: 2000, stockLimit: 200, options: [{ name: 'Colour', values: ['Black', 'White'] }] });
+  await product(furniture.id, { name: 'Poseur table', description: '60 cm round top, 110 cm high.', pricePence: 4500, vatRateBps: 2000, options: [{ name: 'Top', values: ['White', 'Black'] }] });
+  await product(furniture.id, {
+    name: 'Lockable counter',
+    description: '1 m wide with a lockable cupboard and shelf.',
+    pricePence: 9500,
+    earlyPricePence: 8500,
+    earlyUntilOffsetDays: 42,
+    latePricePence: 12_000,
+    lateFromOffsetDays: 10,
+    vatRateBps: 2000,
+    stockLimit: 40,
+  });
+  await product(furniture.id, { name: 'Literature rack', pricePence: 3500, vatRateBps: 2000 });
+  await product(electrics.id, {
+    name: '500 W power socket',
+    description: 'Single 13 A socket, live from the start of build-up.',
+    pricePence: 8500,
+    latePricePence: 11_000,
+    lateFromOffsetDays: 10,
+    vatRateBps: 2000,
+    requiredDetails: [{ id: 'position', label: 'Where on the stand should it go?', type: 'text', required: true }],
+  });
+  await product(electrics.id, { name: 'LED spotlight on arm', pricePence: 4200, vatRateBps: 2000 });
+  await product(electrics.id, { name: '24-hour power supply', description: 'For fridges and servers that must stay on overnight.', pricePence: 16_000, vatRateBps: 2000 });
+  await product(av.id, { name: '55-inch screen with floor stand', description: 'HDMI input, delivered and set up on your stand.', pricePence: 29_500, vatRateBps: 2000, stockLimit: 20 });
+  await product(cleaning.id, { name: 'Daily stand clean', description: 'Vacuum, empty bins and wipe down each morning of the show.', unit: 'per day', pricePence: 3500, vatRateBps: 2000 });
+  await createTask(actor, london.id, {
+    title: 'Order your stand electrics',
+    descriptionHtml: '<p>Order sockets and lighting from the shop. Space-only stands must order their mains supply.</p>',
+    kind: 'order',
+    linkedCategoryId: electrics.id,
+    deadline: { mode: 'offset', offsetDays: 28 },
+    published: true,
+    requirements: { [space.id]: 'required', [shell.id]: 'if_applicable' },
+  });
+  // Dura Roofing has an account with Media10, so it can pay on invoice.
+  await db.update(companies).set({ invoiceAllowed: true }).where(eq(companies.name, 'Dura Roofing Group'));
+  await updatePlatformSettings(actor, {
+    invoicing: {
+      legalName: 'Media 10 Limited',
+      address: 'Demo address: set the real one in Platform settings',
+      vatNumber: 'GB 000 0000 00',
+      companyNumber: '00000000',
+      email: 'accounts@media10.example',
+      phone: '',
+      paymentInstructions: 'Demo bank details: set the real ones in Platform settings.',
+      dueDays: 30,
+      footer: 'Questions about this invoice? Email accounts@media10.example',
+    },
+    orderTerms: 'Orders are confirmed when paid, or when placed on an approved invoice account. Cancellations more than 14 days before build-up are refunded in full; after that, at the show team’s discretion.',
+  });
 
   console.log('\nDemo data created.');
   console.log(`Super admin: ${DEMO_ADMIN} (sign in with the emailed code from /dev/mailbox)`);
   console.log(`Two-factor key for your authenticator app: ${totpSecret}`);
-  console.log('Show admin: ops@blueprint.test · Exhibitor: amira@acme-insulation.test · Supplier: fiona@expofurniture.test\n');
+  console.log('Show admin: ops@blueprint.test · Exhibitor: amira@acme-insulation.test (card) or dev@duraroofing.test (invoice) · Supplier: fiona@expofurniture.test\n');
   await closeDb();
 }
 

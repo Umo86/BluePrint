@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { IconAddressBook, IconBook2, IconChecklist, IconCrane, IconLayoutDashboard, IconLayoutGrid, IconSettings, IconUsersGroup } from '@tabler/icons-react';
+import { IconAddressBook, IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconLayoutDashboard, IconLayoutGrid, IconReceipt, IconSettings, IconUsersGroup } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth, requireActor } from '@/server/auth/current';
@@ -31,12 +31,17 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
     nav.push({ label: 'Overview', href: base, exact: true, icon: <IconLayoutDashboard size={18} /> });
     nav.push({ label: 'Exhibitors', href: `${base}/exhibitors`, icon: <IconAddressBook size={18} />, section: 'Exhibitors' });
     nav.push({ label: 'Stands', href: `${base}/stands`, icon: <IconLayoutGrid size={18} />, section: 'Exhibitors' });
-    nav.push({ label: 'Tasks and forms', href: `${base}/tasks`, icon: <IconChecklist size={18} />, section: 'Exhibitor manual' });
-    nav.push({ label: 'Manual pages', href: `${base}/manual`, icon: <IconBook2 size={18} />, section: 'Exhibitor manual' });
   }
+  // Kept with the other exhibitor pages (health and safety reviewers see only this one).
   if (p.has('review_space_only') || p.has('manage_exhibitors')) {
     nav.push({ label: 'Space-only approvals', href: `${base}/space-only`, icon: <IconCrane size={18} />, section: 'Exhibitors' });
   }
+  if (p.has('view')) {
+    nav.push({ label: 'Tasks and forms', href: `${base}/tasks`, icon: <IconChecklist size={18} />, section: 'Exhibitor manual' });
+    nav.push({ label: 'Manual pages', href: `${base}/manual`, icon: <IconBook2 size={18} />, section: 'Exhibitor manual' });
+  }
+  if (p.has('manage_orders')) nav.push({ label: 'Shop catalogue', href: `${base}/shop`, icon: <IconBuildingStore size={18} />, section: 'Shop' });
+  if (p.has('manage_orders') || p.has('view_reports')) nav.push({ label: 'Orders', href: `${base}/orders`, icon: <IconReceipt size={18} />, section: 'Shop' });
   if (isAdmin || p.has('edit_content') || p.has('manage_exhibitors')) {
     nav.push({ label: 'Show settings', href: `${base}/settings`, icon: <IconSettings size={18} />, section: 'Set-up' });
   }

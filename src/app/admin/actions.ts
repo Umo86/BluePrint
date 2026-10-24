@@ -31,6 +31,8 @@ import { resetTwoFactor } from '@/server/auth/login';
 import { createInvitation, resendInvitation, revokeInvitation } from '@/server/auth/invitations';
 import { createCompany, setCompanyArchived, setCompanyInvoiceAllowed, setMemberAccess, updateCompany, removeMember } from '@/server/services/companies';
 import { createSupplier, removeSupplierUser, setSupplierStatus, updateSupplier, updateSupplierCommission } from '@/server/services/suppliers';
+import { adminRefreshSupplierStripe } from '@/server/services/supplier-portal';
+import { processTransfers } from '@/server/services/orders';
 import { createLibraryItem, deleteLibraryItem, updateLibraryItem, type LibraryKind } from '@/server/services/library';
 import { updatePlatformSettings, type PlatformSettings } from '@/server/services/settings';
 import { removeSuppression, retryFailedEmails } from '@/server/services/system';
@@ -283,11 +285,29 @@ export async function updateSupplierAction(supplierId: string, input: { name: st
   }, 'Supplier saved.');
 }
 
-export async function updateSupplierCommissionAction(supplierId: string, type: 'percent' | 'fixed' | null, value: number | null): Promise<ActionResult> {
+export async function updateSupplierCommissionAction(supplierId: string, type: 'percent' | 'fixed' | null, value: number | null, vatRegistered?: boolean): Promise<ActionResult> {
   return runAction(async () => {
-    await updateSupplierCommission(await superAdmin(), supplierId, { commissionType: type, commissionValue: value });
+    await updateSupplierCommission(await superAdmin(), supplierId, { commissionType: type, commissionValue: value, vatRegistered: typeof vatRegistered === 'boolean' ? vatRegistered : undefined });
     revalidatePath(`/admin/suppliers/${supplierId}`);
-  }, 'Commission saved.');
+  }, 'Commission and VAT saved.');
+}
+
+export async function refreshSupplierStripeAction(supplierId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await superAdmin();
+    await adminRefreshSupplierStripe(String(supplierId));
+    revalidatePath(`/admin/suppliers/${supplierId}`);
+  }, 'Checked with Stripe.');
+}
+
+export async function retryAllTransfersAction(): Promise<ActionResult<{ attempted: number; sent: number }>> {
+  return runAction(async () => {
+    const actor = await superAdmin();
+    const r = await processTransfers({ includeFailed: true });
+    await audit(actor, 'shop.transfers_retried', { details: r });
+    revalidatePath('/admin/payments');
+    return r;
+  });
 }
 
 export async function setSupplierStatusAction(supplierId: string, status: 'active' | 'disabled'): Promise<ActionResult> {

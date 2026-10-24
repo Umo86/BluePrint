@@ -18,6 +18,8 @@ export const supplierSchema = z.object({
 export const supplierCommissionSchema = z.object({
   commissionType: z.enum(['percent', 'fixed']).nullable(),
   commissionValue: z.number().int().min(0).max(1_000_000).nullable(),
+  /** Whether the supplier charges VAT on their share (so is paid it). Super admins only. */
+  vatRegistered: z.boolean().optional(),
 });
 
 /** Super admins, and show admins of any edition (they assign suppliers to categories). */
@@ -106,7 +108,10 @@ export async function updateSupplierCommission(actor: Actor, supplierId: string,
   assertSuperAdmin(actor);
   const data = supplierCommissionSchema.parse(input);
   const db = await getDb();
-  await db.update(suppliers).set(data).where(eq(suppliers.id, supplierId));
+  await db
+    .update(suppliers)
+    .set({ commissionType: data.commissionType, commissionValue: data.commissionValue, ...(data.vatRegistered === undefined ? {} : { vatRegistered: data.vatRegistered }) })
+    .where(eq(suppliers.id, supplierId));
   await audit(actor, 'supplier.commission_updated', { entityType: 'supplier', entityId: supplierId, details: data });
 }
 

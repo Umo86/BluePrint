@@ -1,9 +1,10 @@
-import { IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconHome } from '@tabler/icons-react';
+import { IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconHome, IconReceipt, IconShoppingCart } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth } from '@/server/auth/current';
 import { getWorkspaces } from '@/server/services/workspaces';
 import { checklistForStand } from '@/server/services/submissions';
+import { basketCountForStand } from '@/server/services/shop';
 import { loadPortal } from './load';
 import { StandSwitcher } from './stand-switcher';
 
@@ -14,11 +15,14 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
   const workspaces = await getWorkspaces(auth.actor);
   const checklist = await checklistForStand(ctx.actor, ctx.stand.id);
   const toDo = checklist.items.filter((i) => !i.done && i.state !== 'submitted').length;
+  const basketCount = await basketCountForStand(ctx.actor, ctx.stand.id);
   const base = `/portal/${ctx.edition.slug}`;
   const nav: NavItem[] = [
     { label: 'Home', href: base, exact: true, icon: <IconHome size={18} /> },
     { label: 'Your checklist', href: `${base}/checklist`, icon: <IconChecklist size={18} />, badge: toDo || null },
     ...(ctx.stand.isSpaceOnly ? [{ label: 'Stand approval', href: `${base}/space-only`, icon: <IconCrane size={18} /> }] : []),
+    { label: 'Order services', href: `${base}/shop`, icon: <IconShoppingCart size={18} />, badge: basketCount || null },
+    { label: 'Your orders', href: `${base}/orders`, icon: <IconReceipt size={18} /> },
     { label: 'Exhibitor manual', href: `${base}/manual`, icon: <IconBook2 size={18} /> },
     { label: 'Your company and team', href: `${base}/company`, icon: <IconBuildingStore size={18} /> },
   ];

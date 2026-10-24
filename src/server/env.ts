@@ -33,6 +33,8 @@ const schema = z.object({
   // Payments
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // Signing secret of a second endpoint for connected-account events (account.updated), if used.
+  STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
 
   // Scheduled jobs (Vercel Cron sends this as a bearer token)
   CRON_SECRET: z.string().optional(),
@@ -69,6 +71,9 @@ export function env(): Env {
     for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'] as const) {
       if (!value[k]) missing.push(k);
     }
+    // Card payments are optional, but once switched on the webhook secret is needed to confirm them.
+    if (value.STRIPE_SECRET_KEY && !value.STRIPE_WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET');
+    if (value.STRIPE_SECRET_KEY && /^pk_/.test(value.STRIPE_SECRET_KEY)) missing.push('STRIPE_SECRET_KEY (a publishable key was given; use the secret or restricted key)');
     if (missing.length && process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION !== 'true') {
       throw new Error(`Missing required production settings: ${missing.join(', ')}`);
     }

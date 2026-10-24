@@ -35,6 +35,23 @@ export const platformSettingsSchema = z.object({
       replyTo: z.string().max(200).default(''),
     })
     .default({ senderName: 'BluePrint', senderAddress: '', replyTo: '' }),
+  /** Media10's details printed on every invoice and credit note (Media10 is the seller of record). */
+  invoicing: z
+    .object({
+      legalName: z.string().trim().max(200).default('Media 10 Limited'),
+      address: z.string().trim().max(500).default(''),
+      vatNumber: z.string().trim().max(40).default(''),
+      companyNumber: z.string().trim().max(40).default(''),
+      email: z.string().trim().max(200).default(''),
+      phone: z.string().trim().max(40).default(''),
+      /** How to pay an invoice by bank transfer: account name, sort code, account number, IBAN. */
+      paymentInstructions: z.string().trim().max(600).default(''),
+      dueDays: z.number().int().min(0).max(120).default(30),
+      footer: z.string().trim().max(400).default(''),
+    })
+    .default({ legalName: 'Media 10 Limited', address: '', vatNumber: '', companyNumber: '', email: '', phone: '', paymentInstructions: '', dueDays: 30, footer: '' }),
+  /** Terms the exhibitor accepts at checkout (plain text). */
+  orderTerms: z.string().trim().max(5000).default(''),
   assistantEnabled: z.boolean().default(true),
   maintenanceMessage: z.string().max(500).default(''),
 });

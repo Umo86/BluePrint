@@ -113,6 +113,42 @@ export function SettingsForms({ settings }: { settings: PlatformSettings }) {
       </Section>
 
       <Section
+        title="Invoices"
+        description="Media10 is the seller on every order, so these details are printed on every VAT invoice and credit note."
+        pending={busy('invoicing')}
+        onSave={() => run('invoicing', { invoicing: s.invoicing })}
+      >
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <TextInput label="Legal company name" value={s.invoicing.legalName} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, legalName: e.currentTarget.value } })} maxLength={200} />
+          <TextInput label="VAT registration number" value={s.invoicing.vatNumber} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, vatNumber: e.currentTarget.value } })} maxLength={40} />
+          <TextInput label="Company number" value={s.invoicing.companyNumber} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, companyNumber: e.currentTarget.value } })} maxLength={40} />
+          <NumberInput label="Invoice payment terms (days)" value={s.invoicing.dueDays} onChange={(v) => setS({ ...s, invoicing: { ...s.invoicing, dueDays: Number(v || 0) } })} min={0} max={120} />
+          <TextInput label="Accounts email" value={s.invoicing.email} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, email: e.currentTarget.value } })} maxLength={200} />
+          <TextInput label="Accounts phone" value={s.invoicing.phone} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, phone: e.currentTarget.value } })} maxLength={40} />
+        </SimpleGrid>
+        <Textarea label="Registered address" value={s.invoicing.address} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, address: e.currentTarget.value } })} autosize minRows={3} maxLength={500} />
+        <Textarea
+          label="How to pay an invoice"
+          description="Bank details for invoice customers: account name, sort code, account number, IBAN. Shown only on unpaid invoices."
+          value={s.invoicing.paymentInstructions}
+          onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, paymentInstructions: e.currentTarget.value } })}
+          autosize
+          minRows={3}
+          maxLength={600}
+        />
+        <TextInput label="Footer note" value={s.invoicing.footer} onChange={(e) => setS({ ...s, invoicing: { ...s.invoicing, footer: e.currentTarget.value } })} maxLength={400} />
+      </Section>
+
+      <Section
+        title="Order terms"
+        description="Shown at checkout. When set, exhibitors must accept them before ordering. Leave empty for none."
+        pending={busy('terms')}
+        onSave={() => run('terms', { orderTerms: s.orderTerms })}
+      >
+        <Textarea value={s.orderTerms} onChange={(e) => setS({ ...s, orderTerms: e.currentTarget.value })} autosize minRows={4} maxLength={5000} aria-label="Order terms" />
+      </Section>
+
+      <Section
         title="Reminders"
         description="When BluePrint (and the assistant) remind exhibitors about a deadline, in days before it. Tasks can set their own."
         pending={busy('reminders')}

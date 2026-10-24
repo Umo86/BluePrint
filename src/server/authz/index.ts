@@ -9,6 +9,7 @@ import {
   standContractors,
   stands,
   supplierUsers,
+  users,
   type EditionPermission,
   type EditionRole,
 } from '../db/schema';
@@ -73,6 +74,19 @@ export async function requireShowAdmin(actor: Actor, editionId: string, opts: { 
   if (access.role !== 'super_admin' && access.role !== 'show_admin') throw forbidden();
   if (opts.write) assertWritable(actor);
   return access;
+}
+
+/** Active staff in an edition who hold a permission (show admins hold them all), for notifications. */
+export async function editionStaffWith(editionId: string, permission: EditionPermission, db?: DbLike) {
+  const d = db ?? (await getDb());
+  const rows = await d
+    .select({ id: users.id, email: users.email, name: users.name, role: editionStaff.role, permissions: editionStaff.permissions })
+    .from(editionStaff)
+    .innerJoin(users, eq(users.id, editionStaff.userId))
+    .where(and(eq(editionStaff.editionId, editionId), eq(users.status, 'active')));
+  return rows.filter((r) =>
+    r.role === 'show_admin' ? true : r.role === 'hs_reviewer' ? HS_REVIEWER_PERMISSIONS.has(permission) : permission === 'view' || r.permissions.includes(permission),
+  );
 }
 
 /** Editions where the actor is on the staff (all editions for super admins). */

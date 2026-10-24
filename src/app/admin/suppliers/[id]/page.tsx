@@ -9,7 +9,7 @@ import { getSupplierDetail } from '@/server/services/suppliers';
 import { getPlatformSettings } from '@/server/services/settings';
 import { AppError } from '@/server/errors';
 import { commissionLabel, dateShort } from '@/lib/format';
-import { removeSupplierUserAction, resendInvitationAction, revokeInvitationAction, setSupplierStatusAction } from '../../actions';
+import { refreshSupplierStripeAction, removeSupplierUserAction, resendInvitationAction, revokeInvitationAction, setSupplierStatusAction } from '../../actions';
 import { InviteSupplierUser, SupplierCommissionForm, SupplierDetailsForm } from '../supplier-controls';
 
 export default async function SupplierPage({ params }: PageProps<'/admin/suppliers/[id]'>) {
@@ -63,6 +63,7 @@ export default async function SupplierPage({ params }: PageProps<'/admin/supplie
             type={supplier.commissionType}
             value={supplier.commissionValue}
             defaultLabel={commissionLabel(settings.defaultCommissionType, settings.defaultCommissionValue)}
+            vatRegistered={supplier.vatRegistered}
           />
         </Stack>
         <Stack>
@@ -93,6 +94,11 @@ export default async function SupplierPage({ params }: PageProps<'/admin/supplie
             <Text fz="xs" c="dimmed" mt="xs">
               The supplier connects their own bank details with Stripe from the supplier portal. BluePrint never sees or stores bank details.
             </Text>
+            {supplier.stripeAccountId ? (
+              <ActionButton action={refreshSupplierStripeAction} args={[supplier.id]} variant="default" size="xs" mt="sm">
+                Check status with Stripe
+              </ActionButton>
+            ) : null}
           </Paper>
 
           <Paper withBorder p="md">

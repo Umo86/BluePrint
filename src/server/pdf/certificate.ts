@@ -1,5 +1,6 @@
 import 'server-only';
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, type PDFPage } from 'pdf-lib';
+import { hexToRgb, safe, wrap } from './text';
 
 export type CertificateInput = {
   reference: string;
@@ -18,38 +19,6 @@ export type CertificateInput = {
   breakdownEnds: Date | null;
   brandColor?: string | null;
 };
-
-function hexToRgb(hex: string | null | undefined) {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex ?? '');
-  return m ? rgb(parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255) : rgb(0.18, 0.32, 0.69);
-}
-
-// The standard PDF fonts only cover WinAnsi characters; replace anything else so text never fails to draw.
-function safe(text: string) {
-  return text
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/[–—]/g, '-')
-    .replace(/[^\x20-\x7e -ÿ£€]/g, '?');
-}
-
-function wrap(text: string, font: PDFFont, size: number, width: number) {
-  const lines: string[] = [];
-  for (const para of safe(text).split(/\r?\n/)) {
-    let line = '';
-    for (const word of para.split(/\s+/)) {
-      const next = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(next, size) > width && line) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = next;
-      }
-    }
-    lines.push(line);
-  }
-  return lines;
-}
 
 const fmt = (d: Date | null) =>
   d ? d.toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) : 'To be confirmed';

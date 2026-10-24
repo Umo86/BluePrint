@@ -9,7 +9,7 @@ import type { EditionPermission } from '@/server/db/schema';
  * Loads the edition for a show dashboard page and checks the page's permission.
  * People without it get "not found", exactly like people with no access at all.
  */
-export async function loadEdition(editionId: string, need: EditionPermission | 'show_admin' | 'settings' | 'space_only' = 'view') {
+export async function loadEdition(editionId: string, need: EditionPermission | 'show_admin' | 'settings' | 'space_only' | 'orders' = 'view') {
   if (!/^[0-9a-f-]{36}$/i.test(editionId)) notFound();
   const actor = await requireActor();
   let loaded: Awaited<ReturnType<typeof getEditionForStaff>>;
@@ -25,6 +25,8 @@ export async function loadEdition(editionId: string, need: EditionPermission | '
     if (!isAdmin) notFound();
   } else if (need === 'space_only') {
     if (!access.permissions.has('review_space_only') && !access.permissions.has('manage_exhibitors')) notFound();
+  } else if (need === 'orders') {
+    if (!access.permissions.has('manage_orders') && !access.permissions.has('view_reports')) notFound();
   } else if (need === 'settings') {
     if (!isAdmin && !access.permissions.has('edit_content') && !access.permissions.has('manage_exhibitors')) notFound();
   } else if (!access.permissions.has(need)) {
