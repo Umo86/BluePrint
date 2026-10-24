@@ -42,6 +42,7 @@ export default async function EditionAdminPage({ params }: PageProps<'/admin/edi
           city: edition.city ?? '',
           status: edition.status,
           vatRateBps: edition.vatRateBps,
+          assistantEnabled: edition.assistantEnabled,
           buildUpStartsAt: toLocalDateTimeString(edition.buildUpStartsAt),
           openStartsAt: toLocalDateTimeString(edition.openStartsAt),
           openEndsAt: toLocalDateTimeString(edition.openEndsAt),

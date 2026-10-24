@@ -39,7 +39,7 @@ export async function systemStatus(actor: Actor) {
     storage: e.STORAGE_PROVIDER === 'r2' ? 'Cloudflare R2' : 'Local disk',
     payments: e.STRIPE_SECRET_KEY ? (e.STRIPE_SECRET_KEY.startsWith('sk_live') ? 'Stripe (live)' : 'Stripe (test mode)') : 'Not connected',
     paymentWebhooks: e.STRIPE_WEBHOOK_SECRET ? 'Signed webhooks on' : 'Not set up',
-    assistant: e.AI_PROVIDER === 'anthropic' ? (e.ANTHROPIC_API_KEY ? 'Claude (key set)' : 'Claude (key missing)') : 'Built-in answers only',
+    assistant: e.ANTHROPIC_API_KEY ? 'Claude (key set)' : e.NODE_ENV === 'production' ? 'Not set up (no Claude API key)' : 'Practice mode (no Claude API key)',
     cron: e.CRON_SECRET ? 'Protected' : 'Secret missing',
     encryptionKey: e.APP_ENCRYPTION_KEY ? 'Set' : 'Development key in use',
   };

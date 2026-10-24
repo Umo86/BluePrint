@@ -8,6 +8,8 @@ import {
   IconLayoutDashboard,
   IconLayoutGrid,
   IconMail,
+  IconMessageChatbot,
+  IconLifebuoy,
   IconFileSpreadsheet,
   IconReceipt,
   IconSettings,
@@ -20,6 +22,8 @@ import { getCurrentAuth, requireActor } from '@/server/auth/current';
 import { getEditionForStaff } from '@/server/services/editions';
 import { getWorkspaces } from '@/server/services/workspaces';
 import { AppError } from '@/server/errors';
+import { openTicketCount } from '@/server/services/helpdesk';
+import { unansweredCount } from '@/server/assistant';
 import { ROLE_LABELS } from '@/lib/roles';
 
 export default async function ManageLayout({ children, params }: LayoutProps<'/manage/[editionId]'>) {
@@ -54,10 +58,18 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
     nav.push({ label: 'Space-only approvals', href: `${base}/space-only`, icon: <IconCrane size={18} />, section: 'Exhibitors' });
   }
   if (p.has('send_emails')) nav.push({ label: 'Emails', href: `${base}/emails`, icon: <IconMail size={18} />, section: 'Exhibitors' });
+  if (p.has('helpdesk')) {
+    const waiting = await openTicketCount(edition.id);
+    nav.push({ label: 'Help desk', href: `${base}/help-desk`, icon: <IconLifebuoy size={18} />, section: 'Exhibitors', badge: waiting || null });
+  }
   if (p.has('view')) {
     nav.push({ label: 'Tasks and forms', href: `${base}/tasks`, icon: <IconChecklist size={18} />, section: 'Exhibitor manual' });
     nav.push({ label: 'Manual pages', href: `${base}/manual`, icon: <IconBook2 size={18} />, section: 'Exhibitor manual' });
     nav.push({ label: 'Announcements', href: `${base}/announcements`, icon: <IconSpeakerphone size={18} />, section: 'Exhibitor manual' });
+  }
+  if (p.has('helpdesk') || p.has('edit_content')) {
+    const gaps = await unansweredCount(edition.id);
+    nav.push({ label: 'Assistant', href: `${base}/assistant`, icon: <IconMessageChatbot size={18} />, section: 'Exhibitor manual', badge: gaps || null });
   }
   if (p.has('manage_orders')) nav.push({ label: 'Shop catalogue', href: `${base}/shop`, icon: <IconBuildingStore size={18} />, section: 'Shop' });
   if (p.has('manage_orders') || p.has('view_reports')) nav.push({ label: 'Orders', href: `${base}/orders`, icon: <IconReceipt size={18} />, section: 'Shop' });

@@ -77,6 +77,8 @@ export const editionBasicsSchema = z.object({
   breakdownEndsAt: optionalDate,
   vatRateBps: z.number().int().min(0).max(10_000).optional(),
   status: z.enum(EDITION_STATUSES).optional(),
+  /** The exhibitor assistant for this show. */
+  assistantEnabled: z.boolean().optional(),
 });
 
 export const brandingSchema = z.object({
@@ -273,6 +275,7 @@ export async function updateEditionBasics(actor: Actor, editionId: string, input
       breakdownEndsAt: data.breakdownEndsAt,
       ...(data.vatRateBps !== undefined ? { vatRateBps: data.vatRateBps } : {}),
       ...(data.status ? { status: data.status } : {}),
+      ...(data.assistantEnabled !== undefined ? { assistantEnabled: data.assistantEnabled } : {}),
     })
     .where(eq(editions.id, editionId))
     .returning();

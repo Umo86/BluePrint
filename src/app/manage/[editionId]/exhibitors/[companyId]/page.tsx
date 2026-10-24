@@ -7,6 +7,8 @@ import { TextLink } from '@/components/links';
 import { getExhibitor } from '@/server/services/stands';
 import { checklistForCompany } from '@/server/services/progress';
 import { companyOrdersForStaff, ORDER_STATUS_LABELS } from '@/server/services/orders';
+import { ticketsForCompany, TICKET_STATUS_LABELS } from '@/server/services/helpdesk';
+import { conversationsForCompany } from '@/server/assistant';
 import { TASK_STATE_LABELS, REQUIREMENT_LABELS } from '@/lib/task-labels';
 import { listExhibitorTypes, listHalls } from '@/server/services/show-setup';
 import { AppError } from '@/server/errors';
@@ -32,7 +34,13 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
   }
   const [types, halls] = d.canManage ? await Promise.all([listExhibitorTypes(actor, edition.id), listHalls(actor, edition.id)]) : [[], []];
   const canSeeOrders = access.permissions.has('manage_orders') || access.permissions.has('view_reports');
-  const [checklist, companyOrders] = await Promise.all([checklistForCompany(actor, edition.id, companyId), canSeeOrders ? companyOrdersForStaff(actor, edition.id, companyId) : Promise.resolve(null)]);
+  const canSeeTickets = access.permissions.has('helpdesk') || access.permissions.has('manage_exhibitors');
+  const [checklist, companyOrders, companyTickets, chats] = await Promise.all([
+    checklistForCompany(actor, edition.id, companyId),
+    canSeeOrders ? companyOrdersForStaff(actor, edition.id, companyId) : Promise.resolve(null),
+    canSeeTickets ? ticketsForCompany(actor, edition.id, companyId) : Promise.resolve(null),
+    conversationsForCompany(actor, edition.id, companyId),
+  ]);
   const typeOptions = types.map((t) => ({ value: t.id, label: t.name }));
   const hallOptions = halls.map((h) => ({ value: h.id, label: h.name }));
   const c = d.company;
@@ -228,6 +236,79 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
             </Text>
           )}
         </Paper>
+      ) : null}
+
+      {companyTickets || chats ? (
+        <SimpleGrid cols={{ base: 1, lg: 2 }}>
+          {companyTickets ? (
+            <Paper withBorder p="md">
+              <Title order={2} fz="md" mb="sm">
+                Help desk questions ({companyTickets.length})
+              </Title>
+              {companyTickets.length ? (
+                <Table verticalSpacing={4} fz="sm">
+                  <TableTbody>
+                    {companyTickets.map((t) => (
+                      <TableTr key={t.id}>
+                        <TableTd>
+                          {access.permissions.has('helpdesk') ? (
+                            <TextLink href={`/manage/${edition.id}/help-desk/${t.id}`} fz="sm" fw={600}>
+                              {t.subject}
+                            </TextLink>
+                          ) : (
+                            <Text fz="sm" fw={600}>
+                              {t.subject}
+                            </Text>
+                          )}
+                          <Text fz="xs" c="dimmed">
+                            {t.number} · {dateShort(t.updatedAt)}
+                          </Text>
+                        </TableTd>
+                        <TableTd>
+                          <Badge variant="light" color={t.status === 'open' ? 'blue' : t.status === 'pending' ? 'orange' : 'gray'}>
+                            {TICKET_STATUS_LABELS[t.status]}
+                          </Badge>
+                        </TableTd>
+                      </TableTr>
+                    ))}
+                  </TableTbody>
+                </Table>
+              ) : (
+                <Text fz="sm" c="dimmed">
+                  No questions yet.
+                </Text>
+              )}
+            </Paper>
+          ) : null}
+          {chats ? (
+            <Paper withBorder p="md">
+              <Title order={2} fz="md" mb="sm">
+                Assistant conversations ({chats.length})
+              </Title>
+              {chats.length ? (
+                <Table verticalSpacing={4} fz="sm">
+                  <TableTbody>
+                    {chats.map((c) => (
+                      <TableTr key={c.id}>
+                        <TableTd>
+                          <TextLink href={`/manage/${edition.id}/assistant/${c.id}`} fz="sm" fw={600}>
+                            {c.userName || 'Exhibitor'}
+                          </TextLink>
+                        </TableTd>
+                        <TableTd>{c.messages} messages</TableTd>
+                        <TableTd>{dateShort(c.updatedAt)}</TableTd>
+                      </TableTr>
+                    ))}
+                  </TableTbody>
+                </Table>
+              ) : (
+                <Text fz="sm" c="dimmed">
+                  No conversations yet.
+                </Text>
+              )}
+            </Paper>
+          ) : null}
+        </SimpleGrid>
       ) : null}
 
       <SimpleGrid cols={{ base: 1, lg: 2 }}>

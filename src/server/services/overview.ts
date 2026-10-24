@@ -7,6 +7,7 @@ import { getEdition, listShowsWithEditions } from './editions';
 import { listExhibitors } from './stands';
 import { computeEditionProgress, pct } from './progress';
 import { spaceOnlyQueue } from './space-only';
+import { openTicketCount } from './helpdesk';
 import type { Actor } from '../auth/actor';
 
 const DAY = 86_400_000;
@@ -88,10 +89,13 @@ export async function editionOverview(actor: Actor, editionId: string) {
     emails = { sent7d: Number(row?.sent ?? 0), problems7d: Number(row?.problems ?? 0) };
   }
 
+  const questions = p.has('helpdesk') ? await openTicketCount(editionId) : null;
+
   return {
     edition,
     show: found!.show,
     summary,
+    questions,
     byType: byType.map((t) => ({ name: t.name, isSpaceOnly: t.isSpaceOnly, stands: Number(t.n) })),
     standTotal,
     hallCount: Number(hallCount),

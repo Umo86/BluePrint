@@ -1,10 +1,12 @@
 import { Alert, Badge, Group, Paper, Progress, SimpleGrid, Stack, Text, Title } from '@mantine/core';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { IconAlertTriangle, IconMessageChatbot } from '@tabler/icons-react';
 import { ButtonLink, TextLink } from '@/components/links';
 import { RichHtml } from '@/components/rich-html';
 import { checklistForStand } from '@/server/services/submissions';
 import { pagesForType } from '@/server/services/manual';
 import { announcementsForType } from '@/server/services/announcements';
+import { pendingNudges, assistantStatus } from '@/server/assistant';
+import { NudgesSeen } from './nudges-seen';
 import { dateLong, dateTime, daysUntil } from '@/lib/format';
 import { TASK_STATE_LABELS } from '@/lib/task-labels';
 import { loadPortal } from './load';
@@ -12,11 +14,13 @@ import { loadPortal } from './load';
 export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>) {
   const { slug } = await params;
   const ctx = await loadPortal(slug);
-  const [checklist, pages, news] = await Promise.all([
+  const [checklist, pages, news, assistant] = await Promise.all([
     checklistForStand(ctx.actor, ctx.stand.id),
     pagesForType(ctx.edition.id, ctx.stand.typeId),
     announcementsForType(ctx.edition.id, ctx.stand.typeId, 6),
+    assistantStatus(ctx.edition),
   ]);
+  const nudges = await pendingNudges(ctx.actor, ctx.stand.id);
   const base = `/portal/${ctx.edition.slug}`;
   const p = checklist.progress;
   const pct = p.required ? Math.round((p.requiredDone / p.required) * 100) : 100;
@@ -40,6 +44,26 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
         </Text>
       </div>
       {ctx.closedReason ? <Alert color="gray">{ctx.closedReason}</Alert> : null}
+      {nudges.length ? (
+        <Alert color="blue" icon={<IconMessageChatbot size={18} />} title="A reminder from your assistant">
+          <NudgesSeen standId={ctx.stand.id} items={nudges.map((n) => ({ taskId: n.taskId, step: n.step }))} />
+          <Stack gap={4}>
+            {nudges.map((n) => (
+              <Text key={n.taskId} fz="sm">
+                <TextLink href={`${base}/tasks/${n.taskId}`} fz="sm" fw={600}>
+                  {n.title}
+                </TextLink>{' '}
+                {n.overdue ? `was due ${dateLong(n.deadline)} and is still to do.` : `is due ${dateLong(n.deadline)}.`}
+              </Text>
+            ))}
+            {assistant.available ? (
+              <Text fz="sm">
+                Need a hand? <TextLink href={`${base}/assistant`}>Ask the assistant</TextLink>.
+              </Text>
+            ) : null}
+          </Stack>
+        </Alert>
+      ) : null}
       {p.overdue || p.changesNeeded ? (
         <Alert color="orange" icon={<IconAlertTriangle size={18} />} title="Needs your attention">
           {p.overdue ? `${p.overdue} required ${p.overdue === 1 ? 'task is' : 'tasks are'} past the deadline. ` : ''}

@@ -40,9 +40,7 @@ const schema = z.object({
   CRON_SECRET: z.string().optional(),
 
   // AI assistant
-  AI_PROVIDER: z.enum(['anthropic', 'builtin']).default('builtin'),
   ANTHROPIC_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().optional(),
 
   // First super admin, created by `npm run bootstrap`
   BOOTSTRAP_SUPER_ADMIN_EMAIL: z.string().email().optional(),

@@ -1,10 +1,13 @@
-import { IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconHome, IconReceipt, IconShoppingCart } from '@tabler/icons-react';
+import { IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconHelpCircle, IconHome, IconReceipt, IconShoppingCart } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth } from '@/server/auth/current';
 import { getWorkspaces } from '@/server/services/workspaces';
 import { checklistForStand } from '@/server/services/submissions';
 import { basketCountForStand } from '@/server/services/shop';
+import { ticketsAwaitingExhibitor } from '@/server/services/helpdesk';
+import { assistantStatus } from '@/server/assistant';
+import { AssistantLauncher } from '@/components/assistant-launcher';
 import { loadPortal } from './load';
 import { StandSwitcher } from './stand-switcher';
 
@@ -16,6 +19,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
   const checklist = await checklistForStand(ctx.actor, ctx.stand.id);
   const toDo = checklist.items.filter((i) => !i.done && i.state !== 'submitted').length;
   const basketCount = await basketCountForStand(ctx.actor, ctx.stand.id);
+  const [awaiting, assistant] = await Promise.all([ticketsAwaitingExhibitor(ctx.actor, ctx.stand.id), assistantStatus(ctx.edition)]);
   const base = `/portal/${ctx.edition.slug}`;
   const nav: NavItem[] = [
     { label: 'Home', href: base, exact: true, icon: <IconHome size={18} /> },
@@ -25,6 +29,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
     { label: 'Your orders', href: `${base}/orders`, icon: <IconReceipt size={18} /> },
     { label: 'Exhibitor manual', href: `${base}/manual`, icon: <IconBook2 size={18} /> },
     { label: 'Your company and team', href: `${base}/company`, icon: <IconBuildingStore size={18} /> },
+    { label: 'Help', href: `${base}/help`, icon: <IconHelpCircle size={18} />, badge: awaiting || null },
   ];
   const logoUrl = ctx.edition.branding.logoFileId ? `/files/${ctx.edition.branding.logoFileId}` : null;
   return (
@@ -44,6 +49,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
     >
       <PlatformNotice />
       {children}
+      {assistant.available ? <AssistantLauncher slug={ctx.edition.slug} standId={ctx.stand.id} /> : null}
     </AppShell>
   );
 }

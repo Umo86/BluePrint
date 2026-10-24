@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Button, Group, NumberInput, Paper, SegmentedControl, SimpleGrid, Stack, Switch, TagsInput, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { Alert, Button, Group, NumberInput, Paper, SegmentedControl, Select, SimpleGrid, Stack, Switch, TagsInput, Text, Textarea, TextInput, Title } from '@mantine/core';
 import { useAction } from '@/lib/use-action';
 import { money } from '@/lib/format';
 import type { PlatformSettings } from '@/server/services/settings';
@@ -213,20 +213,69 @@ export function SettingsForms({ settings }: { settings: PlatformSettings }) {
             max={20}
           />
           <NumberInput label="Email logs (months)" value={s.retention.emailLogMonths} onChange={(v) => setS({ ...s, retention: { ...s.retention, emailLogMonths: Number(v || 24) } })} min={1} max={120} />
+          <NumberInput
+            label="Assistant conversations (months)"
+            value={s.retention.assistantMonths}
+            onChange={(v) => setS({ ...s, retention: { ...s.retention, assistantMonths: Number(v || 12) } })}
+            min={1}
+            max={60}
+          />
         </SimpleGrid>
       </Section>
 
       <Section
         title="Assistant and notices"
         pending={busy('assistant')}
-        onSave={() => run('assistant', { assistantEnabled: s.assistantEnabled, maintenanceMessage: s.maintenanceMessage })}
+        onSave={() =>
+          run('assistant', {
+            assistantEnabled: s.assistantEnabled,
+            assistantModel: s.assistantModel,
+            assistantEffort: s.assistantEffort,
+            assistantDailyLimit: s.assistantDailyLimit,
+            maintenanceMessage: s.maintenanceMessage,
+          })
+        }
       >
         <Switch
           label="Exhibitor assistant switched on"
-          description="Turns the AI assistant off everywhere at once (for example if something goes wrong)."
+          description="Turns the AI assistant off everywhere at once (for example if something goes wrong). Each show can also switch it off in its settings."
           checked={s.assistantEnabled}
           onChange={(e) => setS({ ...s, assistantEnabled: e.currentTarget.checked })}
         />
+        <SimpleGrid cols={{ base: 1, md: 3 }}>
+          <Select
+            label="Claude model"
+            description="Sonnet is the best balance; Haiku is cheapest and fastest; Opus is the most capable."
+            data={[
+              { value: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (recommended)' },
+              { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (lowest cost)' },
+              { value: 'claude-opus-5-5', label: 'Claude Opus 5.5 (most capable)' },
+            ]}
+            value={s.assistantModel}
+            onChange={(v) => v && setS({ ...s, assistantModel: v as typeof s.assistantModel })}
+            allowDeselect={false}
+          />
+          <Select
+            label="Effort"
+            description="Low answers fastest and costs least."
+            data={[
+              { value: 'low', label: 'Low (recommended for chat)' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+            ]}
+            value={s.assistantEffort}
+            onChange={(v) => v && setS({ ...s, assistantEffort: v as typeof s.assistantEffort })}
+            allowDeselect={false}
+          />
+          <NumberInput
+            label="Questions per show per day"
+            description="A ceiling on cost. Each exhibitor can also ask up to 30 an hour."
+            value={s.assistantDailyLimit}
+            onChange={(v) => setS({ ...s, assistantDailyLimit: Number(v || 0) })}
+            min={0}
+            max={100000}
+          />
+        </SimpleGrid>
         <Textarea
           label="Notice shown to everyone"
           description="Shown at the top of every page, for example planned maintenance. Leave empty for none."

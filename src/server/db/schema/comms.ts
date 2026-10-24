@@ -225,8 +225,12 @@ export const tickets = pgTable(
     contactName: text('contact_name'),
     contactEmail: text('contact_email'),
     contactPhone: text('contact_phone'),
+    /** Reference shown to exhibitors, for example HD-000012. */
+    number: text('number'),
     subject: text('subject').notNull(),
     status: text('status', { enum: ['open', 'pending', 'closed'] }).notNull().default('open'),
+    lastMessageAt: timestamp('last_message_at', tz),
+    lastMessageBy: text('last_message_by', { enum: ['exhibitor', 'staff'] }),
     source: text('source', { enum: ['portal', 'assistant', 'staff'] }).notNull().default('portal'),
     assignedTo: uuid('assigned_to'),
     createdAt: createdAt(),
@@ -246,6 +250,8 @@ export const ticketMessages = pgTable(
     body: text('body').notNull(),
     /** Internal notes are never shown to the exhibitor. */
     internal: boolean('internal').notNull().default(false),
+    /** Uploaded files (ticket purpose) attached to this message. */
+    attachments: jsonb('attachments').$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
   },
   (t) => [index('ticket_messages_ticket_idx').on(t.ticketId)],
@@ -272,6 +278,8 @@ export const assistantConversations = pgTable(
       .references(() => editions.id, { onDelete: 'cascade' }),
     standId: uuid('stand_id').references(() => stands.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').notNull(),
+    /** Set when the exhibitor starts a new conversation; old ones stay for the record. */
+    closedAt: timestamp('closed_at', tz),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -304,7 +312,25 @@ export const assistantUnanswered = pgTable(
     question: text('question').notNull(),
     conversationId: uuid('conversation_id'),
     resolvedAt: timestamp('resolved_at', tz),
+    resolvedBy: uuid('resolved_by'),
     createdAt: createdAt(),
   },
   (t) => [index('assistant_unanswered_edition_idx').on(t.editionId)],
+);
+
+/** Questions and answers the show team adds for the assistant (often from questions it could not answer). */
+export const assistantFaqs = pgTable(
+  'assistant_faqs',
+  {
+    id: id(),
+    editionId: uuid('edition_id')
+      .notNull()
+      .references(() => editions.id, { onDelete: 'cascade' }),
+    question: text('question').notNull(),
+    answer: text('answer').notNull(),
+    createdBy: uuid('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('assistant_faqs_edition_idx').on(t.editionId)],
 );

@@ -40,6 +40,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<'
           city: edition.city ?? '',
           status: edition.status,
           vatRateBps: edition.vatRateBps,
+          assistantEnabled: edition.assistantEnabled,
           buildUpStartsAt: toLocalDateTimeString(edition.buildUpStartsAt),
           openStartsAt: toLocalDateTimeString(edition.openStartsAt),
           openEndsAt: toLocalDateTimeString(edition.openEndsAt),

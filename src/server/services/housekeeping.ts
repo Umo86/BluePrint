@@ -64,6 +64,8 @@ export async function runHousekeeping(now = new Date()) {
     .returning({ id: emailOutbox.id });
   const oldEvents = await db.delete(stripeEvents).where(and(isNotNull(stripeEvents.processedAt), lt(stripeEvents.receivedAt, new Date(now.getTime() - 90 * DAY)))).returning({ id: stripeEvents.id });
   const oldRuns = await db.delete(cronRuns).where(lt(cronRuns.startedAt, new Date(now.getTime() - 90 * DAY))).returning({ id: cronRuns.id });
+  const { purgeOldConversations } = await import('../assistant');
+  const oldChats = await purgeOldConversations(settings.retention.assistantMonths);
   return {
     checkoutsReleased: checkouts.cancelled,
     payoutsSent: payouts.sent,
@@ -73,5 +75,6 @@ export async function runHousekeeping(now = new Date()) {
     emailLogsRemoved: oldEmails.length,
     stripeEventsRemoved: oldEvents.length,
     cronRunsRemoved: oldRuns.length,
+    assistantConversationsRemoved: oldChats,
   };
 }

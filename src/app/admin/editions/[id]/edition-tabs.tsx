@@ -35,6 +35,7 @@ type EditionProps = {
   openStartsAt: string | null;
   openEndsAt: string | null;
   breakdownEndsAt: string | null;
+  assistantEnabled: boolean;
   feeMode: 'exhibitor_pays' | 'deduct_from_supplier' | null;
   defaultCommissionType: 'percent' | 'fixed' | null;
   defaultCommissionValue: number | null;

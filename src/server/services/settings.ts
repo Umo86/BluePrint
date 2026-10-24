@@ -26,8 +26,10 @@ export const platformSettingsSchema = z.object({
       incidentYears: z.number().int().min(1).max(20).default(3),
       inactiveContactYears: z.number().int().min(1).max(20).default(3),
       emailLogMonths: z.number().int().min(1).max(120).default(24),
+      /** Assistant conversations nobody has touched for this long are deleted. */
+      assistantMonths: z.number().int().min(1).max(60).default(12),
     })
-    .default({ ordersYears: 6, spaceOnlyYearsAfterShow: 6, incidentYears: 3, inactiveContactYears: 3, emailLogMonths: 24 }),
+    .default({ ordersYears: 6, spaceOnlyYearsAfterShow: 6, incidentYears: 3, inactiveContactYears: 3, emailLogMonths: 24, assistantMonths: 12 }),
   emailDefaults: z
     .object({
       senderName: z.string().max(80).default('BluePrint'),
@@ -53,6 +55,12 @@ export const platformSettingsSchema = z.object({
   /** Terms the exhibitor accepts at checkout (plain text). */
   orderTerms: z.string().trim().max(5000).default(''),
   assistantEnabled: z.boolean().default(true),
+  /** The Claude model behind the exhibitor assistant. */
+  assistantModel: z.enum(['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5']).default('claude-sonnet-5-5'),
+  /** How much effort the model puts into each reply: lower is faster and cheaper. */
+  assistantEffort: z.enum(['low', 'medium', 'high']).default('low'),
+  /** Most questions the assistant answers per show per day (a cost ceiling). */
+  assistantDailyLimit: z.number().int().min(0).max(100_000).default(3000),
   maintenanceMessage: z.string().max(500).default(''),
 });
 

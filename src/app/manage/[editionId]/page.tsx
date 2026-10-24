@@ -69,10 +69,11 @@ export default async function EditionOverview({ params }: PageProps<'/manage/[ed
         <Title order={2} fz="md" mb="xs">
           Needs attention
         </Title>
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 3 + (o.spaceOnly ? 1 : 0) + (o.emails ? 1 : 0) }}>
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: Math.min(6, 3 + (o.spaceOnly ? 1 : 0) + (o.emails ? 1 : 0) + (o.questions !== null ? 1 : 0)) }}>
           <Attention label="Stands with overdue tasks" value={o.checklist.standsOverdue} href={`${base}/exhibitors?progress=behind`} tone="red" />
           <Attention label="Waiting for your review" value={o.checklist.awaitingReview} href={`${base}/exhibitors?progress=review`} tone="blue" />
           {o.spaceOnly ? <Attention label="Space-only packs to review" value={o.spaceOnly.toReview} href={`${base}/space-only`} tone="blue" /> : null}
+          {o.questions !== null ? <Attention label="Questions for the team" value={o.questions} href={`${base}/help-desk`} tone="blue" /> : null}
           <Attention label="Invitations not sent" value={o.summary.notSent} href={`${base}/exhibitors?state=not_sent`} tone="orange" />
           {o.emails ? <Attention label="Emails bounced (7 days)" value={o.emails.problems7d} href={`${base}/emails?tab=sent&filter=problems`} tone="orange" /> : null}
         </SimpleGrid>

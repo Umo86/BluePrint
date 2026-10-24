@@ -43,6 +43,13 @@
       "when": 1792859526204,
       "tag": "0005_email_headers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792864843023,
+      "tag": "0006_assistant_helpdesk",
+      "breakpoints": true
     }
   ]
 }

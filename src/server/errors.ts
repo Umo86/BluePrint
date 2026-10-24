@@ -5,7 +5,8 @@ export type AppErrorCode =
   | 'conflict'
   | 'rate_limited'
   | 'unauthenticated'
-  | 'read_only';
+  | 'read_only'
+  | 'unavailable';
 
 /** Errors that are safe to show to the person who triggered them. */
 export class AppError extends Error {

@@ -63,7 +63,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 // Numbers and loading
 // ---------------------------------------------------------------------------
 
-const PREFIX = { order: 'ORD', invoice: 'INV', credit_note: 'CRN' } as const;
+const PREFIX = { order: 'ORD', invoice: 'INV', credit_note: 'CRN', ticket: 'HD' } as const;
 
 /** Next number in a gap-free sequence (orders, invoices and credit notes each have their own). */
 export async function nextNumber(db: DbLike, key: keyof typeof PREFIX) {

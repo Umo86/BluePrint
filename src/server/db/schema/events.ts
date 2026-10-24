@@ -78,6 +78,8 @@ export const editions = pgTable(
     openEndsAt: timestamp('open_ends_at', tz),
     breakdownEndsAt: timestamp('breakdown_ends_at', tz),
     status: text('status', { enum: EDITION_STATUSES }).notNull().default('draft'),
+    /** The exhibitor assistant for this show (it also has to be switched on for the platform). */
+    assistantEnabled: boolean('assistant_enabled').notNull().default(true),
     branding: jsonb('branding').$type<EditionBranding>().notNull().default({}),
     emailSettings: jsonb('email_settings').$type<EditionEmailSettings>().notNull().default({}),
     spaceOnlyRules: jsonb('space_only_rules').$type<SpaceOnlyRules | null>(),
