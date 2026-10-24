@@ -83,7 +83,7 @@ export async function confirmEnrollmentAction(code: string): Promise<ActionResul
   return runAction(async () => {
     const auth = await getCurrentAuth();
     if (!auth) redirect('/sign-in');
-    const recoveryCodes = await confirmTotpEnrollment(auth.actor, String(code));
+    const recoveryCodes = await confirmTotpEnrollment(auth.actor, String(code), auth.session);
     // Setting up two-factor with a fresh code counts as passing it, on a fresh session.
     await renewSession(auth, { twoFactorVerified: true });
     return { recoveryCodes };

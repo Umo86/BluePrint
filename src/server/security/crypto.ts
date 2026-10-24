@@ -40,7 +40,7 @@ function keyFrom(raw: string, name: string): Buffer {
 function encryptionKey(): Buffer {
   const raw = env().APP_ENCRYPTION_KEY;
   if (!raw) {
-    if (env().NODE_ENV === 'production' && !localProductionAllowed(env().APP_URL)) {
+    if (env().NODE_ENV === 'production' && !localProductionAllowed()) {
       throw new Error('APP_ENCRYPTION_KEY is required in production');
     }
     return DEV_KEY;

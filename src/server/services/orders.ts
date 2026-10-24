@@ -256,7 +256,15 @@ async function alertFailedRefund(orderId: string, amountPence: number, alreadySh
   const db = await getDb();
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!o) return;
-  const team = await editionStaffWith(o.editionId, 'manage_orders');
+  let team = await editionStaffWith(o.editionId, 'manage_orders');
+  if (!team.length) {
+    // Nobody at the show handles orders: tell the super admins instead.
+    team = (await db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(and(eq(users.isSuperAdmin, true), eq(users.status, 'active')))).map((u) => ({
+      ...u,
+      role: 'show_admin' as const,
+      permissions: [],
+    }));
+  }
   const amount = `£${(amountPence / 100).toFixed(2)}`;
   const { html, text } = renderSimpleEmail({
     heading: `A card refund failed: ${o.number}`,

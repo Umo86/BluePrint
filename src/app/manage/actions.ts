@@ -203,7 +203,7 @@ export async function inviteContactAction(
   }, input.sendNow ? 'Invitation sent.' : 'Invitation saved. Send it when the show is ready.');
 }
 
-export async function sendUnsentInvitesAction(editionId: string): Promise<ActionResult<{ sent: number }>> {
+export async function sendUnsentInvitesAction(editionId: string): Promise<ActionResult<{ sent: number; skipped: number }>> {
   return runAction(async () => {
     const r = await sendUnsentInvitations(await requireActor(), id(editionId));
     refresh(editionId);
@@ -257,7 +257,7 @@ export async function runImportAction(editionId: string, form: FormData): Promis
     });
     refresh(editionId);
     return {
-      summary: `Imported ${r.created} new and ${r.updated} updated stands, ${r.newCompanies} new companies, and ${r.invitations} invitations ${r.invitationsSent ? 'sent' : 'saved to send later'}.${r.skipped.length ? ` ${r.skipped.length} rows with problems were skipped.` : ''}`,
+      summary: `Imported ${r.created} new and ${r.updated} updated stands, ${r.newCompanies} new companies, and ${r.invitations} invitations ${r.invitationsSent ? 'sent' : 'saved to send later'}.${r.skipped.length ? ` ${r.skipped.length} rows with problems were skipped.` : ''}${r.notInvited ? ` ${r.notInvited} contacts could not be invited (for example your own address).` : ''}`,
     };
   });
 }

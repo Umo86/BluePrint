@@ -26,7 +26,13 @@ export async function isStaffUser(userId: string): Promise<boolean> {
 
 export async function createSession(
   userId: string,
-  opts: { ip?: string | null; userAgent?: string | null; twoFactorVerified?: boolean },
+  opts: {
+    ip?: string | null;
+    userAgent?: string | null;
+    twoFactorVerified?: boolean;
+    /** When renewing a session: the original sign-in time, so "signed in recently" checks stay honest. */
+    signedInAt?: Date;
+  },
 ): Promise<{ token: string; expiresAt: Date; session: SessionRow }> {
   const db = await getDb();
   const staff = await isStaffUser(userId);
@@ -45,6 +51,7 @@ export async function createSession(
       twoFactorVerified: opts.twoFactorVerified ?? (!staff && !owner?.totpEnabledAt),
       ip: opts.ip ?? null,
       userAgent: opts.userAgent?.slice(0, 300) ?? null,
+      ...(opts.signedInAt ? { createdAt: opts.signedInAt } : {}),
     })
     .returning();
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId));

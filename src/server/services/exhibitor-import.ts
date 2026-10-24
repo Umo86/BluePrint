@@ -2,8 +2,8 @@ import 'server-only';
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { companies, companyMembers, editions, exhibitorTypes, halls, invitations, stands } from '../db/schema';
-import { requireEditionPermission } from '../authz';
-import { conflict, invalid, notFound } from '../errors';
+import { memberCovers, requireEditionPermission } from '../authz';
+import { AppError, conflict, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { createInvitation } from '../auth/invitations';
 import { isValidEmail, normaliseEmail } from '../auth/login';
@@ -204,7 +204,7 @@ export async function planImport(actor: Actor, editionId: string, rowsIn: string
       ? await db
           .select({ companyId: companyMembers.companyId })
           .from(companyMembers)
-          .where(inArray(companyMembers.companyId, [...nameMatches, ...aspMatches].map((c) => c.id)))
+          .where(and(inArray(companyMembers.companyId, [...nameMatches, ...aspMatches].map((c) => c.id)), memberCovers(editionId)))
       : []
     ).map((r) => r.companyId),
   );
@@ -414,14 +414,22 @@ export async function runImport(actor: Actor, editionId: string, rowsIn: string[
   });
 
   if (opts.sendInvites && invitesToMake.length) await assertRateLimit(`bulk-invite:${editionId}`, 5000, 24 * 3600, invitesToMake.length);
+  // The exhibitors are already saved, so an invitation that cannot be made (such as one to the
+  // importer's own address) is skipped rather than stopping the rest.
+  let notInvited = 0;
   for (const inv of invitesToMake) {
-    await createInvitation(actor, { kind: 'exhibitor', email: inv.email, editionId, companyId: inv.companyId, role: 'main_contact' }, { send: opts.sendInvites, bulk: true });
+    try {
+      await createInvitation(actor, { kind: 'exhibitor', email: inv.email, editionId, companyId: inv.companyId, role: 'main_contact' }, { send: opts.sendInvites, bulk: true });
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      notInvited++;
+    }
   }
   await audit(actor, 'exhibitors.imported', {
     editionId,
-    details: { ...result, invitations: invitesToMake.length, invitationsSent: opts.sendInvites, skipped: plan.summary.errors },
+    details: { ...result, invitations: invitesToMake.length - notInvited, notInvited, invitationsSent: opts.sendInvites, skipped: plan.summary.errors },
   });
-  return { ...result, invitations: invitesToMake.length, invitationsSent: opts.sendInvites, skipped: plan.rows.filter((r) => r.action === 'error').map((r) => r.line) };
+  return { ...result, invitations: invitesToMake.length - notInvited, notInvited, invitationsSent: opts.sendInvites, skipped: plan.rows.filter((r) => r.action === 'error').map((r) => r.line) };
 }
 
 /** A starter file people can fill in. */

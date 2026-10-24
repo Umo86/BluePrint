@@ -120,6 +120,7 @@ export async function updateCompany(actor: Actor, companyId: string, input: z.in
   assertWritable(actor);
   const role = await canManageCompany(actor, companyId);
   if (!role) throw notFound();
+  await assertCoversCompany(actor, companyId, role);
   const data = companySchema.parse(input);
   const db = await getDb();
   const [c] = await db.update(companies).set(data).where(eq(companies.id, companyId)).returning();
@@ -132,6 +133,7 @@ export async function setCompanyInvoiceAllowed(actor: Actor, companyId: string, 
   assertWritable(actor);
   const role = await canManageCompany(actor, companyId);
   if (role !== 'admin' && role !== 'staff') throw forbidden();
+  await assertCoversCompany(actor, companyId, role);
   const db = await getDb();
   await db.update(companies).set({ invoiceAllowed: allowed }).where(eq(companies.id, companyId));
   await audit(actor, 'company.invoice_allowed_changed', { entityType: 'company', entityId: companyId, companyId, details: { allowed } });
@@ -145,33 +147,43 @@ export async function setCompanyArchived(actor: Actor, companyId: string, archiv
 }
 
 /**
- * Someone can only be changed or removed by a person whose say covers every show they act at:
- * super admins, main contacts for every show, or staff who manage exhibitors at each of those shows.
- * So one show's team, or a contact added for one show, cannot touch the company's people elsewhere.
+ * The shows a person's say over a company covers: every show (super admins, and main contacts for
+ * every show), the shows a main contact was invited for, or, for staff, the company's shows where
+ * they manage exhibitors. One show's team, or a contact added for one show, cannot change what
+ * belongs to the company's other shows.
  */
-async function assertCanManageMember(actor: Actor, companyId: string, role: 'admin' | 'staff' | 'main_contact', target: { editionIds: string[] | null }) {
-  if (role === 'admin') return;
+async function reachOver(actor: Actor, companyId: string, role: 'admin' | 'staff' | 'main_contact') {
   const db = await getDb();
   const companyEditions = (await db.selectDistinct({ editionId: stands.editionId }).from(stands).where(eq(stands.companyId, companyId))).map((r) => r.editionId);
-  let reach: string[] | 'all';
+  if (role === 'admin') return { reach: 'all' as const, companyEditions };
   if (role === 'main_contact') {
     const [me] = await db
       .select()
       .from(companyMembers)
       .where(and(eq(companyMembers.companyId, companyId), eq(companyMembers.userId, actor.userId)))
       .limit(1);
-    reach = me?.editionIds ?? 'all';
-  } else {
-    reach = [];
-    for (const id of companyEditions) if ((await getEditionAccess(actor, id, db))?.permissions.has('manage_exhibitors')) reach.push(id);
+    return { reach: me?.editionIds ?? ('all' as const), companyEditions };
   }
+  const reach: string[] = [];
+  for (const id of companyEditions) if ((await getEditionAccess(actor, id, db))?.permissions.has('manage_exhibitors')) reach.push(id);
+  return { reach, companyEditions };
+}
+
+/** Company-wide details (name, address, VAT number, paying on invoice) need a say over every show it exhibits at. */
+async function assertCoversCompany(actor: Actor, companyId: string, role: 'admin' | 'staff' | 'main_contact') {
+  const { reach, companyEditions } = await reachOver(actor, companyId, role);
   if (reach === 'all') return;
-  if (target.editionIds === null && role === 'main_contact') {
-    throw forbidden('This person acts for your company at every show. Ask the show team to change it.');
+  if (!companyEditions.every((e) => reach.includes(e))) {
+    throw forbidden('This company also exhibits at other shows, and these details are shared with them. Ask a super admin to change them.');
   }
+}
+
+/** Changing someone's role or payment rights needs a say over every show they act at. */
+async function assertCanManageMember(actor: Actor, companyId: string, role: 'admin' | 'staff' | 'main_contact', target: { editionIds: string[] | null }) {
+  const { reach, companyEditions } = await reachOver(actor, companyId, role);
+  if (reach === 'all') return;
   const theirs = target.editionIds ?? companyEditions;
-  const mine = reach;
-  if (!theirs.every((e) => mine.includes(e))) {
+  if (target.editionIds === null || !theirs.every((e) => reach.includes(e))) {
     throw forbidden('This person also acts for the company at other shows. Ask a super admin to change it.');
   }
 }
@@ -185,8 +197,22 @@ export async function removeMember(actor: Actor, companyId: string, userId: stri
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, companyId));
   const target = members.find((m) => m.userId === userId);
   if (!target) throw notFound();
-  await assertCanManageMember(actor, companyId, role, target);
   if (role === 'main_contact' && userId === actor.userId) throw forbidden('Ask the show team to remove the main contact.');
+  // Someone who also acts for the company at shows the actor does not cover is only taken off the
+  // actor's shows; their access elsewhere stays.
+  const { reach, companyEditions } = await reachOver(actor, companyId, role);
+  if (reach !== 'all') {
+    const theirs = target.editionIds ?? companyEditions;
+    const keep = theirs.filter((e) => !reach.includes(e));
+    if (target.editionIds === null || keep.length === theirs.length) {
+      throw forbidden('This person also acts for the company at other shows. Ask a super admin to remove them.');
+    }
+    if (keep.length) {
+      await db.update(companyMembers).set({ editionIds: keep }).where(and(eq(companyMembers.companyId, companyId), eq(companyMembers.userId, userId)));
+      await audit(actor, 'company.member_removed_from_shows', { entityType: 'user', entityId: userId, companyId, details: { shows: theirs.filter((e) => reach.includes(e)) } });
+      return;
+    }
+  }
   const mainContacts = members.filter((m) => m.role === 'main_contact');
   if (target.role === 'main_contact' && mainContacts.length <= 1 && role === 'main_contact') {
     throw conflict('A company needs a main contact.');

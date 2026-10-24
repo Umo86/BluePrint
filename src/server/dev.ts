@@ -8,5 +8,5 @@ import { env, localProductionAllowed } from './env';
 export function devMailboxEnabled() {
   const e = env();
   if (e.EMAIL_PROVIDER !== 'outbox') return false;
-  return e.NODE_ENV !== 'production' || localProductionAllowed(e.APP_URL);
+  return e.NODE_ENV !== 'production' || localProductionAllowed();
 }

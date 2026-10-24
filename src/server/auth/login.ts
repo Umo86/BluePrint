@@ -106,9 +106,6 @@ export async function issueEmailCode(email: string, opts: { userId?: string | nu
 /** Checks and uses up an emailed code. Throws a generic error when it does not match. */
 export async function consumeEmailCode(email: string, codeRaw: string, ctx: RequestContext) {
   const code = codeRaw.replace(/\s/g, '');
-  await assertRateLimit(`email-code-verify:email:${email}`, 10, 15 * 60);
-  // A ceiling per day as well, so guessing cannot simply carry on window after window.
-  await assertRateLimit(`email-code-verify:email-day:${email}`, 40, 24 * 3600);
   await assertRateLimit(`email-code-verify:ip:${ctx.ip ?? 'unknown'}`, 200, 15 * 60);
   if (!/^\d{6}$/.test(code)) throw invalid(GENERIC_CODE_ERROR);
 
@@ -119,7 +116,12 @@ export async function consumeEmailCode(email: string, codeRaw: string, ctx: Requ
     .where(and(eq(loginCodes.email, email), isNull(loginCodes.consumedAt), gt(loginCodes.expiresAt, new Date())))
     .orderBy(desc(loginCodes.createdAt))
     .limit(1);
+  // With no code waiting there is nothing to guess, so the address's own limits are not used up
+  // (otherwise anyone could lock a person out of signing in by typing wrong codes for them).
   if (!row) throw invalid(GENERIC_CODE_ERROR);
+  await assertRateLimit(`email-code-verify:email:${email}`, 10, 15 * 60);
+  // A ceiling per day as well, so guessing cannot simply carry on window after window.
+  await assertRateLimit(`email-code-verify:email-day:${email}`, 100, 24 * 3600);
 
   // Count the attempt in one step, so guesses sent at the same moment cannot all see the same count.
   const [counted] = await db
@@ -152,7 +154,10 @@ export async function consumeEmailCode(email: string, codeRaw: string, ctx: Requ
 export async function requestSignInCode(emailRaw: string, ctx: RequestContext): Promise<void> {
   const email = normaliseEmail(emailRaw);
   if (!isValidEmail(email)) throw invalid('Enter a valid email address.', { email: 'Enter a valid email address.' });
-  await assertRateLimit(`signin-code:email:${email}`, 5, 15 * 60);
+  // Five codes per address from each network every 15 minutes, so someone elsewhere cannot use up a
+  // person's allowance; plus a ceiling per address per hour against email flooding.
+  await assertRateLimit(`signin-code:email:${email}:ip:${ctx.ip ?? 'unknown'}`, 5, 15 * 60);
+  await assertRateLimit(`signin-code:email-hour:${email}`, 30, 3600);
   // Generous per network, because a whole venue or office can share one internet address.
   await assertRateLimit(`signin-code:ip:${ctx.ip ?? 'unknown'}`, 100, 15 * 60);
 
@@ -292,8 +297,12 @@ export async function beginTotpEnrollment(actor: Actor) {
   return { secret, uri, qrDataUrl };
 }
 
-export async function confirmTotpEnrollment(actor: Actor, code: string): Promise<string[]> {
+export async function confirmTotpEnrollment(actor: Actor, code: string, currentSession?: { createdAt: Date } | null): Promise<string[]> {
   if (actor.readOnly) throw invalid('Changes are switched off while viewing as someone else.');
+  // Like a password change: a borrowed session must not be able to lock the owner out.
+  if (!currentSession || Date.now() - currentSession.createdAt.getTime() > RECENT_SIGN_IN_MS) {
+    throw invalid('For your security, sign out and sign in again, then turn on two-factor sign-in within 15 minutes.');
+  }
   await assertRateLimit(`totp-enrol:${actor.userId}`, 10, 15 * 60);
   const db = await getDb();
   const [user] = await db.select().from(users).where(eq(users.id, actor.userId)).limit(1);

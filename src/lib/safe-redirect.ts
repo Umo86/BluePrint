@@ -12,7 +12,11 @@ export function localPath(value: string | null | undefined): string | null {
   try {
     const u = new URL(value, base);
     if (u.origin !== base) return null;
-    return `${u.pathname}${u.search}${u.hash}`;
+    // Tidying the path can turn "/.//evil.example" into "//evil.example", which a browser would
+    // read as another website, so the tidied result is checked again.
+    const path = `${u.pathname}${u.search}${u.hash}`;
+    if (!path.startsWith('/') || path.startsWith('//')) return null;
+    return path;
   } catch {
     return null;
   }

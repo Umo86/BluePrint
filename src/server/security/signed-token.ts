@@ -14,7 +14,7 @@ function deriveKey(purpose: string, root: string) {
 
 function key(purpose: string) {
   const e = env();
-  if (!e.APP_ENCRYPTION_KEY && e.NODE_ENV === 'production' && !localProductionAllowed(e.APP_URL)) {
+  if (!e.APP_ENCRYPTION_KEY && e.NODE_ENV === 'production' && !localProductionAllowed()) {
     throw new Error('APP_ENCRYPTION_KEY is required in production');
   }
   return deriveKey(purpose, e.APP_ENCRYPTION_KEY ?? 'blueprint-local-development-key');

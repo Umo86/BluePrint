@@ -22,7 +22,7 @@ import {
   serviceCategories,
 } from '../db/schema';
 import { getEditionAccess, memberCovers, requireEditionPermission } from '../authz';
-import { conflict, forbidden, invalid, notFound } from '../errors';
+import { AppError, conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { createInvitation } from '../auth/invitations';
 import { assertRateLimit } from '../security/rate-limit';
@@ -369,7 +369,8 @@ export async function getExhibitor(actor: Actor, editionId: string, companyId: s
   const activity = await db
     .select()
     .from(auditLog)
-    .where(and(eq(auditLog.companyId, companyId), or(eq(auditLog.editionId, editionId), isNull(auditLog.editionId))))
+    // This show's events only: company changes made at other shows belong to those shows.
+    .where(and(eq(auditLog.companyId, companyId), eq(auditLog.editionId, editionId)))
     .orderBy(desc(auditLog.at))
     .limit(50);
   // Every email BluePrint sent this company for the show, with how far it got (delivered, bounced...).
@@ -545,6 +546,7 @@ export async function setStandStatus(actor: Actor, standId: string, status: 'act
   await requireEditionPermission(actor, current.editionId, 'manage_exhibitors', { write: true });
   const db = await getDb();
   await db.update(stands).set({ status }).where(eq(stands.id, standId));
+  if (status === 'cancelled') await revokeInvitationsWithoutStand(current.editionId, current.companyId);
   await audit(actor, status === 'cancelled' ? 'stand.cancelled' : 'stand.restored', {
     entityType: 'stand',
     entityId: standId,
@@ -564,12 +566,29 @@ export async function deleteStand(actor: Actor, standId: string) {
   const [{ p }] = await db.select({ p: count() }).from(spaceOnlyPacks).where(eq(spaceOnlyPacks.standId, standId));
   if (Number(o) + Number(s) + Number(p) > 0) throw conflict('This stand has orders or completed tasks, so it cannot be deleted. Cancel it instead.');
   await db.delete(stands).where(eq(stands.id, standId));
+  await revokeInvitationsWithoutStand(current.editionId, current.companyId);
   await audit(actor, 'stand.deleted', { entityType: 'stand', entityId: standId, editionId: current.editionId, companyId: current.companyId, details: { number: current.number } });
 }
 
 // ---------------------------------------------------------------------------
 // Invitations and notes
 // ---------------------------------------------------------------------------
+
+/** When a company no longer has a stand at a show, its waiting invitations for that show stop working. */
+async function revokeInvitationsWithoutStand(editionId: string, companyId: string | null) {
+  if (!companyId) return;
+  const db = await getDb();
+  const [stillHere] = await db
+    .select({ id: stands.id })
+    .from(stands)
+    .where(and(eq(stands.editionId, editionId), eq(stands.companyId, companyId), eq(stands.status, 'active')))
+    .limit(1);
+  if (stillHere) return;
+  await db
+    .update(invitations)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(invitations.editionId, editionId), eq(invitations.companyId, companyId), eq(invitations.kind, 'exhibitor'), isNull(invitations.acceptedAt), isNull(invitations.revokedAt)));
+}
 
 async function requireExhibitingCompany(editionId: string, companyId: string) {
   const db = await getDb();
@@ -612,19 +631,26 @@ export async function sendUnsentInvitations(actor: Actor, editionId: string) {
         gt(invitations.expiresAt, new Date()),
       ),
     );
-  if (!unsent.length) return { sent: 0 };
+  if (!unsent.length) return { sent: 0, skipped: 0 };
   await assertRateLimit(`bulk-invite:${editionId}`, 5000, 24 * 3600, unsent.length);
   let sent = 0;
+  let skipped = 0;
   for (const inv of unsent) {
-    await createInvitation(
-      actor,
-      { kind: 'exhibitor', email: inv.email, editionId, companyId: inv.companyId, role: inv.role },
-      { send: true, bulk: true },
-    );
-    sent++;
+    // One that can no longer be sent (for example, its stand was cancelled) does not stop the rest.
+    try {
+      await createInvitation(
+        actor,
+        { kind: 'exhibitor', email: inv.email, editionId, companyId: inv.companyId, role: inv.role },
+        { send: true, bulk: true },
+      );
+      sent++;
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      skipped++;
+    }
   }
-  await audit(actor, 'invitation.bulk_sent', { editionId, details: { sent } });
-  return { sent };
+  await audit(actor, 'invitation.bulk_sent', { editionId, details: { sent, skipped } });
+  return { sent, skipped };
 }
 
 export async function addExhibitorNote(actor: Actor, editionId: string, companyId: string, body: string) {

@@ -73,6 +73,19 @@ describe('sign-in with an emailed code', () => {
     await makeUser({ email: 'spammy@example.com' });
     for (let i = 0; i < 5; i++) await requestSignInCode('spammy@example.com', ctx);
     await expect(requestSignInCode('spammy@example.com', ctx)).rejects.toThrow(/Too many attempts/);
+    // Someone elsewhere has not used up the person's own allowance.
+    await expect(requestSignInCode('spammy@example.com', { ip: '192.0.2.44', userAgent: 'other' })).resolves.toBeUndefined();
+  });
+
+  it('does not let strangers lock someone out by typing wrong codes for them', async () => {
+    const u = await makeUser({ email: 'target@example.com' });
+    // No code is waiting, so these use up nothing of the person's own.
+    for (let i = 0; i < 30; i++) {
+      await expect(verifySignInCode('target@example.com', '123456', { ip: `198.51.100.${i}`, userAgent: 'x' })).rejects.toThrow(/wrong or has expired/);
+    }
+    await requestSignInCode('target@example.com', ctx);
+    const code = codeFromEmail((await lastEmailTo('target@example.com')).subject);
+    expect((await verifySignInCode('target@example.com', code, ctx)).id).toBe(u.id);
   });
 });
 
@@ -177,8 +190,11 @@ describe('two-factor', () => {
     expect(stored.totpSecretEnc).not.toContain(secret);
     expect(decryptSecret(stored.totpSecretEnc!)).toBe(secret);
 
-    await expect(confirmTotpEnrollment(actor, '000000')).rejects.toThrow();
-    const recovery = await confirmTotpEnrollment(actor, totpCode(secret));
+    const fresh = { createdAt: new Date() };
+    await expect(confirmTotpEnrollment(actor, '000000', fresh)).rejects.toThrow();
+    // Not from a session signed in long ago (it could be someone else's open browser).
+    await expect(confirmTotpEnrollment(actor, totpCode(secret), { createdAt: new Date(Date.now() - 16 * 60 * 1000) })).rejects.toThrow(/sign in again/);
+    const recovery = await confirmTotpEnrollment(actor, totpCode(secret), fresh);
     expect(recovery).toHaveLength(10);
 
     // The code used for enrolment cannot be replayed.
@@ -194,7 +210,7 @@ describe('two-factor', () => {
     const current = await createSession(u.id, ctx);
     const actor = actorFor(u, { sessionId: current.session.id });
     const { secret } = await beginTotpEnrollment(actor);
-    await confirmTotpEnrollment(actor, totpCode(secret));
+    await confirmTotpEnrollment(actor, totpCode(secret), current.session);
     // The device that set it up stays signed in; the other one has to sign in again.
     expect(await validateSessionToken(before.token)).toBeNull();
     expect(await validateSessionToken(current.token)).not.toBeNull();

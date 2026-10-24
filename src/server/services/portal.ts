@@ -2,7 +2,7 @@ import 'server-only';
 import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { companies, companyMembers, editions, exhibitorTypes, halls, invitations, shows, stands, users } from '../db/schema';
-import { inViewedEdition, membershipCovers, requireStandAccess } from '../authz';
+import { inViewedEdition, memberCovers, membershipCovers, requireStandAccess } from '../authz';
 import { forbidden, notFound } from '../errors';
 import type { Actor } from '../auth/actor';
 
@@ -110,7 +110,8 @@ export async function companyForPortal(actor: Actor, standId: string) {
     .select({ id: users.id, name: users.name, email: users.email, phone: users.phone, lastLoginAt: users.lastLoginAt, role: companyMembers.role, canPay: companyMembers.canPay })
     .from(companyMembers)
     .innerJoin(users, eq(users.id, companyMembers.userId))
-    .where(eq(companyMembers.companyId, company.id))
+    // The people who act for the company at this show.
+    .where(and(eq(companyMembers.companyId, company.id), memberCovers(stand.editionId)))
     .orderBy(asc(users.name));
   const companyStands = await db
     .select({ id: stands.id })

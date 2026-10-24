@@ -30,6 +30,7 @@ export type SendEmailInput = {
 export type SendResult = { outboxId: string; status: 'sent' | 'failed' | 'suppressed' | 'queued' };
 
 const PLAIN_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+const NAMED_ADDRESS = /^[^\r\n<>"]{1,100} <[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+>$/;
 
 function oneLine(value: string) {
   return value.replace(/[\r\n]+/g, ' ').trim();
@@ -65,7 +66,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
   }
   // Header values are always single lines, and a reply-to is a plain address or nothing.
   from = oneLine(from);
-  replyTo = replyTo && PLAIN_ADDRESS.test(replyTo.trim()) ? replyTo.trim() : null;
+  replyTo = replyTo && (PLAIN_ADDRESS.test(replyTo.trim()) || NAMED_ADDRESS.test(replyTo.trim())) ? replyTo.trim() : null;
   const subject = oneLine(input.subject).slice(0, 300);
 
   let suppressedReason: string | null = null;

@@ -250,7 +250,7 @@ export function payments(): PaymentsProvider | null {
   if (instance) return instance;
   const e = env();
   if (e.STRIPE_SECRET_KEY) instance = new StripeProvider();
-  else if (e.NODE_ENV !== 'production' || localProductionAllowed(e.APP_URL)) instance = new SimulatedPayments();
+  else if (e.NODE_ENV !== 'production' || localProductionAllowed()) instance = new SimulatedPayments();
   return instance;
 }
 

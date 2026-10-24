@@ -164,7 +164,7 @@ export function assistantModel(): AssistantModel | null {
   if (override !== undefined) return override;
   const e = env();
   if (e.ANTHROPIC_API_KEY) return new ClaudeModel(e.ANTHROPIC_API_KEY);
-  const local = process.env.NODE_ENV !== 'production' || localProductionAllowed(e.APP_URL);
+  const local = process.env.NODE_ENV !== 'production' || localProductionAllowed();
   return local ? new OfflineModel() : null;
 }
 

@@ -6,9 +6,11 @@ BluePrint holds personal and commercial information about exhibitors, contractor
 
 ## Signing in
 
-- **Emailed codes.** People sign in with a six-digit code sent to their work email. Each code works once, for 10 minutes, and allows five tries. An address can ask for five codes and make ten guesses every 15 minutes, and 40 guesses a day. One network (a venue or an office) can ask for up to 100 codes every 15 minutes, so a whole build-up crew on the venue Wi-Fi is not blocked.
+- **Emailed codes.** People sign in with a six-digit code sent to their work email. Each code works once, for 10 minutes, and allows five tries.
+  - **Asking for codes.** An address can get five codes every 15 minutes from each network, and 30 an hour in all. One network (a venue or an office) can ask for up to 100 codes every 15 minutes, so a whole build-up crew on the venue Wi-Fi is not blocked.
+  - **Guessing.** An address allows ten guesses every 15 minutes and 100 a day. Guesses only count while a code is actually waiting, so strangers can't lock someone out by typing wrong codes for them.
 - **Passwords (optional).** Passwords must be at least 12 characters and not a known common password. They are stored with Argon2id. After ten wrong passwords, password sign-in pauses for 15 minutes; codes still work. A password can only be set or removed within 15 minutes of signing in, and the person gets an email whenever it changes.
-- **Two-factor sign-in.** Every super admin and show team member must use an authenticator app (with ten single-use recovery codes). Exhibitors, contractors and suppliers can turn it on too, and from then on it is always asked for. Turning it on signs out the person's other devices and emails them.
+- **Two-factor sign-in.** Every super admin and show team member must use an authenticator app (with ten single-use recovery codes). Exhibitors, contractors and suppliers can turn it on too, and from then on it is always asked for. Like a password, it can only be turned on within 15 minutes of signing in, so someone at a borrowed, open browser can't lock the owner out. Turning it on signs out the person's other devices and emails them.
 - **No clues for attackers.** The sign-in page answers the same way, and takes the same time, whether or not an address has an account.
 - **Sessions.** Each sign-in gets a new random 256-bit token, stored only as a fingerprint (hash). The cookie can't be read by page scripts, is only sent over HTTPS, and isn't sent by other websites. Passing two-factor issues a fresh token. Staff are signed out after 12 hours of inactivity and after 7 days in all; everyone else after 30 days. People can see their devices and sign them out (Account and security). Super admins can sign anyone out everywhere or disable an account, which ends all of its sessions at once.
 
@@ -34,7 +36,8 @@ Every request is checked on the server against the person's role and the record 
 | Supplier | Only their own catalogue, their orders and their payouts. |
 
 - **Viewing as an exhibitor** (to help someone) is read-only. It covers that exhibitor's portal at one show only, never their other shows, staff work or supplier account. It is re-checked on every page and recorded in the audit log.
-- **A company's people** can only be changed or removed by someone whose rights cover every show those people act at.
+- **A company's people.** A show team that removes someone takes them off its own shows only; their access at other shows stays. Changing someone's role or payment rights needs rights covering every show they act at.
+- **Shared company details.** The name, address, VAT number and "pay on invoice" setting are shared with every show, and print on their invoices. They can only be changed by super admins, staff who manage exhibitors at every show the company exhibits at, or a main contact for all of those shows.
 - **Supplier details** (shared by every show) can only be changed by super admins or the supplier's own people.
 
 ## Files
@@ -123,7 +126,7 @@ See [assistant](assistant.md).
 
 ## What was checked before launch
 
-- **Automated tests.** 199 unit and integration tests, including tests that each kind of person can only reach what they should. There are also browser journeys through the exhibitor portal, the show dashboard, the super admin dashboard, the shop, space-only approvals, the help desk and the assistant, run against both the development and the production build.
+- **Automated tests.** 204 unit and integration tests, including tests that each kind of person can only reach what they should. There are also browser journeys through the exhibitor portal, the show dashboard, the super admin dashboard, the shop, space-only approvals, the help desk and the assistant, run against both the development and the production build.
 - **Independent security review.** On 24 October 2026, three separate reviewers read the code without seeing the author's reasoning. They covered:
   - sign-in and administration;
   - access control and files;
@@ -139,6 +142,13 @@ See [assistant](assistant.md).
   - Code guesses were not counted atomically.
   - The local test settings could have exposed a test mailbox.
   - Assistant links could hide their destination.
+
+  A fourth reviewer then checked the fixes themselves. That found and closed the remaining gaps:
+  - a second redirect trick (`/.//`);
+  - wrong codes that could lock someone out;
+  - two-factor being turned on from a borrowed session;
+  - space-only emails, contact lists, shared company details and imports that still crossed shows;
+  - invitations that couldn't be cancelled once their stand was gone.
 - **Dependencies.** `npm audit` reports no known vulnerabilities (24 October 2026).
 
 ## Keeping it secure
@@ -156,6 +166,7 @@ See [assistant](assistant.md).
 
 ## Known limits
 
-- **Locking someone out.** Someone who knows a person's address can use up its code requests for 15 minutes and so delay their sign-in. They can't sign in themselves.
+- **Flooding someone with codes.** Someone who knows a person's address can request codes for it until the hourly ceiling is reached (each request emails the person), which stops new codes for up to an hour. They can't sign in themselves.
+- **Role and payment rights are per company.** Someone who is a main contact (or can pay) for a company keeps that role at every show they are added to. Only a super admin can change it if they act at shows the show team doesn't cover.
 - **Network limits on Vercel only.** The per-network limits rely on the visitor address Vercel provides, so they assume BluePrint runs on Vercel.
 - **Shared company records.** Company records are shared between shows, so a show team that reuses a company can see its name and details, but not its people, orders or documents at other shows.

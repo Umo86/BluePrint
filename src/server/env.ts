@@ -69,6 +69,8 @@ export function env(): Env {
   const value = parsed.data;
   if (value.NODE_ENV === 'production') {
     const missing: string[] = [];
+    // Links in emails and the same-site checks depend on the real address.
+    if (!process.env.APP_URL) missing.push('APP_URL');
     if (!value.DATABASE_URL) missing.push('DATABASE_URL');
     if (!value.APP_ENCRYPTION_KEY) missing.push('APP_ENCRYPTION_KEY');
     if (!value.CRON_SECRET) missing.push('CRON_SECRET');
@@ -82,7 +84,7 @@ export function env(): Env {
     // Card payments are optional, but once switched on the webhook secret is needed to confirm them.
     if (value.STRIPE_SECRET_KEY && !value.STRIPE_WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET');
     if (value.STRIPE_SECRET_KEY && /^pk_/.test(value.STRIPE_SECRET_KEY)) missing.push('STRIPE_SECRET_KEY (a publishable key was given; use the secret or restricted key)');
-    if (missing.length && !localProductionAllowed(value.APP_URL)) {
+    if (missing.length && !localProductionAllowed()) {
       throw new Error(`Missing required production settings: ${missing.join(', ')}`);
     }
   }
@@ -95,8 +97,9 @@ export function env(): Env {
  * few rules: no real email, files or encryption key needed. It only ever applies when the site's
  * address is this computer and it is not running on Vercel, so a live site can never use it.
  */
-export function localProductionAllowed(appUrl: string | undefined = process.env.APP_URL) {
-  return process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION === 'true' && !process.env.VERCEL && isLocalAddress(appUrl);
+export function localProductionAllowed() {
+  // The address as actually set: a missing APP_URL never counts as "this computer".
+  return process.env.BLUEPRINT_ALLOW_LOCAL_PRODUCTION === 'true' && !process.env.VERCEL && isLocalAddress(process.env.APP_URL);
 }
 
 export function isProduction() {

@@ -55,7 +55,7 @@ export async function clearSessionCookie() {
  * been passed, so a token seen before that point is worthless.
  */
 export async function renewSession(auth: CurrentAuth, opts: { twoFactorVerified: boolean }) {
-  const { token, expiresAt } = await createSession(auth.user.id, { ...(await requestContext()), twoFactorVerified: opts.twoFactorVerified });
+  const { token, expiresAt } = await createSession(auth.user.id, { ...(await requestContext()), twoFactorVerified: opts.twoFactorVerified, signedInAt: auth.session.createdAt });
   await revokeSession(auth.session.id);
   await setSessionCookie(token, expiresAt);
 }

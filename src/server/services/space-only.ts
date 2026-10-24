@@ -24,7 +24,7 @@ import {
   type SpaceOnlyRules,
   type SubmissionStatus,
 } from '../db/schema';
-import { getEditionAccess, getMemberships, inViewedEdition, isViewingAs, membershipCovers } from '../authz';
+import { getEditionAccess, getMemberships, inViewedEdition, isViewingAs, memberCovers, membershipCovers } from '../authz';
 import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { createInvitation } from '../auth/invitations';
@@ -217,6 +217,7 @@ export async function nominateContractor(actor: Actor, standId: string, raw: z.i
     if (!input.companyName) errors.companyName = 'Enter the contractor’s company name.';
     if (!input.contactName) errors.contactName = 'Enter a contact name.';
     if (!isValidEmail(email)) errors.email = 'Enter a valid email address.';
+    else if (email === normaliseEmail(actor.realEmail)) errors.email = 'That is your own address. If your company is building the stand, choose “We are building it ourselves”.';
     if (Object.keys(errors).length) throw invalid('Please check the contractor’s details.', errors);
     values = { standId, contractorCompanyName: input.companyName!, contactName: input.contactName!, contactEmail: email, contactPhone: input.phone || null, userId: null, status: 'invited', nominatedBy: actor.realUserId };
   }
@@ -498,7 +499,7 @@ async function notifyPackPeople(standId: string, subject: string, paragraphs: st
         .select({ email: users.email, id: users.id })
         .from(companyMembers)
         .innerJoin(users, eq(users.id, companyMembers.userId))
-        .where(and(eq(companyMembers.companyId, stand.companyId), eq(users.status, 'active')))
+        .where(and(eq(companyMembers.companyId, stand.companyId), eq(users.status, 'active'), memberCovers(stand.editionId)))
     : [];
   const [contractor] = await db.select().from(standContractors).where(and(eq(standContractors.standId, standId), eq(standContractors.status, 'active'))).limit(1);
   const send = async (to: string, userId: string | null, path: string) => {

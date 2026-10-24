@@ -58,7 +58,7 @@ export type CreateInvitationInput = {
   permissions?: string[];
 };
 
-async function authorize(actor: Actor, input: CreateInvitationInput) {
+async function authorize(actor: Actor, input: CreateInvitationInput, opts: { creating: boolean } = { creating: true }) {
   assertWritable(actor);
   switch (input.kind) {
     case 'super_admin':
@@ -72,7 +72,8 @@ async function authorize(actor: Actor, input: CreateInvitationInput) {
     case 'exhibitor': {
       if (!input.editionId || !input.companyId) throw invalid('Choose the exhibiting company.');
       await requireEditionPermission(actor, input.editionId, 'manage_exhibitors');
-      // Only for companies that exhibit at this show.
+      // New invitations only for companies that exhibit at this show (cancelling is always allowed).
+      if (!opts.creating) return;
       const db = await getDb();
       const [here] = await db
         .select({ id: stands.id })
@@ -97,10 +98,9 @@ async function authorize(actor: Actor, input: CreateInvitationInput) {
       return;
     }
     case 'supplier':
+      // Supplier accounts are shared by every show, so only super admins add people to them.
       if (!input.supplierId) throw invalid('Choose the supplier.');
-      if (actor.isSuperAdmin && !actor.readOnly) return;
-      if (!input.editionId) throw forbidden();
-      await requireShowAdmin(actor, input.editionId);
+      assertSuperAdmin(actor);
       return;
   }
 }
@@ -266,7 +266,7 @@ export async function revokeInvitation(actor: Actor, invitationId: string) {
   const db = await getDb();
   const [inv] = await db.select().from(invitations).where(eq(invitations.id, invitationId)).limit(1);
   if (!inv) throw notFound();
-  await authorize(actor, { ...inv, email: inv.email, permissions: inv.permissions });
+  await authorize(actor, { ...inv, email: inv.email, permissions: inv.permissions }, { creating: false });
   await db.update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, invitationId));
   await audit(actor, 'invitation.revoked', { entityType: 'invitation', entityId: inv.id, editionId: inv.editionId });
 }
