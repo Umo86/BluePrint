@@ -4,9 +4,9 @@ import { ZodError } from 'zod';
 import { AppError } from './errors';
 import { RateLimitedError } from './security/rate-limit';
 
-export type ActionResult<T = undefined> =
-  | { ok: true; data?: T; message?: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+import type { ActionResult } from '@/lib/action-result';
+
+export type { ActionResult };
 
 /**
  * Wraps a server action body: known errors become friendly messages, anything unexpected is

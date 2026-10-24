@@ -6,7 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --conditions=react-server scripts/migrate.ts",
+    "seed": "tsx --conditions=react-server scripts/seed.ts",
+    "bootstrap": "tsx --conditions=react-server scripts/bootstrap.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

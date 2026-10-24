@@ -126,7 +126,7 @@ export async function requireActor(opts: { allowIncompleteTwoFactor?: boolean } 
     redirect(`/sign-in?next=${encodeURIComponent(next)}`);
   }
   if (!opts.allowIncompleteTwoFactor) {
-    if (auth.needsTwoFactorSetup) redirect('/account/two-factor-setup');
+    if (auth.needsTwoFactorSetup) redirect('/two-factor-setup');
     if (auth.needsSecondFactor) redirect(`/two-factor?next=${encodeURIComponent(await currentPath())}`);
   }
   return auth.actor;
