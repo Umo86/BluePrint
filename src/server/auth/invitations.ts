@@ -24,6 +24,7 @@ import { forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { sendEmail } from '../email/send';
 import { renderSimpleEmail } from '../email/simple';
+import { renderTemplate } from '../email/templates';
 import {
   assertSuperAdmin,
   assertWritable,
@@ -183,6 +184,16 @@ export async function createInvitation(actor: Actor, input: CreateInvitationInpu
 async function sendInvitationEmail(inv: typeof invitations.$inferSelect, url: string, actor: Actor) {
   const d = await describeInvitation(inv);
   const brand = d.edition?.branding?.primaryColor;
+  // Exhibitor invitations use the show's own wording (editable under Emails); the rest are fixed.
+  if (inv.kind === 'exhibitor' && d.edition) {
+    const db = await getDb();
+    const standNumbers = inv.companyId
+      ? (await db.select({ number: stands.number }).from(stands).where(and(eq(stands.editionId, d.edition.id), eq(stands.companyId, inv.companyId), eq(stands.status, 'active')))).map((s) => s.number)
+      : [];
+    const r = await renderTemplate(d.edition, 'invite_exhibitor', { invite_link: url, company: d.company?.name ?? 'your company', stand: standNumbers.join(', ') || 'to be confirmed' });
+    await sendEmail({ to: inv.email, editionId: d.edition.id, companyId: inv.companyId, standId: inv.standId, templateKey: 'invite_exhibitor', category: 'transactional', subject: r.subject, html: r.html, text: r.text, sentBy: actor.realUserId });
+    return;
+  }
   const { html, text } = renderSimpleEmail({
     heading: d.headline,
     paragraphs: [

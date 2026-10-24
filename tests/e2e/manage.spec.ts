@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { expectToast, signInStaff, signInWithCode, totp, watchForErrors } from './helpers';
+import { expectToast, staffSession, signInWithCode, totp, watchForErrors } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -20,7 +20,7 @@ test('show team dashboard: exhibitors, stands, import and settings', async ({ pa
   test.setTimeout(300_000);
   const errors = watchForErrors(page);
   const stamp = Date.now().toString(36);
-  await signInStaff(page, 'admin@blueprint.test');
+  await staffSession(page);
   dashboard = await openUkcwDashboard(page);
 
   await test.step('overview shows the seeded exhibitors', async () => {
@@ -48,7 +48,7 @@ test('show team dashboard: exhibitors, stands, import and settings', async ({ pa
     await dialog.getByLabel('Contact email').fill(`glazing.${stamp}@example.test`);
     await dialog.getByRole('button', { name: 'Add exhibitor' }).click();
     await expect(page.getByRole('heading', { name: `E2E Glazing ${stamp}` })).toBeVisible();
-    await expect(page.getByText(`glazing.${stamp}@example.test`)).toBeVisible();
+    await expect(page.getByRole('cell', { name: `glazing.${stamp}@example.test`, exact: true })).toBeVisible();
   });
 
   await test.step('notes, stand edits and colleague invitations', async () => {
@@ -65,7 +65,7 @@ test('show team dashboard: exhibitors, stands, import and settings', async ({ pa
     await page.getByLabel('Email address').fill(`colleague.${stamp}@example.test`);
     await page.getByRole('button', { name: 'Send invitation' }).click();
     await expectToast(page, 'Invitation sent.');
-    await expect(page.getByText(`colleague.${stamp}@example.test`)).toBeVisible();
+    await expect(page.getByRole('cell', { name: `colleague.${stamp}@example.test`, exact: true })).toBeVisible();
   });
 
   await test.step('stands page: add, cancel and delete a stand', async () => {

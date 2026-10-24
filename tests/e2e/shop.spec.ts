@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { expectToast, signInStaff, signInWithCode, watchForErrors } from './helpers';
+import { expectToast, staffSession, signInWithCode, watchForErrors } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -134,7 +134,7 @@ test('the supplier confirms the order and offers a new product', async ({ page }
 test('the show team approves the product and refunds part of the order', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watchForErrors(page);
-  await signInStaff(page, 'admin@blueprint.test');
+  await staffSession(page);
   await page.goto('/admin/shows');
   await page.getByRole('link', { name: 'UKCW London 2027' }).click();
   await page.getByRole('link', { name: 'Open show dashboard' }).click();

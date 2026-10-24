@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { IconAddressBook, IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconLayoutDashboard, IconLayoutGrid, IconReceipt, IconSettings, IconUsersGroup } from '@tabler/icons-react';
+import { IconAddressBook, IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconLayoutDashboard, IconLayoutGrid, IconMail, IconReceipt, IconSettings, IconUsersGroup } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth, requireActor } from '@/server/auth/current';
@@ -36,6 +36,7 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
   if (p.has('review_space_only') || p.has('manage_exhibitors')) {
     nav.push({ label: 'Space-only approvals', href: `${base}/space-only`, icon: <IconCrane size={18} />, section: 'Exhibitors' });
   }
+  if (p.has('send_emails')) nav.push({ label: 'Emails', href: `${base}/emails`, icon: <IconMail size={18} />, section: 'Exhibitors' });
   if (p.has('view')) {
     nav.push({ label: 'Tasks and forms', href: `${base}/tasks`, icon: <IconChecklist size={18} />, section: 'Exhibitor manual' });
     nav.push({ label: 'Manual pages', href: `${base}/manual`, icon: <IconBook2 size={18} />, section: 'Exhibitor manual' });

@@ -36,6 +36,13 @@
       "when": 1792858512436,
       "tag": "0004_shop_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792859526204,
+      "tag": "0005_email_headers",
+      "breakpoints": true
     }
   ]
 }

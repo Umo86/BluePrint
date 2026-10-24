@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Cookie, type Page } from '@playwright/test';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -80,6 +80,26 @@ export async function signInStaff(page: Page, email: string, secret = DEMO_TOTP_
   await expect(page).not.toHaveURL(/two-factor/);
 }
 
+const savedStaffSessions = new Map<string, Cookie[]>();
+
+/**
+ * Signs a staff member in once and reuses that session in later tests, the way a person keeps their
+ * browser signed in. BluePrint allows five sign-in codes per address every 15 minutes (as in production),
+ * so a long run of tests cannot sign the same person in from scratch every time.
+ * If the saved session no longer works, it signs in again.
+ */
+export async function staffSession(page: Page, email = 'admin@blueprint.test') {
+  const saved = savedStaffSessions.get(email);
+  if (saved) {
+    await page.context().addCookies(saved);
+    await page.goto('/account');
+    if (!/\/(sign-in|two-factor)/.test(new URL(page.url()).pathname)) return;
+    await page.context().clearCookies();
+  }
+  await signInStaff(page, email);
+  savedStaffSessions.set(email, await page.context().cookies());
+}
+
 /** Collects browser errors (failed hydration, uncaught exceptions) so a test can assert there were none. */
 export function watchForErrors(page: Page) {
   const errors: string[] = [];
@@ -89,6 +109,8 @@ export function watchForErrors(page: Page) {
     const text = msg.text();
     // The browser logs 404s for deliberately missing pages; those are checked separately.
     if (/Failed to load resource: the server responded with a status of 404/.test(text)) return;
+    // Email previews are shown in a sandboxed frame that may not run anything; Chrome reports it doing its job.
+    if (/Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed/.test(text)) return;
     errors.push(`console: ${text}`);
   });
   return errors;

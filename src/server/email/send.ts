@@ -1,9 +1,9 @@
 import 'server-only';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { getDb } from '../db/client';
-import { emailOutbox, emailSuppressions, unsubscribes } from '../db/schema';
-import { env } from '../env';
+import { editions, emailOutbox, emailSuppressions, unsubscribes } from '../db/schema';
 import { emailProvider } from './provider';
+import { senderFor } from './templates';
 
 export type EmailCategory = 'transactional' | 'reminder' | 'campaign' | 'security';
 
@@ -23,9 +23,11 @@ export type SendEmailInput = {
   campaignId?: string | null;
   sentBy?: string | null;
   headers?: Record<string, string>;
+  /** Queue it for the next batch instead of sending now (campaigns). */
+  deferred?: boolean;
 };
 
-export type SendResult = { outboxId: string; status: 'sent' | 'failed' | 'suppressed' };
+export type SendResult = { outboxId: string; status: 'sent' | 'failed' | 'suppressed' | 'queued' };
 
 /**
  * Records every email in the outbox (so it shows on the exhibitor's record), then hands it to
@@ -35,7 +37,14 @@ export type SendResult = { outboxId: string; status: 'sent' | 'failed' | 'suppre
 export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
   const db = await getDb();
   const to = input.to.trim().toLowerCase();
-  const from = input.from ?? env().EMAIL_DEFAULT_FROM;
+  let from = input.from;
+  let replyTo = input.replyTo ?? null;
+  // Show emails come from the show's own sender (set in Show settings), unless a caller chose one.
+  if (!from) {
+    const sender = await senderFor(input.editionId ? ((await db.select().from(editions).where(eq(editions.id, input.editionId)).limit(1))[0] ?? null) : null, input.category);
+    from = sender.from;
+    replyTo = replyTo ?? sender.replyTo;
+  }
 
   let suppressedReason: string | null = null;
   if (input.category !== 'security') {
@@ -62,7 +71,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
       templateKey: input.templateKey,
       category: input.category,
       fromAddress: from,
-      replyTo: input.replyTo ?? null,
+      replyTo,
       subject: input.subject,
       html: input.html,
       text: input.text,
@@ -70,18 +79,29 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
       error: suppressedReason,
       campaignId: input.campaignId ?? null,
       sentBy: input.sentBy ?? null,
+      headers: input.headers ?? null,
     })
     .returning({ id: emailOutbox.id });
 
   if (suppressedReason) return { outboxId: row.id, status: 'suppressed' };
-  return deliverOutboxEmail(row.id, input.headers);
+  if (input.deferred) return { outboxId: row.id, status: 'queued' };
+  return deliverOutboxEmail(row.id);
 }
 
-/** Sends one queued outbox email. Also used by the retry job. */
-export async function deliverOutboxEmail(outboxId: string, headers?: Record<string, string>): Promise<SendResult> {
+/** Sends one queued outbox email. Also used by the batch sender and the retry job. */
+export async function deliverOutboxEmail(outboxId: string): Promise<SendResult> {
   const db = await getDb();
   const [mail] = await db.select().from(emailOutbox).where(eq(emailOutbox.id, outboxId)).limit(1);
   if (!mail) throw new Error('Outbox email not found');
+  if (mail.status !== 'queued' && mail.status !== 'failed') return { outboxId, status: mail.status === 'suppressed' ? 'suppressed' : 'sent' };
+  // Claim the email first (the attempt counter only moves on for one worker), so two batch
+  // senders running at once can never send the same email twice.
+  const [claimed] = await db
+    .update(emailOutbox)
+    .set({ attempts: mail.attempts + 1 })
+    .where(and(eq(emailOutbox.id, outboxId), eq(emailOutbox.attempts, mail.attempts), inArray(emailOutbox.status, ['queued', 'failed'])))
+    .returning({ id: emailOutbox.id });
+  if (!claimed) return { outboxId, status: 'sent' };
   try {
     const result = await emailProvider().send({
       from: mail.fromAddress,
@@ -90,17 +110,14 @@ export async function deliverOutboxEmail(outboxId: string, headers?: Record<stri
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
-      headers,
+      headers: mail.headers ?? undefined,
     });
-    await db
-      .update(emailOutbox)
-      .set({ status: 'sent', providerMessageId: result.id, sentAt: new Date(), attempts: mail.attempts + 1, error: null })
-      .where(eq(emailOutbox.id, outboxId));
+    await db.update(emailOutbox).set({ status: 'sent', providerMessageId: result.id, sentAt: new Date(), error: null }).where(eq(emailOutbox.id, outboxId));
     return { outboxId, status: 'sent' };
   } catch (err) {
     await db
       .update(emailOutbox)
-      .set({ status: 'failed', attempts: mail.attempts + 1, error: err instanceof Error ? err.message.slice(0, 500) : 'Send failed' })
+      .set({ status: 'failed', error: err instanceof Error ? err.message.slice(0, 500) : 'Send failed' })
       .where(eq(emailOutbox.id, outboxId));
     return { outboxId, status: 'failed' };
   }

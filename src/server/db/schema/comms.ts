@@ -92,6 +92,8 @@ export const emailOutbox = pgTable(
     attempts: integer('attempts').notNull().default(0),
     campaignId: uuid('campaign_id'),
     sentBy: uuid('sent_by'),
+    /** Extra headers to send with it (for example List-Unsubscribe on campaign emails). */
+    headers: jsonb('headers').$type<Record<string, string>>(),
     sentAt: timestamp('sent_at', tz),
     lastEventAt: timestamp('last_event_at', tz),
     createdAt: createdAt(),
@@ -139,10 +141,12 @@ export const unsubscribes = pgTable(
 export type CampaignFilter = {
   exhibitorTypeIds?: string[];
   hallIds?: string[];
-  taskNotDoneId?: string;
-  categoryNotOrderedId?: string;
+  taskNotDoneId?: string | null;
+  categoryNotOrderedId?: string | null;
   neverSignedIn?: boolean;
   standIds?: string[];
+  /** Main contacts only (default), or everyone at each company. */
+  audience?: 'main_contacts' | 'everyone';
 };
 
 export const campaigns = pgTable(

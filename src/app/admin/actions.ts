@@ -33,6 +33,8 @@ import { createCompany, setCompanyArchived, setCompanyInvoiceAllowed, setMemberA
 import { createSupplier, removeSupplierUser, setSupplierStatus, updateSupplier, updateSupplierCommission } from '@/server/services/suppliers';
 import { adminRefreshSupplierStripe } from '@/server/services/supplier-portal';
 import { processTransfers } from '@/server/services/orders';
+import { isCronJob, runCronJob, type CronJob } from '@/server/cron';
+import { invalid } from '@/server/errors';
 import { createLibraryItem, deleteLibraryItem, updateLibraryItem, type LibraryKind } from '@/server/services/library';
 import { updatePlatformSettings, type PlatformSettings } from '@/server/services/settings';
 import { removeSuppression, retryFailedEmails } from '@/server/services/system';
@@ -290,6 +292,17 @@ export async function updateSupplierCommissionAction(supplierId: string, type: '
     await updateSupplierCommission(await superAdmin(), supplierId, { commissionType: type, commissionValue: value, vatRegistered: typeof vatRegistered === 'boolean' ? vatRegistered : undefined });
     revalidatePath(`/admin/suppliers/${supplierId}`);
   }, 'Commission and VAT saved.');
+}
+
+export async function runCronJobAction(job: string): Promise<ActionResult<Record<string, unknown>>> {
+  return runAction(async () => {
+    const actor = await superAdmin();
+    if (!isCronJob(String(job))) throw invalid('Unknown job.');
+    const result = await runCronJob(job as CronJob);
+    await audit(actor, 'cron.run_manually', { details: { job } });
+    revalidatePath('/admin/system');
+    return result;
+  }, 'Done.');
 }
 
 export async function refreshSupplierStripeAction(supplierId: string): Promise<ActionResult> {

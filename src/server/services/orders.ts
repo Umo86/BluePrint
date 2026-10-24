@@ -28,6 +28,7 @@ import { audit } from '../audit';
 import { SYSTEM_ACTOR, type Actor } from '../auth/actor';
 import { sendEmail } from '../email/send';
 import { renderSimpleEmail } from '../email/simple';
+import { renderTemplate } from '../email/templates';
 import { appUrl } from '../auth/login';
 import { payments, type WebhookEvent } from '../payments/provider';
 import { renderInvoice, type InvoiceLine } from '../pdf/invoice';
@@ -279,16 +280,24 @@ async function notifyOrderPlaced(orderId: string) {
   const ctx = await orderContext(db, orderId);
   const o = ctx.order;
   const paid = o.status === 'paid';
-  await emailExhibitor(
-    ctx,
-    paid ? `Order ${o.number} confirmed` : `Order ${o.number} placed on invoice`,
-    [
-      paid ? `Thank you. We have received your payment of ${money(o.totalPence)} for stand ${ctx.stand.number}.` : `Thank you. Your order for stand ${ctx.stand.number} has been placed and an invoice for ${money(o.totalPence)} has been issued.`,
-      ...linesSummary(ctx.lines),
-      'Your VAT invoice is available on the order page.',
-    ],
-    'order_confirmation',
-  );
+  // The exhibitor's confirmation uses the show's own wording (editable under Emails).
+  for (const r of await exhibitorRecipients(db, o)) {
+    const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, r.id)).limit(1);
+    const m = await renderTemplate(ctx.edition, 'order_confirmation', {
+      first_name: (person?.name || '').split(' ')[0] || 'there',
+      name: person?.name ?? '',
+      company: ctx.company?.name ?? '',
+      stand: ctx.stand.number,
+      order_number: o.number,
+      order_total: money(o.totalPence),
+      order_link: appUrl(`/portal/${ctx.edition.slug}/orders/${o.id}`),
+      order_lines: linesSummary(ctx.lines).join('\n'),
+      payment_note: paid
+        ? `We have received your payment of ${money(o.totalPence)} for stand ${ctx.stand.number}. Your VAT invoice is on the order page.`
+        : `Your order for stand ${ctx.stand.number} is confirmed. A VAT invoice for ${money(o.totalPence)} is on the order page${o.dueAt ? `, with payment due by ${o.dueAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ctx.edition.timezone })}` : ''}.`,
+    });
+    await sendEmail({ to: r.email, toUserId: r.id, editionId: ctx.edition.id, companyId: o.companyId, standId: ctx.stand.id, templateKey: 'order_confirmation', category: 'transactional', subject: m.subject, html: m.html, text: m.text });
+  }
   const bySupplier = new Map<string, LineRow[]>();
   for (const l of ctx.lines) if (l.supplierId) bySupplier.set(l.supplierId, [...(bySupplier.get(l.supplierId) ?? []), l]);
   for (const [supplierId, lines] of bySupplier) {

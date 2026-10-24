@@ -270,7 +270,7 @@ describe('card checkout and payouts', () => {
 
     // Emails and the order task.
     const exMail = await db.select().from(emailOutbox).where(eq(emailOutbox.toEmail, ex.user.email));
-    expect(exMail.map((m) => m.subject)).toContain(`Order ${order.number} confirmed`);
+    expect(exMail.map((m) => m.subject)).toContain(`Order ${order.number} confirmed: ${edition.name}`);
     const supplierMail = await db.select().from(emailOutbox).where(eq(emailOutbox.toEmail, furnitureCo.supplier.email));
     expect(supplierMail.some((m) => m.subject.startsWith(`New order ${order.number}`))).toBe(true);
     expect(supplierMail.some((m) => m.text.includes('Daily clean'))).toBe(false);

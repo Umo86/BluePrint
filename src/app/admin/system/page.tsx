@@ -6,7 +6,7 @@ import { ActionButton } from '@/components/action-button';
 import { requireSuperAdmin } from '@/server/auth/current';
 import { systemStatus } from '@/server/services/system';
 import { dateTime } from '@/lib/format';
-import { removeSuppressionAction, retryEmailsAction } from '../actions';
+import { removeSuppressionAction, retryEmailsAction, runCronJobAction } from '../actions';
 
 const CONFIG_LABELS: Record<string, string> = {
   database: 'Database',
@@ -21,6 +21,8 @@ const CONFIG_LABELS: Record<string, string> = {
 };
 
 const WARN = /missing|Not set up|Not connected|Development key|Local/;
+
+const JOB_LABELS = { 'send-queue': 'email sending', reminders: 'reminders', housekeeping: 'tidy-up' } as const;
 
 export default async function SystemPage() {
   const actor = await requireSuperAdmin();
@@ -155,9 +157,28 @@ export default async function SystemPage() {
 
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Paper withBorder p="md">
-          <Title order={2} fz="md" mb="sm">
-            Scheduled jobs
-          </Title>
+          <Group justify="space-between" mb="sm">
+            <Title order={2} fz="md">
+              Scheduled jobs
+            </Title>
+            <Group gap={6}>
+              {(['send-queue', 'reminders', 'housekeeping'] as const).map((job) => (
+                <ActionButton
+                  key={job}
+                  action={runCronJobAction}
+                  args={[job]}
+                  size="compact-xs"
+                  variant="default"
+                  confirm={job === 'reminders' ? { title: 'Send reminders now?', body: 'Exhibitors with tasks coming up or overdue are emailed now, if they have not had today’s reminder.', confirmLabel: 'Send reminders' } : undefined}
+                >
+                  Run {JOB_LABELS[job]}
+                </ActionButton>
+              ))}
+            </Group>
+          </Group>
+          <Text fz="xs" c="dimmed" mb="sm">
+            They run by themselves (emails every 10 minutes, reminders at 8am, tidy-up at 3am UK time). You can also run one now.
+          </Text>
           {s.jobs.length ? (
             <Table fz="sm">
               <TableThead>
@@ -170,7 +191,7 @@ export default async function SystemPage() {
               <TableTbody>
                 {s.jobs.map((j) => (
                   <TableTr key={j.id}>
-                    <TableTd>{j.job}</TableTd>
+                    <TableTd>{JOB_LABELS[j.job as keyof typeof JOB_LABELS] ?? j.job}</TableTd>
                     <TableTd>{dateTime(j.startedAt)}</TableTd>
                     <TableTd>
                       <StatusBadge status={j.status} />

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getDb, type DbLike } from '../db/client';
 import {
   auditLog,
+  emailOutbox,
   companies,
   companyMembers,
   editions,
@@ -254,6 +255,13 @@ export async function getExhibitor(actor: Actor, editionId: string, companyId: s
     .where(and(eq(auditLog.companyId, companyId), or(eq(auditLog.editionId, editionId), isNull(auditLog.editionId))))
     .orderBy(desc(auditLog.at))
     .limit(50);
+  // Every email BluePrint sent this company for the show, with how far it got (delivered, bounced...).
+  const emails = await db
+    .select({ id: emailOutbox.id, toEmail: emailOutbox.toEmail, subject: emailOutbox.subject, status: emailOutbox.status, createdAt: emailOutbox.createdAt })
+    .from(emailOutbox)
+    .where(and(eq(emailOutbox.editionId, editionId), eq(emailOutbox.companyId, companyId)))
+    .orderBy(desc(emailOutbox.createdAt))
+    .limit(30);
   return {
     company,
     stands: standRows,
@@ -261,6 +269,8 @@ export async function getExhibitor(actor: Actor, editionId: string, companyId: s
     invites,
     notes,
     activity,
+    emails,
+    canOpenEmails: access.permissions.has('send_emails'),
     canManage: access.permissions.has('manage_exhibitors'),
     canNote: access.permissions.has('manage_exhibitors') || access.permissions.has('helpdesk'),
   };

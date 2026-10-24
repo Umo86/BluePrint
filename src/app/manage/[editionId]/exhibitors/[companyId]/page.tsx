@@ -3,6 +3,7 @@ import { Badge, Code, Group, Paper, SimpleGrid, Stack, Table, TableTbody, TableT
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ActionButton } from '@/components/action-button';
+import { TextLink } from '@/components/links';
 import { getExhibitor } from '@/server/services/stands';
 import { listExhibitorTypes, listHalls } from '@/server/services/show-setup';
 import { AppError } from '@/server/errors';
@@ -262,6 +263,41 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
               {c.vatNumber ? <Text fz="sm">VAT {c.vatNumber}</Text> : null}
             </Paper>
           )}
+          <Paper withBorder p="md">
+            <Title order={2} fz="md" mb="sm">
+              Emails sent
+            </Title>
+            {d.emails.length ? (
+              <Table fz="xs">
+                <TableTbody>
+                  {d.emails.map((m) => (
+                    <TableTr key={m.id}>
+                      <TableTd style={{ whiteSpace: 'nowrap' }}>{dateTime(m.createdAt)}</TableTd>
+                      <TableTd>
+                        {d.canOpenEmails ? (
+                          <TextLink href={`/manage/${edition.id}/emails/sent/${m.id}`} fz="xs">
+                            {m.subject}
+                          </TextLink>
+                        ) : (
+                          m.subject
+                        )}
+                        <Text fz="xs" c="dimmed">
+                          {m.toEmail}
+                        </Text>
+                      </TableTd>
+                      <TableTd>
+                        <StatusBadge status={m.status} />
+                      </TableTd>
+                    </TableTr>
+                  ))}
+                </TableTbody>
+              </Table>
+            ) : (
+              <Text fz="sm" c="dimmed">
+                None yet.
+              </Text>
+            )}
+          </Paper>
           <Paper withBorder p="md">
             <Title order={2} fz="md" mb="sm">
               Activity

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect, waitForApp } from './fixtures';
-import { expectToast, signInStaff, signInWithCode, watchForErrors } from './helpers';
+import { expectToast, staffSession, signInWithCode, watchForErrors } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -21,7 +21,7 @@ test('the show team builds a manual page and a form task', async ({ page }) => {
   const errors = watchForErrors(page);
   const stamp = Date.now().toString(36);
   taskTitle = `Stand team details ${stamp}`;
-  await signInStaff(page, 'admin@blueprint.test');
+  await staffSession(page);
   dashboard = await openUkcwDashboard(page);
 
   await test.step('manual page with a download', async () => {
@@ -121,7 +121,7 @@ test('an exhibitor completes their checklist', async ({ page }) => {
 
 test('the team asks for changes, and the exhibitor sees it; space-only stands do not get the task', async ({ page, browser }) => {
   test.setTimeout(240_000);
-  await signInStaff(page, 'admin@blueprint.test');
+  await staffSession(page);
   await page.goto(`${dashboard}/tasks`);
   await page.getByRole('link', { name: taskTitle }).click();
   await page.getByRole('tab', { name: /Responses/ }).click();
@@ -153,7 +153,7 @@ test('the team asks for changes, and the exhibitor sees it; space-only stands do
 
 test('admins can see the portal as an exhibitor, read-only', async ({ page }) => {
   test.setTimeout(120_000);
-  await signInStaff(page, 'admin@blueprint.test');
+  await staffSession(page);
   await page.goto(`${dashboard}/exhibitors`);
   await page.getByRole('link', { name: 'Acme Insulation Ltd' }).click();
   await page.getByRole('button', { name: 'See their portal' }).click();

@@ -201,6 +201,15 @@ async function main() {
     published: true,
     requirements: { [space.id]: 'required', [shell.id]: 'if_applicable' },
   });
+  // Something due soon, so the reminder emails have something to say in a demo.
+  await createTask(actor, london.id, {
+    title: 'Read the build-up and breakdown rules',
+    descriptionHtml: '<p>Vehicle access times, working at height and what can be left on the stand overnight.</p>',
+    kind: 'info',
+    deadline: { mode: 'fixed', at: new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString() },
+    published: true,
+    requirements: { [shell.id]: 'required', [space.id]: 'required' },
+  });
   // Dura Roofing has an account with Media10, so it can pay on invoice.
   await db.update(companies).set({ invoiceAllowed: true }).where(eq(companies.name, 'Dura Roofing Group'));
   await updatePlatformSettings(actor, {
