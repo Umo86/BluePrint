@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { sessions } from '../db/schema';
@@ -130,6 +130,13 @@ export async function requireActor(opts: { allowIncompleteTwoFactor?: boolean } 
     if (auth.needsSecondFactor) redirect(`/two-factor?next=${encodeURIComponent(await currentPath())}`);
   }
   return auth.actor;
+}
+
+/** For super admin pages: anyone else gets "not found", so the area's existence is not revealed. */
+export async function requireSuperAdmin(): Promise<Actor> {
+  const actor = await requireActor();
+  if (!actor.isSuperAdmin || actor.readOnly) notFound();
+  return actor;
 }
 
 /** For route handlers: returns null instead of redirecting. */

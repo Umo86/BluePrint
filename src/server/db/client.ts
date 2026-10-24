@@ -7,7 +7,6 @@ import * as schema from './schema';
 import { env } from '../env';
 
 export type Schema = typeof schema;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Db = PgDatabase<PgQueryResultHKT, Schema, ExtractTablesWithRelations<Schema>>;
 export type Tx = PgTransaction<PgQueryResultHKT, Schema, ExtractTablesWithRelations<Schema>>;
 /** Anything that can run a query: the database itself or an open transaction. */
@@ -39,10 +38,10 @@ async function createPglite(dataDir: string | null): Promise<Holder> {
   if (dataDir) fs.mkdirSync(dataDir, { recursive: true });
   const client = dataDir ? new PGlite(dataDir) : new PGlite();
   await client.waitReady;
-  const db = drizzle({ client, schema }) as unknown as Db;
+  const local = drizzle({ client, schema });
   // Local databases migrate themselves; production runs `npm run db:migrate` during deploy.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await migrate(db as any, { migrationsFolder: MIGRATIONS_FOLDER });
+  await migrate(local, { migrationsFolder: MIGRATIONS_FOLDER });
+  const db = local as unknown as Db;
   return { db, ready: Promise.resolve(), close: () => client.close() };
 }
 

@@ -15,5 +15,15 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  // Starts the app on a fresh demo database unless E2E_EXTERNAL_SERVER is set.
+  webServer: process.env.E2E_EXTERNAL_SERVER
+    ? undefined
+    : {
+        command: 'scripts/e2e-server.sh',
+        url: `http://localhost:${PORT}/sign-in`,
+        reuseExistingServer: false,
+        timeout: 240_000,
+        env: { E2E_PORT: String(PORT) },
+      },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], launchOptions: { executablePath: '/opt/pw-browsers/chromium' } } }],
 });

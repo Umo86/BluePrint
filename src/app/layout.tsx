@@ -5,8 +5,8 @@ import '@mantine/dropzone/styles.css';
 import '@mantine/tiptap/styles.css';
 import './globals.css';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
-import { ColorSchemeScript, mantineHtmlProps } from '@mantine/core';
+import { connection } from 'next/server';
+import { mantineHtmlProps } from '@mantine/core';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
@@ -15,13 +15,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// BluePrint always uses the light colour scheme, so Mantine's colour-scheme script (an inline
+// script) is not needed: the attribute is set on <html> by mantineHtmlProps.
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
+  // Every page is rendered per request, so each one gets a fresh CSP nonce (see proxy.ts).
+  // A page built ahead of time would have no nonce and its scripts would be blocked.
+  await connection();
   return (
     <html lang="en-GB" {...mantineHtmlProps}>
-      <head>
-        <ColorSchemeScript nonce={nonce} defaultColorScheme="light" />
-      </head>
       <body>
         <Providers>{children}</Providers>
       </body>

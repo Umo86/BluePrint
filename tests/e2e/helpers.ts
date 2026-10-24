@@ -54,3 +54,46 @@ export async function signInWithCode(page: Page, email: string) {
   }
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
+
+/** The demo super admin's authenticator key (set with SEED_TOTP_SECRET when seeding). */
+export const DEMO_TOTP_SECRET = process.env.E2E_TOTP_SECRET ?? 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+
+/**
+ * Signs a staff member in with an emailed code and then their authenticator code.
+ * Codes can only be used once, so if this 30-second window's code was already used it waits for the next.
+ */
+export async function signInStaff(page: Page, email: string, secret = DEMO_TOTP_SECRET) {
+  await signInWithCode(page, email);
+  await expect(page).toHaveURL(/two-factor/);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.getByLabel('Code from your authenticator app').fill(totp(secret));
+    await page.getByRole('button', { name: 'Continue' }).click();
+    try {
+      await expect(page).not.toHaveURL(/two-factor/, { timeout: 5000 });
+      return;
+    } catch {
+      const wait = 30_000 - (Date.now() % 30_000) + 500;
+      await page.waitForTimeout(wait);
+    }
+  }
+  await expect(page).not.toHaveURL(/two-factor/);
+}
+
+/** Collects browser errors (failed hydration, uncaught exceptions) so a test can assert there were none. */
+export function watchForErrors(page: Page) {
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`));
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return;
+    const text = msg.text();
+    // The browser logs 404s for deliberately missing pages; those are checked separately.
+    if (/Failed to load resource: the server responded with a status of 404/.test(text)) return;
+    errors.push(`console: ${text}`);
+  });
+  return errors;
+}
+
+/** Waits for a Mantine notification containing `text`. */
+export async function expectToast(page: Page, text: string | RegExp) {
+  await expect(page.locator('.mantine-Notification-root', { hasText: text }).first()).toBeVisible();
+}

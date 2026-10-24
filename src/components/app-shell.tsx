@@ -46,7 +46,6 @@ function initials(name: string, email: string) {
 export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, children }: Props) {
   const [opened, { toggle, close }] = useDisclosure();
   const pathname = usePathname();
-  let lastSection: string | undefined;
 
   return (
     <MantineAppShell header={{ height: 60 }} navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="lg">
@@ -124,10 +123,10 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, child
       <MantineAppShell.Navbar p="sm">
         <MantineAppShell.Section grow component={ScrollArea}>
           <Stack gap={2}>
-            {nav.map((item) => {
+            {nav.map((item, i) => {
               const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/');
-              const header = item.section && item.section !== lastSection ? item.section : null;
-              lastSection = item.section ?? lastSection;
+              const previousSection = nav.slice(0, i).reduce<string | undefined>((acc, n) => n.section ?? acc, undefined);
+              const header = item.section && item.section !== previousSection ? item.section : null;
               return (
                 <div key={item.href}>
                   {header ? (

@@ -1,5 +1,6 @@
 import { Center, Container, Paper, Stack, Text, Title } from '@mantine/core';
 import { BrandMark } from './brand';
+import { PlatformNotice } from './platform-notice';
 
 export function AuthCard({ title, subtitle, children }: { title: string; subtitle?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
           <Center>
             <BrandMark />
           </Center>
+          <PlatformNotice />
           <Paper withBorder shadow="sm" p="xl" radius="md">
             <Stack gap="md">
               <div>

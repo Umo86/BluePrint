@@ -67,7 +67,6 @@ export function EnrollForm() {
           <List.Item>Enter the six-digit code the app shows.</List.Item>
         </List>
         <Center>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <Image src={setup.qrDataUrl} alt="QR code for your authenticator app" w={200} h={200} />
         </Center>
         <Text fz="xs" c="dimmed" ta="center">
