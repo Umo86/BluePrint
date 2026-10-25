@@ -20,7 +20,7 @@ Use one shared Media10 login (with two-factor) for each service rather than some
 ## 2. Database (Neon)
 
 1. Create a project in **AWS Europe West 2 (London)** with the latest Postgres version.
-2. Copy the **pooled** connection string (the host name contains `-pooler`) and make sure it ends with `?sslmode=require`. This is `DATABASE_URL`.
+2. Copy the **pooled** connection string (the host name contains `-pooler`) and end it with `?sslmode=verify-full` (Neon shows `sslmode=require&channel_binding=require`, which also works but logs a warning on every start). This is `DATABASE_URL`.
 3. Create a branch called `staging` for a test site (optional but recommended). Its own connection string goes in Vercel's **Preview** environment, so test builds never touch live data.
 4. In the project settings, set the restore window (history retention) as long as your plan allows.
 
@@ -51,12 +51,12 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 ## 5. Create the Vercel project
 
 1. **Add New → Project** and import the Git repository. Vercel detects Next.js.
-2. **Settings → Build and Deployment → Build Command**: `npm run db:migrate && npm run build`. Database changes are applied before each deployment goes live. They only ever add to the database, so the previous version keeps working if you roll back.
+2. Nothing to change under **Build and Deployment**: `vercel.json` sets the build command to `npm run db:migrate && npm run build`, so database changes are applied before each deployment goes live. They only ever add to the database, so the previous version keeps working if you roll back. A deployment without `DATABASE_URL` skips the migrations.
 3. **Settings → Environment Variables**. Set these for **Production** (and staging equivalents for **Preview**, or turn preview deployments off):
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `APP_URL` | Yes | The site's address, for example `https://blueprint.media10.co.uk`. Used in email links and to check that requests come from the site itself. |
+| `APP_URL` | Yes | The site's address, for example `https://blueprint.media10.co.uk`. Used in email links and to check that requests come from the site itself. Before you add your own domain, use the production address under **Settings → Domains** (such as `https://blue-print-xyz.vercel.app`), not a deployment's own address: Vercel puts those behind its sign-in. |
 | `DATABASE_URL` | Yes | Neon's pooled connection string (step 2). |
 | `APP_ENCRYPTION_KEY` | Yes | 32 random bytes, base64: `openssl rand -base64 32`. Encrypts two-factor keys. Keep a copy in the company password manager. |
 | `CRON_SECRET` | Yes | A long random value: `openssl rand -hex 32`. Vercel sends it with each scheduled job. |

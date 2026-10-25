@@ -7,6 +7,11 @@ import path from 'node:path';
 async function main() {
   const url = process.env.DATABASE_URL;
   const migrationsFolder = path.join(process.cwd(), 'drizzle');
+  if (!url && process.env.VERCEL) {
+    // A Vercel build without a database (for example a preview with no settings yet): nothing to migrate.
+    console.log('DATABASE_URL is not set for this deployment, so no migrations were applied.');
+    return;
+  }
   if (url) {
     const { Pool } = await import('pg');
     const { drizzle } = await import('drizzle-orm/node-postgres');
