@@ -23,7 +23,7 @@ import { getPlatformSettings } from '../services/settings';
 import { checklistForStand, saveAnswers } from '../services/submissions';
 import { reminderStep } from '../services/reminders';
 import { openTicket } from '../services/helpdesk';
-import { dateLong, dateTime } from '@/lib/format';
+import { dateLong, dateTime, standSize } from '@/lib/format';
 import { toLocalDateTimeString } from '@/lib/dates';
 import { knowledgeFor, type Chunk } from './knowledge';
 import { assistantModel, type ModelReply, type ReplyBlock, type ToolResultBlock, type TurnMessage } from './model';
@@ -109,7 +109,7 @@ function dynamicPrompt(actor: Actor, d: Awaited<ReturnType<typeof standDetails>>
     `Show: ${e.name}${e.venue ? ` at ${e.venue}${e.city ? `, ${e.city}` : ''}` : ''}.`,
     `Build-up starts ${e.buildUpStartsAt ? dateTime(e.buildUpStartsAt) : 'on a date not yet set'}; open ${e.openStartsAt ? dateTime(e.openStartsAt) : 'dates to be confirmed'}${e.openEndsAt ? ` to ${dateTime(e.openEndsAt)}` : ''}; breakdown ends ${e.breakdownEndsAt ? dateTime(e.breakdownEndsAt) : 'at a time not yet set'}.`,
     `You are talking to ${actor.name || 'an exhibitor'} (first name ${firstName(actor.name) || 'unknown'}) from ${d.company?.name ?? 'their company'}.`,
-    `Their stand: ${d.stand.number}, ${d.typeName}${d.hallName ? `, hall ${d.hallName}` : ''}${d.stand.sizeSqm ? `, ${Number(d.stand.sizeSqm)} sqm` : ''}.`,
+    `Their stand: ${d.stand.number}, ${d.typeName}${d.hallName ? `, hall ${d.hallName}` : ''}${standSize(d.stand) ? `, ${standSize(d.stand)}` : ''}${d.stand.openSides ? `, ${d.stand.openSides} open side${d.stand.openSides === 1 ? '' : 's'}` : ''}.`,
     `Checklist: ${checklist.progress.requiredDone} of ${checklist.progress.required} required tasks done${checklist.progress.overdue ? `, ${checklist.progress.overdue} overdue` : ''}${next ? `; next due: “${next.task.title}” by ${dateTime(next.deadline)}` : ''}.`,
   ].join('\n');
 }

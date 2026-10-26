@@ -5,6 +5,7 @@ import { expectToast, staffSession, signInWithCode, watchForErrors } from './hel
 test.describe.configure({ mode: 'serial' });
 
 const PORTAL = '/portal/ukcw-london-2027';
+const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
 let orderNumber = '';
 
 async function addToBasket(page: Page, product: string, fill: (dialog: ReturnType<Page['getByRole']>) => Promise<void>) {
@@ -196,4 +197,41 @@ test('people cannot see orders that are not theirs', async ({ page }) => {
   expect(res.status()).toBe(404);
   const csv = await page.request.get('/supplier/00000000-0000-0000-0000-000000000000/orders/export');
   expect(csv.status()).toBe(404);
+});
+
+test('an exhibitor sends artwork with an order and the supplier downloads it', async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  const errors = watchForErrors(page);
+  await signInWithCode(page, 'dev@duraroofing.test');
+  await page.waitForURL(new RegExp(`${PORTAL}$`));
+  await page.goto(`${PORTAL}/shop`);
+  await page.getByRole('button', { name: 'Add Printed graphic panel to basket' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Printed graphic panel' });
+  // The panel cannot go in the basket without its artwork.
+  await dialog.getByRole('button', { name: 'Add to basket' }).click();
+  await expect(dialog.getByText('Please upload the file.')).toBeVisible();
+  await dialog.locator('input[type=file]').setInputFiles({ name: 'panel-artwork.pdf', mimeType: 'application/pdf', buffer: PDF });
+  await expect(dialog.getByRole('link', { name: 'panel-artwork.pdf' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Add to basket' }).click();
+  await expectToast(page, 'Added to your basket.');
+
+  await page.goto(`${PORTAL}/shop/basket`);
+  await expect(page.getByRole('link', { name: 'panel-artwork.pdf' })).toBeVisible();
+  await page.getByRole('radiogroup').getByText('Pay on invoice').click();
+  await page.getByLabel('I accept these terms').check();
+  await page.getByRole('button', { name: /^Place order on invoice/ }).click();
+  await page.waitForURL(/\/orders\/[0-9a-f-]{36}\?placed=1$/);
+  await expect(page.getByRole('link', { name: 'panel-artwork.pdf' })).toBeVisible();
+  expect(errors, errors.join('\n')).toEqual([]);
+
+  // The supplier sees the artwork on the order line and can download it.
+  const supplier = await (await browser.newContext()).newPage();
+  await signInWithCode(supplier, 'sophie@showsound.test');
+  await supplier.waitForURL(/\/supplier\/[0-9a-f-]{36}$/);
+  await supplier.getByRole('link', { name: 'Orders', exact: true }).click();
+  const link = supplier.getByRole('link', { name: 'panel-artwork.pdf' });
+  await expect(link).toBeVisible();
+  const res = await supplier.request.get((await link.getAttribute('href'))!);
+  expect(res.status()).toBe(200);
+  expect(res.headers()['content-disposition']).toContain('attachment');
 });

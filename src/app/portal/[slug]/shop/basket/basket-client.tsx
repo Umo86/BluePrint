@@ -9,10 +9,12 @@ import { useAction } from '@/lib/use-action';
 import { money } from '@/lib/format';
 import { isAllowedPaymentRedirect } from '@/lib/safe-redirect';
 import { checkoutAction, removeBasketItemAction, updateBasketItemAction } from '../../../shop-actions';
+import { OrderLineDetails } from '@/components/order-line-details';
 
 type Item = {
   itemId: string;
   name: string;
+  code: string | null;
   unit: string;
   imageUrl: string | null;
   options: Record<string, string>;
@@ -99,6 +101,11 @@ export function BasketClient({
                         <Text fz="sm" fw={600}>
                           {i.name}
                         </Text>
+                        {i.code ? (
+                          <Text fz="xs" c="dimmed">
+                            Code {i.code}
+                          </Text>
+                        ) : null}
                         {Object.keys(i.options).length ? (
                           <Text fz="xs" c="dimmed">
                             {Object.entries(i.options)
@@ -106,11 +113,7 @@ export function BasketClient({
                               .join(' · ')}
                           </Text>
                         ) : null}
-                        {Object.keys(i.details).length ? (
-                          <Text fz="xs" c="dimmed" lineClamp={2}>
-                            {Object.values(i.details).map(String).join(' · ')}
-                          </Text>
-                        ) : null}
+                        <OrderLineDetails details={i.details} />
                         {i.problem === 'unavailable' ? (
                           <Text fz="xs" c="red">
                             No longer available. Please remove it.

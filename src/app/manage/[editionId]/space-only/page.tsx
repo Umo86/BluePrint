@@ -5,7 +5,7 @@ import { DownloadButton, TextLink } from '@/components/links';
 import { IconDownload } from '@tabler/icons-react';
 import { spaceOnlyQueue } from '@/server/services/space-only';
 import { PACK_STATUS_LABELS } from '@/lib/space-only';
-import { dateShort } from '@/lib/format';
+import { dateShort, standSize } from '@/lib/format';
 import { loadEdition } from '../load';
 import { QueueFilter } from './queue-filter';
 
@@ -62,7 +62,7 @@ export default async function SpaceOnlyQueuePage({ params, searchParams }: PageP
                     {r.hall ? (
                       <Text fz="xs" c="dimmed">
                         Hall {r.hall.name}
-                        {r.stand.sizeSqm ? ` · ${Number(r.stand.sizeSqm)} sqm` : ''}
+                        {standSize(r.stand) ? ` · ${standSize(r.stand)}` : ''}
                       </Text>
                     ) : null}
                   </TableTd>

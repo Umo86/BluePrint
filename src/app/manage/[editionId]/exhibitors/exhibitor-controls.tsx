@@ -19,6 +19,7 @@ import {
 } from '@mantine/core';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useAction } from '@/lib/use-action';
+import { emptyStandForm, formArea, type StandFormValues } from '@/lib/stand-form';
 import { addExhibitorAction, searchCompaniesAction } from '../../actions';
 
 type Option = { value: string; label: string };
@@ -126,31 +127,51 @@ export function StandFields({
   halls,
   errors,
 }: {
-  value: { number: string; exhibitorTypeId: string | null; hallId: string | null; sizeSqm: number | null; openSides: number; notes: string };
-  onChange: (v: typeof value) => void;
+  value: StandFormValues;
+  onChange: (v: StandFormValues) => void;
   types: Option[];
   halls: Option[];
   errors: Record<string, string>;
 }) {
+  const err = (key: string) => errors[key] ?? errors[`stand.${key}`];
+  const metres = (v: string | number) => (v === '' ? null : Number(v));
+  const fromDimensions = value.widthM !== null && value.depthM !== null;
   return (
     <Stack gap="sm">
       <Group grow align="flex-start">
-        <TextInput label="Stand number" required value={value.number} onChange={(e) => onChange({ ...value, number: e.currentTarget.value })} error={errors.number ?? errors['stand.number']} />
+        <TextInput label="Stand number" required value={value.number} onChange={(e) => onChange({ ...value, number: e.currentTarget.value })} error={err('number')} />
         <Select
           label="Stand type"
           required
           data={types}
           value={value.exhibitorTypeId}
           onChange={(v) => onChange({ ...value, exhibitorTypeId: v })}
-          error={errors.exhibitorTypeId ?? errors['stand.exhibitorTypeId']}
+          error={err('exhibitorTypeId')}
           allowDeselect={false}
         />
       </Group>
       <Group grow align="flex-start">
         <Select label="Hall" data={halls} value={value.hallId} onChange={(v) => onChange({ ...value, hallId: v })} clearable placeholder={halls.length ? 'Choose' : 'Add halls in show settings'} />
-        <NumberInput label="Size (sqm)" value={value.sizeSqm ?? ''} onChange={(v) => onChange({ ...value, sizeSqm: v === '' ? null : Number(v) })} min={0} decimalScale={2} />
         <NumberInput label="Open sides" value={value.openSides} onChange={(v) => onChange({ ...value, openSides: Number(v || 0) })} min={0} max={4} />
       </Group>
+      <div>
+        <Group grow align="flex-start">
+          <NumberInput label="Width (m)" value={value.widthM ?? ''} onChange={(v) => onChange({ ...value, widthM: metres(v) })} min={0} max={500} decimalScale={2} error={err('widthM')} />
+          <NumberInput label="Depth (m)" value={value.depthM ?? ''} onChange={(v) => onChange({ ...value, depthM: metres(v) })} min={0} max={500} decimalScale={2} error={err('depthM')} />
+          <NumberInput
+            label="Area (sqm)"
+            value={formArea(value) ?? ''}
+            onChange={(v) => onChange({ ...value, sizeSqm: metres(v) })}
+            min={0}
+            decimalScale={2}
+            disabled={fromDimensions}
+            error={err('sizeSqm')}
+          />
+        </Group>
+        <Text fz="xs" c="dimmed" mt={4}>
+          Width is along the aisle. With both width and depth the area is worked out for you; for an odd-shaped stand, leave them empty and enter the area.
+        </Text>
+      </div>
       <TextInput label="Notes for the team" value={value.notes} onChange={(e) => onChange({ ...value, notes: e.currentTarget.value })} />
     </Stack>
   );
@@ -165,7 +186,7 @@ export function AddExhibitorButton({ editionId, types, halls, isDraft }: { editi
   const [search, setSearch] = useState('');
   const [matches, setMatches] = useState<{ id: string; name: string; website: string | null; city: string | null }[]>([]);
   const [existingId, setExistingId] = useState<string | null>(null);
-  const [stand, setStand] = useState({ number: '', exhibitorTypeId: (types[0]?.value ?? null) as string | null, hallId: null as string | null, sizeSqm: null as number | null, openSides: 1, notes: '' });
+  const [stand, setStand] = useState(() => emptyStandForm(types[0]?.value ?? null));
   const [email, setEmail] = useState('');
   const [sendNow, setSendNow] = useState(!isDraft);
   const add = useAction(addExhibitorAction, {

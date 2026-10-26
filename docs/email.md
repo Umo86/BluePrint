@@ -57,7 +57,7 @@ BluePrint checks every webhook's signature and time (within five minutes) and ig
 | --- | --- | --- |
 | `send-queue` | every 10 minutes | Sends queued update emails in batches and retries failed sends (three tries, at least 15 minutes apart). |
 | `reminders` | 07:00 UTC (8am UK summer time) | Deadline reminders to exhibitors and the team's morning summary. |
-| `housekeeping` | 02:30 UTC | Releases abandoned checkouts, sends waiting supplier payouts, removes expired sign-in records and unfinished uploads, and deletes email logs older than the retention period. |
+| `housekeeping` | 02:30 UTC | Releases abandoned checkouts, sends waiting supplier payouts, removes expired sign-in records and unfinished uploads, deletes order artwork that was never ordered (after 30 days), and deletes email logs older than the retention period. |
 
 Set `CRON_SECRET` (a long random value); Vercel sends it automatically. Calls without it get "not found". Super admins can also run any job from **Super admin → System**.
 

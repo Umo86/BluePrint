@@ -9,6 +9,7 @@ import { AppError } from '@/server/errors';
 import { dateLong, dateTime, money } from '@/lib/format';
 import { loadPortal } from '../../load';
 import { CancelCheckoutButton } from './cancel-checkout';
+import { OrderLineDetails } from '@/components/order-line-details';
 
 export default async function MyOrder({ params, searchParams }: PageProps<'/portal/[slug]/orders/[orderId]'>) {
   const { slug, orderId } = await params;
@@ -99,6 +100,11 @@ export default async function MyOrder({ params, searchParams }: PageProps<'/port
                   <Text fz="sm" fw={500}>
                     {l.description}
                   </Text>
+                  {l.productCode ? (
+                    <Text fz="xs" c="dimmed">
+                      Code {l.productCode}
+                    </Text>
+                  ) : null}
                   {Object.keys(l.options).length ? (
                     <Text fz="xs" c="dimmed">
                       {Object.entries(l.options)
@@ -106,6 +112,7 @@ export default async function MyOrder({ params, searchParams }: PageProps<'/port
                         .join(' · ')}
                     </Text>
                   ) : null}
+                  <OrderLineDetails details={l.details} />
                   {l.supplierName ? (
                     <Text fz="xs" c="dimmed">
                       Supplied by {l.supplierName}

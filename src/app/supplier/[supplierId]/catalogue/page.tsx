@@ -63,6 +63,11 @@ export default async function SupplierCataloguePage({ params }: PageProps<'/supp
                               {p.name}
                             </TextLink>
                           )}
+                          {p.code ? (
+                            <Text fz="xs" c="dimmed">
+                              Code {p.code}
+                            </Text>
+                          ) : null}
                           {p.status === 'rejected' && p.rejectionReason ? (
                             <Text fz="xs" c="orange" lineClamp={2}>
                               {p.rejectionReason}

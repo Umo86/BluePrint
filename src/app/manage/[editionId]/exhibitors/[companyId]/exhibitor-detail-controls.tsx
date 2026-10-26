@@ -10,10 +10,10 @@ import { CompanyFields, type CompanyFormValues } from '@/components/company-fiel
 import { removeMemberAction, setMemberAccessAction } from '@/app/admin/actions';
 import { startViewAsAction } from '@/app/view-as-actions';
 import { addNoteAction, deleteStandAction, inviteContactAction, setStandStatusAction, updateExhibitorCompanyAction, updateStandAction } from '../../../actions';
+import type { StandFormValues as StandValues } from '@/lib/stand-form';
 import { StandFields } from '../exhibitor-controls';
 
 type Option = { value: string; label: string };
-type StandValues = { number: string; exhibitorTypeId: string | null; hallId: string | null; sizeSqm: number | null; openSides: number; notes: string };
 
 export function CompanyForm({ editionId, companyId, initial }: { editionId: string; companyId: string; initial: CompanyFormValues }) {
   const [f, setF] = useState(initial);

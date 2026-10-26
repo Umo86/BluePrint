@@ -28,6 +28,7 @@ import { answerToText, type FormField } from '@/lib/forms';
 import { TASK_STATE_LABELS } from '@/lib/task-labels';
 import { PACK_STATUS_LABELS } from '@/lib/space-only';
 import { slugify } from '@/lib/slug';
+import { standSize } from '@/lib/format';
 import { buildWorkbook, type SheetSpec } from './xlsx';
 import type { Actor } from '../auth/actor';
 
@@ -197,6 +198,7 @@ async function exhibitorsSheets(actor: Actor, editionId: string, progress: Editi
         { header: 'Stand types', key: 'types', width: 22 },
         { header: 'Halls', key: 'halls' },
         { header: 'Size (sqm)', key: 'size', type: 'number' },
+        { header: 'Stand sizes', key: 'sizes', width: 30 },
         { header: 'Main contact', key: 'contact', width: 24 },
         { header: 'Email', key: 'email', width: 30 },
         { header: 'BluePrint', key: 'state', width: 20 },
@@ -219,6 +221,10 @@ async function exhibitorsSheets(actor: Actor, editionId: string, progress: Editi
         types: [...new Set(r.stands.map((s) => s.typeName))].join(', '),
         halls: [...new Set(r.stands.map((s) => s.hallName).filter(Boolean))].join(', '),
         size: r.stands.reduce((n, s) => n + (s.sizeSqm ? Number(s.sizeSqm) : 0), 0) || null,
+        sizes: r.stands
+          .filter((s) => standSize(s))
+          .map((s) => (r.stands.length > 1 ? `${s.number}: ${standSize(s)}` : standSize(s)))
+          .join('; '),
         contact: r.mainContact?.name ?? '',
         email: r.mainContact?.email ?? r.invite?.email ?? '',
         state: STAND_STATUS_LABELS[r.state],
@@ -461,6 +467,7 @@ async function ordersSheets(editionId: string): Promise<SheetSpec[]> {
         { header: 'Company', key: 'company', width: 28 },
         { header: 'Stand', key: 'stand' },
         { header: 'Item', key: 'item', width: 32 },
+        { header: 'Code', key: 'code', width: 14 },
         { header: 'Options and details', key: 'options', width: 40 },
         { header: 'Quantity', key: 'qty', type: 'number' },
         { header: 'Unit price (net)', key: 'unit', type: 'money' },
@@ -481,6 +488,7 @@ async function ordersSheets(editionId: string): Promise<SheetSpec[]> {
         company: r.companyName ?? '',
         stand: r.standNumber,
         item: r.line.description,
+        code: r.line.productCode ?? '',
         options: describeLineDetails(r.line),
         qty: r.line.quantity,
         unit: r.line.unitPricePence,
@@ -509,6 +517,7 @@ async function servicesSheets(editionId: string): Promise<SheetSpec[]> {
         { header: 'Stand', key: 'stand' },
         { header: 'Company', key: 'company', width: 28 },
         { header: 'Item', key: 'item', width: 32 },
+        { header: 'Code', key: 'code', width: 14 },
         { header: 'Options and details', key: 'options', width: 40 },
         { header: 'Quantity', key: 'qty', type: 'number' },
         { header: 'Supplier', key: 'supplier', width: 24 },
@@ -520,6 +529,7 @@ async function servicesSheets(editionId: string): Promise<SheetSpec[]> {
         stand: r.standNumber,
         company: r.companyName ?? '',
         item: r.line.description,
+        code: r.line.productCode ?? '',
         options: describeLineDetails(r.line),
         qty: r.line.quantity,
         supplier: r.supplierName ?? 'Media10',
@@ -606,7 +616,10 @@ async function spaceOnlySheets(editionId: string): Promise<SheetSpec[]> {
         { header: 'Stand', key: 'stand' },
         { header: 'Company', key: 'company', width: 28 },
         { header: 'Hall', key: 'hall' },
+        { header: 'Width (m)', key: 'width', type: 'number' },
+        { header: 'Depth (m)', key: 'depth', type: 'number' },
         { header: 'Size (sqm)', key: 'size', type: 'number' },
+        { header: 'Open sides', key: 'sides', type: 'number' },
         { header: 'Contractor', key: 'contractor', width: 26 },
         { header: 'Contractor contact', key: 'contact', width: 22 },
         { header: 'Contractor email', key: 'email', width: 28 },
@@ -630,7 +643,10 @@ async function spaceOnlySheets(editionId: string): Promise<SheetSpec[]> {
           stand: r.stand.number,
           company: r.company?.name ?? '',
           hall: r.hall?.name ?? '',
+          width: r.stand.widthM ? Number(r.stand.widthM) : null,
+          depth: r.stand.depthM ? Number(r.stand.depthM) : null,
           size: r.stand.sizeSqm ? Number(r.stand.sizeSqm) : null,
+          sides: r.stand.openSides,
           contractor: contractor?.contractorCompanyName ?? 'Not nominated',
           contact: contractor?.contactName ?? '',
           email: contractor?.contactEmail ?? '',

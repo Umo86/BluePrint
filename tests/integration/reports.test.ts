@@ -297,8 +297,10 @@ describe('Excel reports', () => {
 
     const so = await readXlsx((await buildReport(admin, s.edition.id, 'space_only')).buffer);
     const soSheet = so.getWorksheet('Space-only approvals')!;
-    expect(soSheet.getRow(2).getCell(1).value).toBe('P1');
-    expect(soSheet.getRow(2).getCell(5).value).toBe('Not nominated');
+    const soCol = (name: string) => (soSheet.getRow(1).values as unknown[]).indexOf(name);
+    expect(soSheet.getRow(2).getCell(soCol('Stand')).value).toBe('P1');
+    expect(soSheet.getRow(2).getCell(soCol('Contractor')).value).toBe('Not nominated');
+    expect(soCol('Width (m)')).toBeLessThan(soCol('Size (sqm)'));
   });
 
   it('builds the orders and services reports, and the services page, from live orders only', async () => {
@@ -342,7 +344,9 @@ describe('Excel reports', () => {
 
     const services = await readXlsx((await buildReport(admin, s.edition.id, 'services')).buffer);
     expect(services.worksheets.map((w) => w.name)).toEqual(['By stand', 'By product', 'About this file']);
-    expect(services.getWorksheet('By stand')!.getRow(2).getCell(5).value).toBe('Colour: Black');
+    const byStandSheet = services.getWorksheet('By stand')!;
+    const optionsCol = (byStandSheet.getRow(1).values as unknown[]).indexOf('Options and details');
+    expect(byStandSheet.getRow(2).getCell(optionsCol).value).toBe('Colour: Black');
 
     const ordersFile = await readXlsx((await buildReport(admin, s.edition.id, 'orders')).buffer);
     const items = ordersFile.getWorksheet('Items')!;

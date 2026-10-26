@@ -7,9 +7,10 @@ import { pagesForType } from '@/server/services/manual';
 import { announcementsForType } from '@/server/services/announcements';
 import { pendingNudges, assistantStatus } from '@/server/assistant';
 import { NudgesSeen } from './nudges-seen';
-import { dateLong, dateTime, daysUntil } from '@/lib/format';
+import { dateLong, dateTime, daysUntil, standSize } from '@/lib/format';
 import { TASK_STATE_LABELS } from '@/lib/task-labels';
 import { loadPortal } from './load';
+import { ShowContacts } from '@/components/show-contacts';
 
 export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>) {
   const { slug } = await params;
@@ -40,7 +41,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
         <Text c="dimmed">
           {ctx.stand.companyName} · stand {ctx.stand.number} · {ctx.stand.typeName}
           {ctx.stand.hallName ? ` · hall ${ctx.stand.hallName}` : ''}
-          {ctx.stand.sizeSqm ? ` · ${Number(ctx.stand.sizeSqm)} sqm` : ''}
+          {standSize(ctx.stand) ? ` · ${standSize(ctx.stand)}` : ''}
         </Text>
       </div>
       {ctx.closedReason ? <Alert color="gray">{ctx.closedReason}</Alert> : null}
@@ -192,6 +193,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
               ) : null}
             </Stack>
           </Paper>
+          <ShowContacts contacts={ctx.edition.contacts} />
         </Stack>
       </SimpleGrid>
     </Stack>

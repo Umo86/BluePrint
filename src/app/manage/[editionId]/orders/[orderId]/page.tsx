@@ -9,6 +9,7 @@ import { dateTime, money, percentFromBps } from '@/lib/format';
 import { loadEdition } from '../../load';
 import { FulfilmentSelect } from '@/components/fulfilment-select';
 import { CancelOrderButton, MarkPaidButton, RefundButton, RetryTransferButton, SettleTransferButton } from './order-controls';
+import { OrderLineDetails } from '@/components/order-line-details';
 
 const TRANSFER_LABELS: Record<string, string> = {
   pending: 'Waiting',
@@ -160,6 +161,11 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
                   <Text fz="sm" fw={500}>
                     {l.description}
                   </Text>
+                  {l.productCode ? (
+                    <Text fz="xs" c="dimmed">
+                      Code {l.productCode}
+                    </Text>
+                  ) : null}
                   {Object.keys(l.options).length ? (
                     <Text fz="xs" c="dimmed">
                       {Object.entries(l.options)
@@ -167,13 +173,7 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
                         .join(' · ')}
                     </Text>
                   ) : null}
-                  {Object.keys(l.details).length ? (
-                    <Text fz="xs" c="dimmed" style={{ whiteSpace: 'pre-wrap' }}>
-                      {Object.entries(l.details)
-                        .map(([k, v]) => `${k}: ${String(v)}`)
-                        .join('\n')}
-                    </Text>
-                  ) : null}
+                  <OrderLineDetails details={l.details} />
                   {l.refundedPence ? (
                     <Text fz="xs" c="grape">
                       {money(l.refundedPence)} refunded

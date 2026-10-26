@@ -10,7 +10,7 @@ import { getDb, closeDb } from '../src/server/db/client';
 import { companies, companyMembers, editionStaff, exhibitorTypes, halls, stands, supplierUsers, suppliers as suppliersTable, users } from '../src/server/db/schema';
 import { encryptSecret } from '../src/server/security/crypto';
 import { generateTotpSecret } from '../src/server/security/totp';
-import { createEdition, createShow } from '../src/server/services/editions';
+import { createEdition, createShow, updateEditionContacts } from '../src/server/services/editions';
 import { createSupplier } from '../src/server/services/suppliers';
 import { createCategory, createProduct } from '../src/server/services/catalogue';
 import { createTask } from '../src/server/services/tasks';
@@ -96,6 +96,16 @@ async function main() {
     ])
     .returning();
 
+  // Who exhibitors can contact (shown on their home page) ---------------------
+  await updateEditionContacts(actor, london.id, {
+    contacts: [
+      { id: 'ops', team: 'Operations', name: 'Media10 operations team', email: 'ops@ukcw.example', phone: '+44 20 7946 0001' },
+      { id: 'sales', team: 'Sales', name: 'Stand sales', email: 'sales@ukcw.example', phone: '+44 20 7946 0002' },
+      { id: 'marketing', team: 'Marketing', email: 'marketing@ukcw.example' },
+      { id: 'venue', team: 'Venue', name: 'ExCeL London', note: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL' },
+    ],
+  });
+
   // Team --------------------------------------------------------------------
   const staff = [
     { email: 'ops@blueprint.test', name: 'Olivia Ops', role: 'show_admin' as const, permissions: [] },
@@ -109,19 +119,19 @@ async function main() {
 
   // Exhibitors ----------------------------------------------------------------
   const exhibitors = [
-    { name: 'Acme Insulation Ltd', stand: 'N1-110', type: shell, hall: 0, size: '9', contact: ['Amira Khan', 'amira@acme-insulation.test'] },
-    { name: 'BrightBuild Windows', stand: 'N1-214', type: shell, hall: 0, size: '12', contact: ['Ben Carter', 'ben@brightbuild.test'] },
-    { name: 'Cladtech Systems', stand: 'N2-305', type: shell, hall: 1, size: '18', contact: ['Chloe Wright', 'chloe@cladtech.test'] },
-    { name: 'Dura Roofing Group', stand: 'N2-410', type: shell, hall: 1, size: '9', contact: ['Dev Patel', 'dev@duraroofing.test'] },
-    { name: 'Evergreen Timber Frames', stand: 'N3-501', type: space, hall: 2, size: '72', contact: ['Ella Morgan', 'ella@evergreen.test'] },
-    { name: 'Fortis Steel', stand: 'N3-620', type: space, hall: 2, size: '120', contact: ['Finn O’Brien', 'finn@fortissteel.test'] },
+    { name: 'Acme Insulation Ltd', stand: 'N1-110', type: shell, hall: 0, size: '9', width: '3', depth: '3', contact: ['Amira Khan', 'amira@acme-insulation.test'] },
+    { name: 'BrightBuild Windows', stand: 'N1-214', type: shell, hall: 0, size: '12', width: '4', depth: '3', contact: ['Ben Carter', 'ben@brightbuild.test'] },
+    { name: 'Cladtech Systems', stand: 'N2-305', type: shell, hall: 1, size: '18', width: '6', depth: '3', contact: ['Chloe Wright', 'chloe@cladtech.test'] },
+    { name: 'Dura Roofing Group', stand: 'N2-410', type: shell, hall: 1, size: '9', width: '3', depth: '3', contact: ['Dev Patel', 'dev@duraroofing.test'] },
+    { name: 'Evergreen Timber Frames', stand: 'N3-501', type: space, hall: 2, size: '72', width: '12', depth: '6', contact: ['Ella Morgan', 'ella@evergreen.test'] },
+    { name: 'Fortis Steel', stand: 'N3-620', type: space, hall: 2, size: '120', width: '12', depth: '10', contact: ['Finn O’Brien', 'finn@fortissteel.test'] },
   ];
   for (const x of exhibitors) {
     const [c] = await db
       .insert(companies)
       .values({ name: x.name, website: `https://www.${x.contact[1].split('@')[1].replace('.test', '.example')}`, country: 'United Kingdom' })
       .returning();
-    await db.insert(stands).values({ editionId: london.id, number: x.stand, exhibitorTypeId: x.type.id, hallId: hallRows[x.hall].id, companyId: c.id, sizeSqm: x.size, openSides: 2 });
+    await db.insert(stands).values({ editionId: london.id, number: x.stand, exhibitorTypeId: x.type.id, hallId: hallRows[x.hall].id, companyId: c.id, sizeSqm: x.size, widthM: x.width, depthM: x.depth, openSides: 2 });
     const [u] = await db.insert(users).values({ email: x.contact[1], name: x.contact[0], status: 'active' }).returning();
     await db.insert(companyMembers).values({ companyId: c.id, userId: u.id, role: 'main_contact', canPay: true });
   }
@@ -164,6 +174,12 @@ async function main() {
   });
   const av = await createCategory(actor, london.id, { name: 'Audio visual', supplierId: supplierIds['ShowSound AV'], orderByOffsetDays: 14 });
   const cleaning = await createCategory(actor, london.id, { name: 'Stand cleaning', description: 'Provided by the organiser.', orderByOffsetDays: 7, visibleToTypes: [shell.id] });
+  const graphics = await createCategory(actor, london.id, {
+    name: 'Graphics',
+    description: 'Printed panels for your stand. Upload print-ready artwork when you order.',
+    supplierId: supplierIds['ShowSound AV'],
+    orderByOffsetDays: 21,
+  });
   const product = (categoryId: string, p: Omit<Parameters<typeof createProduct>[2], 'categoryId'>) => createProduct(actor, london.id, { categoryId, ...p });
   await product(furniture.id, { name: 'Folding chair', description: 'Padded seat, stackable.', pricePence: 1800, vatRateBps: 2000, stockLimit: 200, options: [{ name: 'Colour', values: ['Black', 'White'] }] });
   await product(furniture.id, { name: 'Poseur table', description: '60 cm round top, 110 cm high.', pricePence: 4500, vatRateBps: 2000, options: [{ name: 'Top', values: ['White', 'Black'] }] });
@@ -191,6 +207,13 @@ async function main() {
   await product(electrics.id, { name: 'LED spotlight on arm', pricePence: 4200, vatRateBps: 2000 });
   await product(electrics.id, { name: '24-hour power supply', description: 'For fridges and servers that must stay on overnight.', pricePence: 16_000, vatRateBps: 2000 });
   await product(av.id, { name: '55-inch screen with floor stand', description: 'HDMI input, delivered and set up on your stand.', pricePence: 29_500, vatRateBps: 2000, stockLimit: 20 });
+  await product(graphics.id, {
+    name: 'Printed graphic panel',
+    description: 'A 946 mm wide panel that fits between shell scheme uprights. Supply artwork at full size, 100 dpi, with 25 mm bleed.',
+    pricePence: 19_900,
+    vatRateBps: 2000,
+    requiredDetails: [{ id: 'artwork', label: 'Artwork', type: 'file', required: true }],
+  });
   await product(cleaning.id, { name: 'Daily stand clean', description: 'Vacuum, empty bins and wipe down each morning of the show.', unit: 'per day', pricePence: 3500, vatRateBps: 2000 });
   await createTask(actor, london.id, {
     title: 'Order your stand electrics',

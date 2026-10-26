@@ -9,7 +9,8 @@ export type UploadPurpose =
   | 'invoice'
   | 'certificate'
   | 'company_logo'
-  | 'ticket';
+  | 'ticket'
+  | 'order';
 
 const MB = 1024 * 1024;
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -20,16 +21,46 @@ export const DOC_TYPES = [
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ];
 export const DRAWING_TYPES = ['image/vnd.dwg', 'application/x-dwg', 'image/x-dwg'];
+/** Print artwork: PDF (Illustrator files saved with PDF compatibility read as PDF), images, TIFF, EPS and Photoshop. */
+export const ARTWORK_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/tiff', 'image/vnd.adobe.photoshop', 'application/postscript', 'application/eps'];
+
+/** File types browsers often leave blank, by file extension. The server still checks the real bytes. */
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+  psd: 'image/vnd.adobe.photoshop',
+  eps: 'application/postscript',
+  ai: 'application/postscript',
+  ps: 'application/postscript',
+};
+
+/** The type to expect for a file whose browser gave no usable type, from its extension. */
+export function typeFromName(filename: string): string | null {
+  const ext = /\.([a-z0-9]+)$/i.exec(filename)?.[1]?.toLowerCase();
+  return ext ? TYPE_BY_EXTENSION[ext] ?? null : null;
+}
 
 /** What each kind of upload may be. SVG and HTML are never accepted (they can carry scripts). */
-export const UPLOAD_RULES: Record<UploadPurpose, { maxBytes: number; types: string[]; isPublic: boolean; label: string }> = {
+export const UPLOAD_RULES: Record<UploadPurpose, { maxBytes: number; types: string[]; isPublic: boolean; label: string; extensions?: string[] }> = {
   branding: { maxBytes: 5 * MB, types: IMAGE_TYPES, isPublic: true, label: 'PNG, JPG, WebP or GIF up to 5 MB' },
   company_logo: { maxBytes: 5 * MB, types: IMAGE_TYPES, isPublic: true, label: 'PNG, JPG, WebP or GIF up to 5 MB' },
   product: { maxBytes: 10 * MB, types: IMAGE_TYPES, isPublic: true, label: 'PNG, JPG, WebP or GIF up to 10 MB' },
   manual: { maxBytes: 25 * MB, types: [...DOC_TYPES, ...IMAGE_TYPES], isPublic: false, label: 'PDF, Word, Excel, PowerPoint or an image, up to 25 MB' },
   submission: { maxBytes: 25 * MB, types: [...DOC_TYPES, ...IMAGE_TYPES], isPublic: false, label: 'PDF, Word, Excel, PowerPoint or an image, up to 25 MB' },
-  space_only: { maxBytes: 100 * MB, types: [...DOC_TYPES, ...IMAGE_TYPES, ...DRAWING_TYPES], isPublic: false, label: 'PDF, DWG, Word, Excel or an image, up to 100 MB' },
+  space_only: { maxBytes: 100 * MB, types: [...DOC_TYPES, ...IMAGE_TYPES, ...DRAWING_TYPES], isPublic: false, label: 'PDF, DWG, Word, Excel or an image, up to 100 MB', extensions: ['.dwg'] },
   ticket: { maxBytes: 10 * MB, types: ['application/pdf', ...IMAGE_TYPES], isPublic: false, label: 'PDF or an image, up to 10 MB' },
+  order: {
+    maxBytes: 100 * MB,
+    types: ARTWORK_TYPES,
+    isPublic: false,
+    label: 'PDF, JPG, PNG, TIFF, EPS, AI or Photoshop file, up to 100 MB',
+    extensions: ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.tif', '.tiff', '.psd', '.eps', '.ai'],
+  },
   // Made by BluePrint itself, never uploaded through the browser.
   invoice: { maxBytes: 10 * MB, types: ['application/pdf'], isPublic: false, label: 'PDF' },
   certificate: { maxBytes: 10 * MB, types: ['application/pdf'], isPublic: false, label: 'PDF' },

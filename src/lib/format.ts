@@ -38,3 +38,20 @@ export function daysUntil(d: Date | string | null | undefined, from = new Date()
 export function plural(n: number, one: string, many = `${one}s`) {
   return `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 }
+
+type Measure = string | number | null | undefined;
+const measure = (v: Measure) => (v === null || v === undefined || v === '' ? null : Number(v));
+const metres = (n: number) => n.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+
+/**
+ * A stand's size as people say it: "6 m × 3 m (18 sqm)", or "18 sqm" when only the area is known,
+ * or '' when nothing is. The database hands numbers back as strings, so both are accepted.
+ */
+export function standSize(s: { sizeSqm?: Measure; widthM?: Measure; depthM?: Measure }): string {
+  const w = measure(s.widthM);
+  const d = measure(s.depthM);
+  const area = measure(s.sizeSqm);
+  const sqm = area !== null ? `${metres(area)} sqm` : '';
+  if (w !== null && d !== null) return `${metres(w)} m × ${metres(d)} m${sqm ? ` (${sqm})` : ''}`;
+  return sqm;
+}

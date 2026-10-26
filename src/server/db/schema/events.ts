@@ -48,6 +48,18 @@ export type EditionEmailSettings = {
   campaignSenderAddress?: string;
 };
 
+/** Someone exhibitors can contact about the show, shown on their home page (for example Operations). */
+export type EditionContact = {
+  id: string;
+  /** What they look after, e.g. "Operations", "Sales", "Venue". */
+  team: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** Anything else: an address, opening hours. */
+  note?: string;
+};
+
 export type SpaceOnlyRules = {
   maxHeightM: number;
   maxPlatformMm: number;
@@ -83,6 +95,7 @@ export const editions = pgTable(
     branding: jsonb('branding').$type<EditionBranding>().notNull().default({}),
     emailSettings: jsonb('email_settings').$type<EditionEmailSettings>().notNull().default({}),
     spaceOnlyRules: jsonb('space_only_rules').$type<SpaceOnlyRules | null>(),
+    contacts: jsonb('contacts').$type<EditionContact[]>().notNull().default([]),
     /** Overrides the platform card-fee setting for this edition when set. */
     feeMode: text('fee_mode', { enum: ['exhibitor_pays', 'deduct_from_supplier'] }),
     defaultCommissionType: text('default_commission_type', { enum: COMMISSION_TYPES }),
@@ -173,6 +186,9 @@ export const stands = pgTable(
       .references(() => exhibitorTypes.id, { onDelete: 'restrict' }),
     companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
     sizeSqm: numeric('size_sqm', { precision: 8, scale: 2 }),
+    /** Frontage and depth in metres, when known. The area is worked out from them. */
+    widthM: numeric('width_m', { precision: 6, scale: 2 }),
+    depthM: numeric('depth_m', { precision: 6, scale: 2 }),
     openSides: integer('open_sides').notNull().default(1),
     status: text('status', { enum: ['active', 'cancelled'] }).notNull().default('active'),
     notes: text('notes'),
@@ -216,6 +232,8 @@ export const FILE_PURPOSES = [
   'certificate',
   'company_logo',
   'ticket',
+  // Files an exhibitor sends with an order, such as artwork for printed graphics.
+  'order',
 ] as const;
 
 export const files = pgTable(

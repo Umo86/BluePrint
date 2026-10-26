@@ -26,14 +26,14 @@ On a task's **Responses** tab, "Email the stands that have not done it" drafts a
 
 | Report | Contents | Who can download |
 | --- | --- | --- |
-| Exhibitors | Companies, stands, main contact, sign-up, checklist progress, orders and spend | Manage exhibitors or view reports |
+| Exhibitors | Companies, stands and their sizes, main contact, sign-up, checklist progress, orders and spend | Manage exhibitors or view reports |
 | Exhibitor contacts | Everyone with portal access, their role, last sign-in and whether they unsubscribed from updates | Manage exhibitors or view reports |
 | Checklist by stand | One row per stand, one column per task | Manage exhibitors or view reports |
 | All form answers | One sheet per form with every answer (or one form, from its Responses tab) | Manage exhibitors or view reports |
-| Orders | Orders and order items with VAT, refunds, commission and payouts | Manage orders or view reports |
-| Services by stand | The build-up delivery list, by hall and stand, and totals by product | Manage orders or view reports |
+| Orders | Orders and order items (with product codes) with VAT, refunds, commission and payouts | Manage orders or view reports |
+| Services by stand | The build-up delivery list, by hall and stand (with product codes, options and uploaded artwork names), and totals by product | Manage orders or view reports |
 | Commission and payouts | Per supplier | Manage orders or view reports |
-| Space-only approvals | Contractor, pack status, insurance, decision and certificate | Review space-only, manage exhibitors or view reports |
+| Space-only approvals | Stand width, depth, area and open sides, contractor, pack status, insurance, decision and certificate | Review space-only, manage exhibitors or view reports |
 
 ### How the files are kept safe
 

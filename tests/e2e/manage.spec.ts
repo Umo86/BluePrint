@@ -58,10 +58,12 @@ test('show team dashboard: exhibitors, stands, import and settings', async ({ pa
     await expect(page.getByText('Wants an extra power socket.')).toBeVisible();
     await page.getByRole('button', { name: /Change stand/ }).click();
     await page.getByRole('menuitem', { name: 'Edit stand' }).click();
-    await page.getByRole('dialog').getByLabel('Size (sqm)').fill('18');
+    await page.getByRole('dialog').getByLabel('Width (m)').fill('6');
+    await page.getByRole('dialog').getByLabel('Depth (m)').fill('3');
+    await expect(page.getByRole('dialog').getByLabel('Area (sqm)')).toHaveValue('18');
     await page.getByRole('dialog').getByRole('button', { name: 'Save stand' }).click();
     await expectToast(page, 'Stand saved.');
-    await expect(page.getByRole('cell', { name: '18 sqm' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: '6 m × 3 m (18 sqm)' })).toBeVisible();
     await page.getByLabel('Email address').fill(`colleague.${stamp}@example.test`);
     await page.getByRole('button', { name: 'Send invitation' }).click();
     await expectToast(page, 'Invitation sent.');

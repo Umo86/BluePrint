@@ -18,6 +18,7 @@ import {
   stands,
   taskRequirements,
   tasks,
+  type EditionContact,
   type SpaceOnlyRules,
 } from '../db/schema';
 import { assertSuperAdmin, assertWritable, getEditionAccess, requireEditionPermission, requireShowAdmin } from '../authz';
@@ -95,6 +96,25 @@ export const emailSettingsSchema = z.object({
   replyTo: z.string().trim().email('Enter a valid email address.').max(200).optional().or(z.literal('')),
   campaignSenderAddress: z.string().trim().email('Enter a valid email address.').max(200).optional().or(z.literal('')),
 });
+
+const contactSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9]{1,24}$/),
+    team: z.string().trim().min(1, 'Say who this contact is, for example Operations.').max(60),
+    name: z.string().trim().max(100).optional(),
+    email: z.string().trim().email('Enter a valid email address.').max(200).optional().or(z.literal('')),
+    phone: z
+      .string()
+      .trim()
+      .max(40)
+      .regex(/^[0-9+()\-.\s]*$/, 'Use only numbers, spaces and + ( ) - in a phone number.')
+      .optional(),
+    note: z.string().trim().max(300).optional(),
+  })
+  .refine((c) => Boolean(c.email || c.phone || c.note), { message: 'Add an email, a phone number or a note.', path: ['email'] });
+
+/** The people exhibitors can contact about the show, in the order they are shown. */
+export const contactsSchema = z.object({ contacts: z.array(contactSchema).max(8, 'Up to 8 contacts.') });
 
 export const spaceOnlyRulesSchema = z.object({
   maxHeightM: z.number().min(1).max(30),
@@ -311,6 +331,24 @@ export async function updateEditionEmailSettings(actor: Actor, editionId: string
   await audit(actor, 'edition.email_settings_updated', { entityType: 'edition', entityId: editionId, editionId });
 }
 
+export async function updateEditionContacts(actor: Actor, editionId: string, input: z.input<typeof contactsSchema>) {
+  await requireEditionPermission(actor, editionId, 'edit_content', { write: true });
+  const { contacts } = contactsSchema.parse(input);
+  const ids = contacts.map((c) => c.id);
+  if (new Set(ids).size !== ids.length) throw invalid('Each contact needs its own id.');
+  const clean: EditionContact[] = contacts.map((c) => ({
+    id: c.id,
+    team: c.team,
+    ...(c.name ? { name: c.name } : {}),
+    ...(c.email ? { email: c.email.toLowerCase() } : {}),
+    ...(c.phone ? { phone: c.phone } : {}),
+    ...(c.note ? { note: c.note } : {}),
+  }));
+  const db = await getDb();
+  await db.update(editions).set({ contacts: clean }).where(eq(editions.id, editionId));
+  await audit(actor, 'edition.contacts_updated', { entityType: 'edition', entityId: editionId, editionId, details: { contacts: clean.length } });
+}
+
 export async function updateSpaceOnlyRules(actor: Actor, editionId: string, input: z.input<typeof spaceOnlyRulesSchema>) {
   await requireShowAdmin(actor, editionId, { write: true });
   const data = spaceOnlyRulesSchema.parse(input);
@@ -394,6 +432,7 @@ export async function cloneEdition(actor: Actor, sourceId: string, input: z.inpu
         branding: src.branding,
         emailSettings: src.emailSettings,
         spaceOnlyRules: src.spaceOnlyRules,
+        contacts: src.contacts,
         feeMode: src.feeMode,
         defaultCommissionType: src.defaultCommissionType,
         defaultCommissionValue: src.defaultCommissionValue,
@@ -464,6 +503,7 @@ export async function cloneEdition(actor: Actor, sourceId: string, input: z.inpu
         categoryId: catMap.get(p.categoryId)!,
         supplierId: p.supplierId,
         name: p.name,
+        code: p.code,
         description: p.description,
         imageFileId: p.imageFileId,
         unit: p.unit,

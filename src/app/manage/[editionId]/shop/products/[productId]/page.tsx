@@ -63,6 +63,7 @@ export default async function EditProduct({ params }: PageProps<'/manage/[editio
         initial={{
           categoryId: p.categoryId,
           name: p.name,
+          code: p.code ?? '',
           description: p.description ?? '',
           imageFileId: p.imageFileId,
           unit: p.unit,
@@ -73,7 +74,7 @@ export default async function EditProduct({ params }: PageProps<'/manage/[editio
           lateFromOffsetDays: p.lateFromOffsetDays,
           vatRateBps: p.vatRateBps,
           options: p.options,
-          requiredDetails: p.requiredDetails.filter((q) => q.type !== 'file').map((q) => ({ id: q.id, label: q.label, type: q.type === 'textarea' ? 'textarea' : 'text', required: q.required })),
+          requiredDetails: p.requiredDetails.map((q) => ({ id: q.id, label: q.label, type: q.type, required: q.required })),
           stockLimit: p.stockLimit,
           visibleToTypes: p.visibleToTypes,
           commissionType: p.commissionType,

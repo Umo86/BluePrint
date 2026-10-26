@@ -34,10 +34,10 @@ export default async function ImportPage({ params }: PageProps<'/manage/[edition
             <Text span fw={600} fz="sm">
               Stand
             </Text>{' '}
-            columns are required. Optional: Type ({types.map((t) => t.name).join(', ')}), Hall, Size (sqm), Open sides, Contact name, Contact email, Phone, Website, VAT number, Exhibitor ID.
+            columns are required. Optional: Type ({types.map((t) => t.name).join(', ')}), Hall, Width (m), Depth (m), Size (sqm, or width by depth such as 6 x 3), Open sides, Contact name, Contact email, Phone, Website, VAT number, Exhibitor ID.
           </ListItem>
           <ListItem>Companies already in BluePrint are matched by exact name (or exhibitor ID), so last year’s record is reused.</ListItem>
-          <ListItem>Stands that already exist are updated. New halls are created for you.</ListItem>
+          <ListItem>Stands that already exist are updated. Columns the file leaves out, and sizes left blank, stay as they are. New halls are created for you.</ListItem>
           <ListItem>Each company’s contact gets an invitation, unless someone from the company is already on BluePrint.</ListItem>
         </List>
       </Paper>

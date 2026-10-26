@@ -1,9 +1,9 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
-import { files, standContractors, stands, type EditionPermission, type FILE_PURPOSES } from '../db/schema';
+import { files, orderLines, orders, standContractors, stands, type EditionPermission, type FILE_PURPOSES } from '../db/schema';
 import {
   assertWritable,
   getEditionAccess,
@@ -22,7 +22,7 @@ import { audit } from '../audit';
 import { assertRateLimit } from '../security/rate-limit';
 import { storage } from '../storage';
 import type { Actor } from '../auth/actor';
-import { DRAWING_TYPES, UPLOAD_RULES } from '@/lib/upload-rules';
+import { DRAWING_TYPES, UPLOAD_RULES, typeFromName } from '@/lib/upload-rules';
 
 export type FilePurpose = (typeof FILE_PURPOSES)[number];
 export type FileRow = typeof files.$inferSelect;
@@ -30,7 +30,7 @@ export type FileRow = typeof files.$inferSelect;
 const DRAWINGS = DRAWING_TYPES;
 export { UPLOAD_RULES };
 
-const UPLOADABLE: FilePurpose[] = ['branding', 'company_logo', 'product', 'manual', 'submission', 'space_only', 'ticket'];
+const UPLOADABLE: FilePurpose[] = ['branding', 'company_logo', 'product', 'manual', 'submission', 'space_only', 'ticket', 'order'];
 
 export const beginUploadSchema = z.object({
   purpose: z.enum(UPLOADABLE as [FilePurpose, ...FilePurpose[]]),
@@ -81,14 +81,16 @@ async function authorizeUpload(actor: Actor, input: z.infer<typeof beginUploadSc
     }
     case 'submission':
     case 'space_only':
-    case 'ticket': {
+    case 'ticket':
+    case 'order': {
       if (!input.standId) throw invalid('Choose the stand.');
       const [stand] = await db.select().from(stands).where(eq(stands.id, input.standId)).limit(1);
       if (!stand) throw notFound();
       const scope = { editionId: stand.editionId, companyId: stand.companyId, standId: stand.id, supplierId: null };
       const staff = await getEditionAccess(actor, stand.editionId);
       if (staff) {
-        const needed = input.purpose === 'space_only' ? 'review_space_only' : input.purpose === 'ticket' ? 'helpdesk' : 'manage_exhibitors';
+        const needed =
+          input.purpose === 'space_only' ? 'review_space_only' : input.purpose === 'ticket' ? 'helpdesk' : input.purpose === 'order' ? 'manage_orders' : 'manage_exhibitors';
         if (!staff.permissions.has(needed)) throw forbidden();
         assertWritable(actor);
         return scope;
@@ -121,8 +123,11 @@ export async function beginUpload(actor: Actor, raw: z.input<typeof beginUploadS
   const rules = UPLOAD_RULES[input.purpose];
   if (input.size > rules.maxBytes) throw invalid(`That file is too big. Allowed: ${rules.label}.`);
   const acceptsDrawings = rules.types.includes('image/vnd.dwg');
-  // Browsers rarely know what a DWG is, so trust the name for now; the real bytes are checked on completion.
-  const declared = acceptsDrawings && /\.dwg$/i.test(input.filename) ? 'image/vnd.dwg' : input.contentType.toLowerCase();
+  // Browsers rarely know what a DWG, EPS or Photoshop file is, so go by the name for now; the real bytes are checked on completion.
+  const given = input.contentType.toLowerCase();
+  const byName = typeFromName(input.filename);
+  const declared =
+    acceptsDrawings && /\.dwg$/i.test(input.filename) ? 'image/vnd.dwg' : !rules.types.includes(given) && byName && rules.types.includes(byName) ? byName : given;
   if (!rules.types.includes(declared)) throw invalid(`That type of file isn’t accepted here. Allowed: ${rules.label}.`);
   await assertRateLimit(`upload:${actor.realUserId}`, 200, 3600);
   const scope = await authorizeUpload(actor, input);
@@ -274,6 +279,7 @@ export function staffMayReadFile(staff: EditionAccess, purpose: FilePurpose) {
     case 'ticket':
       return has('helpdesk') || has('manage_exhibitors');
     case 'invoice':
+    case 'order':
       return has('manage_orders') || has('view_reports');
     case 'manual':
     case 'branding':
@@ -320,7 +326,27 @@ export async function canReadFile(actor: Actor | null, file: FileRow): Promise<b
     return contractorStands.some((r) => r.editionId === file.editionId);
   }
   if (file.companyId && companyIds.has(file.companyId)) {
-    return ['submission', 'space_only', 'certificate', 'invoice', 'ticket', 'company_logo'].includes(file.purpose);
+    return ['submission', 'space_only', 'certificate', 'invoice', 'ticket', 'company_logo', 'order'].includes(file.purpose);
+  }
+  // A supplier opens a file sent with an order (such as artwork) once it is on one of their paid or invoiced order lines.
+  if (file.purpose === 'order' && file.standId && !isViewingAs(actor)) {
+    const mine = await supplierIdsFor(actor);
+    if (mine.length) {
+      const [line] = await db
+        .select({ id: orderLines.id })
+        .from(orderLines)
+        .innerJoin(orders, eq(orders.id, orderLines.orderId))
+        .where(
+          and(
+            eq(orders.standId, file.standId),
+            inArray(orderLines.supplierId, mine),
+            inArray(orders.status, ['paid', 'invoiced', 'partially_refunded']),
+            sql`exists (select 1 from jsonb_each(${orderLines.details}) d where d.value ->> 'file' = ${file.id})`,
+          ),
+        )
+        .limit(1);
+      if (line) return true;
+    }
   }
   if (file.standId && (file.purpose === 'space_only' || file.purpose === 'certificate') && !isViewingAs(actor)) {
     const [c] = await db
@@ -373,6 +399,32 @@ export async function purgeAbandonedUploads() {
     await db.delete(files).where(eq(files.id, f.id));
   }
   return { removed: stale.length };
+}
+
+/**
+ * Housekeeping: removes files sent with basket items that never became part of an order (such as
+ * artwork for something taken out of the basket), 30 days after they were uploaded.
+ */
+export async function purgeUnusedOrderFiles(now = new Date()) {
+  const db = await getDb();
+  const unused = await db
+    .select()
+    .from(files)
+    .where(
+      and(
+        eq(files.purpose, 'order'),
+        isNull(files.deletedAt),
+        lt(files.createdAt, new Date(now.getTime() - 30 * 24 * 3600 * 1000)),
+        sql`not exists (select 1 from cart_items c cross join lateral jsonb_each(c.details) d where d.value ->> 'file' = cast(${files.id} as text))`,
+        sql`not exists (select 1 from order_lines l cross join lateral jsonb_each(l.details) d where d.value ->> 'file' = cast(${files.id} as text))`,
+      ),
+    )
+    .limit(500);
+  for (const f of unused) {
+    await storage().delete(f.storageKey).catch(() => undefined);
+    await db.update(files).set({ deletedAt: now }).where(eq(files.id, f.id));
+  }
+  return { removed: unused.length };
 }
 
 export function fileUrl(fileId: string | null | undefined) {

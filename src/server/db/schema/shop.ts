@@ -92,6 +92,8 @@ export const products = pgTable(
       .references(() => serviceCategories.id, { onDelete: 'cascade' }),
     supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
+    /** The supplier's own product code (SKU), if they use one. */
+    code: text('code'),
     description: text('description'),
     imageFileId: uuid('image_file_id'),
     unit: text('unit').notNull().default('each'),
@@ -208,6 +210,8 @@ export const orderLines = pgTable(
     supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'set null' }),
     categoryId: uuid('category_id'),
     description: text('description').notNull(),
+    /** The product code when the order was placed. */
+    productCode: text('product_code'),
     quantity: integer('quantity').notNull(),
     unitPricePence: integer('unit_price_pence').notNull(),
     vatRateBps: integer('vat_rate_bps').notNull(),

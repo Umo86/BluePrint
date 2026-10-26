@@ -82,8 +82,8 @@ export function FileUpload({
         multiple={multiple}
         disabled={disabled || Boolean(progress)}
         loading={Boolean(progress)}
-        // DWG files have no standard browser type, so allow them by extension; the server checks the bytes.
-        accept={rules.types.includes('image/vnd.dwg') ? { ...Object.fromEntries(rules.types.map((t) => [t, []])), 'application/octet-stream': ['.dwg'] } : rules.types}
+        // Some files (DWG drawings, Illustrator, EPS, Photoshop) often have no browser type, so allow them by extension; the server checks the bytes.
+        accept={rules.extensions ? { ...Object.fromEntries(rules.types.map((t) => [t, []])), 'application/octet-stream': rules.extensions } : rules.types}
         p="md"
       >
         <Group justify="center" gap="sm" mih={60} style={{ pointerEvents: 'none' }}>

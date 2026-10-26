@@ -6,8 +6,9 @@ import { requireActor } from '@/server/auth/current';
 import { packView } from '@/server/services/space-only';
 import { pagesForType } from '@/server/services/manual';
 import { AppError } from '@/server/errors';
-import { dateTime } from '@/lib/format';
+import { dateTime, standSize } from '@/lib/format';
 import { toPackProps } from '@/app/space-only-props';
+import { ShowContacts } from '@/components/show-contacts';
 
 export default async function ContractorStand({ params }: PageProps<'/contractor/[standId]'>) {
   const { standId } = await params;
@@ -33,7 +34,7 @@ export default async function ContractorStand({ params }: PageProps<'/contractor
         <Text c="dimmed">
           {view.edition.name}
           {view.hall ? ` · hall ${view.hall.name}` : ''}
-          {view.stand.sizeSqm ? ` · ${Number(view.stand.sizeSqm)} sqm` : ''}
+          {standSize(view.stand) ? ` · ${standSize(view.stand)}` : ''}
         </Text>
       </div>
       <SimpleGrid cols={{ base: 1, md: 2 }}>
@@ -49,7 +50,7 @@ export default async function ContractorStand({ params }: PageProps<'/contractor
             Rules for building
           </Text>
           <Group gap="sm" mt={4}>
-            {pages.slice(0, 8).map((p) => (
+            {pages.filter((p) => !p.parentId).map((p) => (
               <TextLink key={p.id} href={`/contractor/${standId}/manual/${p.slug}`} fz="sm">
                 {p.title}
               </TextLink>
@@ -62,6 +63,7 @@ export default async function ContractorStand({ params }: PageProps<'/contractor
           </Group>
         </Paper>
       </SimpleGrid>
+      <ShowContacts contacts={view.edition.contacts} title="Show contacts" />
       <SpaceOnlyPack {...toPackProps(view)} />
     </Stack>
   );

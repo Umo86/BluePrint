@@ -14,6 +14,8 @@ import { assertEditionOpen } from './portal';
 import { soldQuantities } from './catalogue';
 import { closeCheckout, expireStaleOrders, finishInvoiceOrder, markOrderPaid, nextNumber } from './orders';
 import { currentUnitPrice, priceOrder, resolveCommission, type LineInput } from '@/lib/pricing';
+import { isFileAnswer, type FileAnswer } from '@/lib/order-details';
+import { requireOwnVerifiedFile } from './files';
 import type { Actor } from '../auth/actor';
 
 /**
@@ -42,6 +44,7 @@ function productView(p: ProductRow, edition: EditionRow, stockLeft: number | nul
     id: p.id,
     categoryId: p.categoryId,
     name: p.name,
+    code: p.code,
     description: p.description,
     imageUrl: p.imageFileId ? `/files/${p.imageFileId}` : null,
     unit: p.unit,
@@ -130,21 +133,35 @@ export const addToBasketSchema = z.object({
   details: z.record(z.string().max(40), z.string().max(2000)).default({}),
 });
 
-/** Checks chosen options and answers against the product, returning only what it asks for. */
-function cleanChoices(p: ProductRow, options: Record<string, string>, details: Record<string, string>) {
+/**
+ * Checks chosen options and answers against the product, returning only what it asks for.
+ * A file answer must be a checked upload the person made for this stand; it is kept as `{ file, name }`.
+ */
+async function cleanChoices(actor: Actor, standId: string, p: ProductRow, options: Record<string, string>, details: Record<string, string>) {
   const cleanOptions: Record<string, string> = {};
   for (const o of p.options) {
     const v = options[o.name];
     if (!v || !o.values.includes(v)) throw invalid(`Choose a ${o.name.toLowerCase()}.`, { [`options.${o.name}`]: `Choose a ${o.name.toLowerCase()}.` });
     cleanOptions[o.name] = v;
   }
-  const cleanDetails: Record<string, string> = {};
+  const cleanDetails: Record<string, string | FileAnswer> = {};
   for (const q of p.requiredDetails as ProductDetailField[]) {
     const v = (details[q.id] ?? '').toString().trim();
+    if (q.required && !v) throw invalid(q.type === 'file' ? `Upload: ${q.label}` : `Answer: ${q.label}`, { [`details.${q.id}`]: q.type === 'file' ? 'Please upload the file.' : 'Please answer this.' });
+    if (!v) continue;
+    if (q.type === 'file') {
+      const problem = { [`details.${q.id}`]: 'Please upload the file again.' };
+      if (!/^[0-9a-f-]{36}$/i.test(v)) throw invalid('That upload could not be found. Please upload it again.', problem);
+      const f = await requireOwnVerifiedFile(actor, v, 'order').catch(() => {
+        throw invalid('That upload could not be found. Please upload it again.', problem);
+      });
+      if (f.standId !== standId) throw invalid('That upload could not be found. Please upload it again.', problem);
+      cleanDetails[q.id] = { file: f.id, name: f.originalName };
+      continue;
+    }
     const max = q.type === 'textarea' ? 2000 : 300;
-    if (q.required && !v) throw invalid(`Answer: ${q.label}`, { [`details.${q.id}`]: 'Please answer this.' });
     if (v.length > max) throw invalid(`${q.label} is too long.`, { [`details.${q.id}`]: `Use at most ${max} characters.` });
-    if (v) cleanDetails[q.id] = v;
+    cleanDetails[q.id] = v;
   }
   return { options: cleanOptions, details: cleanDetails };
 }
@@ -170,7 +187,7 @@ export async function addToBasket(actor: Actor, standId: string, raw: z.input<ty
   const input = addToBasketSchema.parse(raw);
   const db = await getDb();
   const { product } = await buyableProduct(db, input.productId, stand);
-  const choice = cleanChoices(product, input.options, input.details);
+  const choice = await cleanChoices(actor, standId, product, input.options, input.details);
   const existing = await db.select().from(cartItems).where(eq(cartItems.standId, standId));
   if (existing.length >= MAX_BASKET_ITEMS) throw conflict('Your basket is full. Please check out before adding more.');
   const same = existing.find((i) => i.productId === product.id && JSON.stringify(i.options) === JSON.stringify(choice.options) && JSON.stringify(i.details) === JSON.stringify(choice.details));
@@ -244,6 +261,7 @@ async function priceBasket(db: DbLike, standId: string, method: 'card' | 'invoic
       productId: p.id,
       categoryId: i.category.id,
       name: p.name,
+      code: p.code,
       unit: p.unit,
       imageUrl: p.imageFileId ? `/files/${p.imageFileId}` : null,
       options: i.item.options,
@@ -265,8 +283,8 @@ async function priceBasket(db: DbLike, standId: string, method: 'card' | 'invoic
       supplierChargesVat: i.supplier ? i.supplier.vatRegistered : true,
       // Answers stored on the order under the question asked, so they read well everywhere later.
       detailLabels: Object.fromEntries(
-        Object.entries(i.item.details).map(([k, val]) => [(p.requiredDetails as ProductDetailField[]).find((q) => q.id === k)?.label ?? k, String(val)]),
-      ),
+        Object.entries(i.item.details).map(([k, val]) => [(p.requiredDetails as ProductDetailField[]).find((q) => q.id === k)?.label ?? k, isFileAnswer(val) ? val : String(val)]),
+      ) as Record<string, string | FileAnswer>,
     };
   });
   const buyable = view.filter((v) => !v.problem);
@@ -298,10 +316,12 @@ export async function basketForStand(actor: Actor, standId: string, method: 'car
         itemId: i.itemId,
         productId: i.productId,
         name: i.name,
+        code: i.code,
         unit: i.unit,
         imageUrl: i.imageUrl,
         options: i.options,
-        details: i.details,
+        // Under the question asked, as on the order, so the basket reads the same.
+        details: i.detailLabels,
         quantity: i.quantity,
         unitPence: i.unitPence,
         band: i.band,
@@ -406,6 +426,7 @@ export async function checkout(actor: Actor, standId: string, raw: z.input<typeo
         supplierId: v.supplierId,
         categoryId: v.categoryId,
         description: v.name,
+        productCode: v.code,
         quantity: v.quantity,
         unitPricePence: v.unitPence,
         vatRateBps: v.vatRateBps,

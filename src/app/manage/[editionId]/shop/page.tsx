@@ -168,6 +168,11 @@ export default async function ShopCatalogue({ params, searchParams }: PageProps<
                           <TextLink href={`${base}/products/${p.id}`} fw={600} fz="sm">
                             {p.name}
                           </TextLink>
+                          {p.code ? (
+                            <Text fz="xs" c="dimmed">
+                              Code {p.code}
+                            </Text>
+                          ) : null}
                           <Text fz="xs" c="dimmed">
                             {p.options.map((o) => `${o.name}: ${o.values.join(', ')}`).join(' · ')}
                           </Text>

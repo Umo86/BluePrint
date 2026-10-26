@@ -7,9 +7,11 @@ import { requireActor } from '@/server/auth/current';
 import {
   updateEditionBasics,
   updateEditionBranding,
+  updateEditionContacts,
   updateEditionEmailSettings,
   updateSpaceOnlyRules,
   type brandingSchema,
+  type contactsSchema,
   type editionBasicsSchema,
   type emailSettingsSchema,
   type spaceOnlyRulesSchema,
@@ -69,6 +71,13 @@ export async function updateBrandingAction(editionId: string, input: z.input<typ
     await updateEditionBranding(await requireActor(), id(editionId), input);
     refresh(editionId);
   }, 'Branding saved.');
+}
+
+export async function updateContactsAction(editionId: string, input: z.input<typeof contactsSchema>): Promise<ActionResult> {
+  return runAction(async () => {
+    await updateEditionContacts(await requireActor(), id(editionId), input);
+    refresh(editionId);
+  }, 'Contacts saved.');
 }
 
 export async function updateEmailSettingsAction(editionId: string, input: z.input<typeof emailSettingsSchema>): Promise<ActionResult> {

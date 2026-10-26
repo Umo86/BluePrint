@@ -43,6 +43,12 @@ Every request is checked on the server against the person's role and the record 
 ## Files
 
 - **Accepted files.** PDF, Word, Excel, PowerPoint, images and (for stand plans) DWG drawings, each type with a size limit. SVG and HTML are refused because they can carry scripts. Each file is checked by its actual content, not its name.
+- **Artwork sent with orders.** When a product asks for a file (graphics, for example), exhibitors can upload a PDF, JPG, PNG, TIFF, EPS, AI or Photoshop file of up to 100 MB. It can be opened by:
+  - the exhibitor's own company, for that stand;
+  - staff with orders or reports rights at that show;
+  - the supplier of that order line, once the order is paid or on invoice.
+
+  A file can only be attached to an order for the stand it was uploaded for. Files uploaded but never ordered are deleted by the nightly tidy-up after 30 days.
 - **Storage.** Files are kept privately in Cloudflare R2 under names BluePrint generates. Browsers upload directly with a link that lasts ten minutes.
 - **Downloads.** BluePrint first checks the person may see the file, then hands out a link that lasts one minute and is served from the storage address, not BluePrint's own. Only logos, branding and product photos are public.
 - **Internal notes.** Files added to an internal help desk note can never be opened by the exhibitor.

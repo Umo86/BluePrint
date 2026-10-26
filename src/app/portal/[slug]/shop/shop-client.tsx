@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Group, Modal, NumberInput, Select, Stack, Text, Textarea, TextInput } from '@mantine/core';
-import { IconShoppingCartPlus } from '@tabler/icons-react';
+import { Anchor, Button, Group, Modal, NumberInput, Select, Stack, Text, Textarea, TextInput } from '@mantine/core';
+import { IconFileCheck, IconShoppingCartPlus } from '@tabler/icons-react';
 import { useAction } from '@/lib/use-action';
 import { money } from '@/lib/format';
+import { FileUpload } from '@/components/file-upload';
 import { addToBasketAction } from '../../shop-actions';
 
 type Product = {
@@ -24,12 +25,15 @@ export function AddToBasketButton({ slug, standId, product, disabled }: { slug: 
   const [qty, setQty] = useState(1);
   const [options, setOptions] = useState<Record<string, string>>({});
   const [details, setDetails] = useState<Record<string, string>>({});
+  // Names of files uploaded for file questions, keyed by question.
+  const [fileNames, setFileNames] = useState<Record<string, string>>({});
   const add = useAction(addToBasketAction, {
     onSuccess: () => {
       setOpen(false);
       setQty(1);
       setOptions({});
       setDetails({});
+      setFileNames({});
     },
   });
   const soldOut = product.stockLeft !== null && product.stockLeft <= 0;
@@ -69,7 +73,53 @@ export function AddToBasketButton({ slug, standId, product, disabled }: { slug: 
               />
             ))}
             {product.requiredDetails.map((q) =>
-              q.type === 'textarea' ? (
+              q.type === 'file' ? (
+                <div key={q.id}>
+                  <Text fz="sm" fw={500} mb={4}>
+                    {q.label}
+                    {q.required ? (
+                      <Text span c="red" aria-hidden>
+                        {' '}
+                        *
+                      </Text>
+                    ) : null}
+                  </Text>
+                  {details[q.id] ? (
+                    <Group gap="xs">
+                      <IconFileCheck size={18} color="var(--mantine-color-green-7)" aria-hidden />
+                      <Anchor href={`/files/${details[q.id]}?download=1`} fz="sm">
+                        {fileNames[q.id] ?? 'Uploaded file'}
+                      </Anchor>
+                      <Button
+                        variant="subtle"
+                        size="compact-sm"
+                        onClick={() => {
+                          const rest = { ...details };
+                          delete rest[q.id];
+                          setDetails(rest);
+                        }}
+                      >
+                        Replace
+                      </Button>
+                    </Group>
+                  ) : (
+                    <FileUpload
+                      purpose="order"
+                      scope={{ standId }}
+                      label={`Upload ${q.label.toLowerCase()}`}
+                      onUploaded={(f) => {
+                        setDetails((d) => ({ ...d, [q.id]: f.fileId }));
+                        setFileNames((n) => ({ ...n, [q.id]: f.name }));
+                      }}
+                    />
+                  )}
+                  {add.fieldErrors[`details.${q.id}`] ? (
+                    <Text c="red" fz="xs" mt={4}>
+                      {add.fieldErrors[`details.${q.id}`]}
+                    </Text>
+                  ) : null}
+                </div>
+              ) : q.type === 'textarea' ? (
                 <Textarea
                   key={q.id}
                   label={q.label}

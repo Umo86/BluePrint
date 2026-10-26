@@ -62,7 +62,7 @@ const optionSchema = z.object({
 const detailSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]{1,40}$/),
   label: z.string().trim().min(1, 'Enter the question.').max(200),
-  type: z.enum(['text', 'textarea']),
+  type: z.enum(['text', 'textarea', 'file']),
   required: z.boolean().optional(),
 });
 
@@ -73,6 +73,13 @@ export const productSchema = z
   .object({
     categoryId: z.string().uuid(),
     name: z.string().trim().min(1, 'Enter a name.').max(200),
+    code: z
+      .string()
+      .trim()
+      .max(40, 'Use at most 40 characters.')
+      .regex(/^[A-Za-z0-9 ._\-/#]*$/, 'Use letters, numbers, spaces and . _ - / # only.')
+      .nullable()
+      .optional(),
     description: z.string().trim().max(4000).nullable().optional(),
     imageFileId: z.string().uuid().nullable().optional(),
     unit: z.string().trim().min(1).max(40).default('each'),
@@ -293,6 +300,7 @@ async function checkImage(actor: Actor, imageFileId: string | null | undefined, 
 function productValues(data: z.output<typeof productSchema>) {
   return {
     name: data.name,
+    code: data.code || null,
     description: data.description ?? null,
     unit: data.unit,
     pricePence: data.pricePence,
@@ -432,6 +440,13 @@ export const supplierProductSchema = z
   .object({
     categoryId: z.string().uuid(),
     name: z.string().trim().min(1, 'Enter a name.').max(200),
+    code: z
+      .string()
+      .trim()
+      .max(40, 'Use at most 40 characters.')
+      .regex(/^[A-Za-z0-9 ._\-/#]*$/, 'Use letters, numbers, spaces and . _ - / # only.')
+      .nullable()
+      .optional(),
     description: z.string().trim().max(4000).nullable().optional(),
     imageFileId: z.string().uuid().nullable().optional(),
     unit: z.string().trim().min(1).max(40).default('each'),

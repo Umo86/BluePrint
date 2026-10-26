@@ -17,6 +17,8 @@ export type PortalStand = {
   isSpaceOnly: boolean;
   hallName: string | null;
   sizeSqm: string | null;
+  widthM: string | null;
+  depthM: string | null;
 };
 
 const OPEN_STATUSES = ['live', 'onsite'];
@@ -73,6 +75,8 @@ export async function resolvePortal(actor: Actor, slug: string, chosenStandId?: 
     isSpaceOnly: r.type.isSpaceOnly,
     hallName: r.hall?.name ?? null,
     sizeSqm: r.stand.sizeSqm,
+    widthM: r.stand.widthM,
+    depthM: r.stand.depthM,
   }));
   const stand = portalStands.find((s) => s.id === chosenStandId) ?? portalStands[0];
   const membership = memberships.find((m) => m.companyId === stand.companyId)!;

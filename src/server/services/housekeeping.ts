@@ -5,7 +5,7 @@ import { cronRuns, emailOutbox, loginCodes, sessions, stripeEvents } from '../db
 import { deliverOutboxEmail } from '../email/send';
 import { purgeOldRateLimits } from '../security/rate-limit';
 import { getPlatformSettings } from './settings';
-import { purgeAbandonedUploads } from './files';
+import { purgeAbandonedUploads, purgeUnusedOrderFiles } from './files';
 import { expireStaleOrders, processTransfers } from './orders';
 
 const DAY = 86_400_000;
@@ -51,6 +51,7 @@ export async function runHousekeeping(now = new Date()) {
   const checkouts = await expireStaleOrders();
   const payouts = await processTransfers({});
   const uploads = await purgeAbandonedUploads();
+  const orderFiles = await purgeUnusedOrderFiles(now);
   await purgeOldRateLimits();
   const oldSessions = await db
     .delete(sessions)
@@ -70,6 +71,7 @@ export async function runHousekeeping(now = new Date()) {
     checkoutsReleased: checkouts.cancelled,
     payoutsSent: payouts.sent,
     uploadsRemoved: uploads.removed,
+    orderFilesRemoved: orderFiles.removed,
     sessionsRemoved: oldSessions.length,
     codesRemoved: oldCodes.length,
     emailLogsRemoved: oldEmails.length,

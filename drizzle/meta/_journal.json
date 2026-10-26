@@ -57,6 +57,13 @@
       "when": 1792868492743,
       "tag": "0007_member_show_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793011799236,
+      "tag": "0008_review_additions",
+      "breakpoints": true
     }
   ]
 }

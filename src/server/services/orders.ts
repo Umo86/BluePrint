@@ -38,6 +38,7 @@ import { notifySupplier } from './catalogue';
 import { reversalFor, vatWithin } from '@/lib/pricing';
 import { money } from '@/lib/format';
 import { csvCell } from '@/lib/csv';
+import { answerText } from '@/lib/order-details';
 
 type OrderRow = typeof orders.$inferSelect;
 type LineRow = typeof orderLines.$inferSelect;
@@ -935,6 +936,7 @@ function publicLine(l: LineRow) {
   return {
     id: l.id,
     description: l.description,
+    productCode: l.productCode,
     options: l.options,
     details: l.details,
     quantity: l.quantity,
@@ -1187,7 +1189,7 @@ export async function exportOrdersCsv(actor: Actor, editionId: string) {
     .leftJoin(suppliers, eq(suppliers.id, orderLines.supplierId))
     .where(eq(orders.editionId, editionId))
     .orderBy(asc(orders.createdAt));
-  const header = ['Order', 'Placed', 'Status', 'Payment', 'Company', 'Stand', 'PO number', 'Item', 'Options', 'Quantity', 'Unit net', 'VAT rate', 'Net', 'VAT', 'Gross', 'Refunded', 'Supplier', 'Commission', 'Card fee share', 'Supplier payout', 'Fulfilment'];
+  const header = ['Order', 'Placed', 'Status', 'Payment', 'Company', 'Stand', 'PO number', 'Item', 'Code', 'Options', 'Quantity', 'Unit net', 'VAT rate', 'Net', 'VAT', 'Gross', 'Refunded', 'Supplier', 'Commission', 'Card fee share', 'Supplier payout', 'Fulfilment'];
   const p = (pence: number) => (pence / 100).toFixed(2);
   const lines = [header.map(csvCell).join(',')];
   for (const r of rows) {
@@ -1201,6 +1203,7 @@ export async function exportOrdersCsv(actor: Actor, editionId: string) {
         r.standNumber,
         r.order.poNumber ?? '',
         r.line.description,
+        r.line.productCode ?? '',
         Object.entries(r.line.options ?? {})
           .map(([k, v]) => `${k}: ${v}`)
           .join('; '),
@@ -1266,6 +1269,7 @@ export async function supplierOrders(actor: Actor, supplierId: string, opts: { e
     lines: rows.map((r) => ({
       id: r.line.id,
       description: r.line.description,
+      productCode: r.line.productCode,
       options: r.line.options,
       details: r.line.details,
       quantity: r.line.quantity,
@@ -1286,7 +1290,7 @@ export async function supplierOrders(actor: Actor, supplierId: string, opts: { e
 
 export async function supplierOrdersCsv(actor: Actor, supplierId: string, editionId: string | null) {
   const { lines } = await supplierOrders(actor, supplierId, { editionId });
-  const header = ['Order', 'Placed', 'Show', 'Company', 'Stand', 'Hall', 'Contact', 'Email', 'Phone', 'Item', 'Options', 'Details', 'Quantity', 'Your payout', 'Status'];
+  const header = ['Order', 'Placed', 'Show', 'Company', 'Stand', 'Hall', 'Contact', 'Email', 'Phone', 'Item', 'Code', 'Options', 'Details', 'Quantity', 'Your payout', 'Status'];
   const out = [header.map(csvCell).join(',')];
   for (const l of lines) {
     out.push(
@@ -1301,11 +1305,12 @@ export async function supplierOrdersCsv(actor: Actor, supplierId: string, editio
         l.contact?.email ?? '',
         l.contact?.phone ?? '',
         l.description,
+        l.productCode ?? '',
         Object.entries(l.options ?? {})
           .map(([k, v]) => `${k}: ${v}`)
           .join('; '),
         Object.entries(l.details ?? {})
-          .map(([k, v]) => `${k}: ${String(v)}`)
+          .map(([k, v]) => `${k}: ${answerText(v)}`)
           .join('; '),
         String(l.quantity),
         (l.payoutPence / 100).toFixed(2),

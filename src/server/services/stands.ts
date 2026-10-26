@@ -30,14 +30,44 @@ import { companySchema } from './companies';
 import { computeEditionProgress, type EditionProgress } from './progress';
 import type { Actor } from '../auth/actor';
 
-export const standSchema = z.object({
-  number: z.string().trim().min(1, 'Enter the stand number.').max(30, 'Keep the stand number under 30 characters.'),
-  exhibitorTypeId: z.string().uuid('Choose the stand type.'),
-  hallId: z.string().uuid().nullable().optional(),
-  sizeSqm: z.number().min(0).max(100_000).nullable().optional(),
-  openSides: z.number().int().min(0).max(4).default(1),
-  notes: z.string().trim().max(2000).nullable().optional(),
-});
+const MAX_AREA_SQM = 100_000;
+const metres = z.number().gt(0, 'Enter a number of metres above 0.').max(500, 'Check this: it is over 500 metres.');
+
+export const standSchema = z
+  .object({
+    number: z.string().trim().min(1, 'Enter the stand number.').max(30, 'Keep the stand number under 30 characters.'),
+    exhibitorTypeId: z.string().uuid('Choose the stand type.'),
+    hallId: z.string().uuid().nullable().optional(),
+    /** Floor area. When width and depth are both given, the area is worked out from them instead. */
+    sizeSqm: z.number().min(0).max(MAX_AREA_SQM).nullable().optional(),
+    /** Frontage (along the aisle) and depth, in metres. Odd-shaped stands give just the area. */
+    widthM: metres.nullable().optional(),
+    depthM: metres.nullable().optional(),
+    openSides: z.number().int().min(0).max(4).default(1),
+    notes: z.string().trim().max(2000).nullable().optional(),
+  })
+  .superRefine((s, ctx) => {
+    const hasW = s.widthM !== null && s.widthM !== undefined;
+    const hasD = s.depthM !== null && s.depthM !== undefined;
+    if (hasW && !hasD) ctx.addIssue({ code: 'custom', path: ['depthM'], message: 'Enter the depth as well, or clear the width.' });
+    if (hasD && !hasW) ctx.addIssue({ code: 'custom', path: ['widthM'], message: 'Enter the width as well, or clear the depth.' });
+    if (hasW && hasD && s.widthM! * s.depthM! > MAX_AREA_SQM) ctx.addIssue({ code: 'custom', path: ['widthM'], message: 'Check the width and depth: that stand would be over 100,000 sqm.' });
+  });
+
+/**
+ * The size columns to store for a stand. With both width and depth the area is width × depth,
+ * so the three never disagree; otherwise the area is whatever was entered.
+ */
+export function standSizeColumns(input: { sizeSqm?: number | null; widthM?: number | null; depthM?: number | null }) {
+  const w = input.widthM ?? null;
+  const d = input.depthM ?? null;
+  const area = w !== null && d !== null ? Math.round(w * d * 100) / 100 : (input.sizeSqm ?? null);
+  return {
+    widthM: w !== null && d !== null ? String(w) : null,
+    depthM: w !== null && d !== null ? String(d) : null,
+    sizeSqm: area === null ? null : String(area),
+  };
+}
 
 async function checkTypeAndHall(db: DbLike, editionId: string, typeId: string, hallId: string | null | undefined) {
   const [type] = await db.select().from(exhibitorTypes).where(and(eq(exhibitorTypes.id, typeId), eq(exhibitorTypes.editionId, editionId))).limit(1);
@@ -182,7 +212,19 @@ export async function listExhibitors(actor: Actor, editionId: string, opts: Exhi
 
   type Row = {
     company: typeof companies.$inferSelect;
-    stands: { id: string; number: string; typeId: string; typeName: string; isSpaceOnly: boolean; hallId: string | null; hallName: string | null; sizeSqm: string | null; packStatus: string | null }[];
+    stands: {
+      id: string;
+      number: string;
+      typeId: string;
+      typeName: string;
+      isSpaceOnly: boolean;
+      hallId: string | null;
+      hallName: string | null;
+      sizeSqm: string | null;
+      widthM: string | null;
+      depthM: string | null;
+      packStatus: string | null;
+    }[];
     mainContact: { id: string; name: string; email: string; lastLoginAt: Date | null } | null;
     memberCount: number;
     lastLoginAt: Date | null;
@@ -223,6 +265,8 @@ export async function listExhibitors(actor: Actor, editionId: string, opts: Exhi
       hallId: r.hall?.id ?? null,
       hallName: r.hall?.name ?? null,
       sizeSqm: r.stand.sizeSqm,
+      widthM: r.stand.widthM,
+      depthM: r.stand.depthM,
       packStatus: r.type.isSpaceOnly ? (packByStand.get(r.stand.id) ?? 'not_started') : null,
     });
     const sp = standProgress.get(r.stand.id);
@@ -452,7 +496,7 @@ export async function addExhibitor(actor: Actor, editionId: string, raw: z.input
         number: input.stand.number,
         exhibitorTypeId: input.stand.exhibitorTypeId,
         hallId: input.stand.hallId ?? null,
-        sizeSqm: input.stand.sizeSqm === null || input.stand.sizeSqm === undefined ? null : String(input.stand.sizeSqm),
+        ...standSizeColumns(input.stand),
         openSides: input.stand.openSides,
         notes: input.stand.notes ?? null,
         companyId,
@@ -490,7 +534,7 @@ export async function createStand(actor: Actor, editionId: string, raw: z.input<
       number: input.number,
       exhibitorTypeId: input.exhibitorTypeId,
       hallId: input.hallId ?? null,
-      sizeSqm: input.sizeSqm === null || input.sizeSqm === undefined ? null : String(input.sizeSqm),
+      ...standSizeColumns(input),
       openSides: input.openSides,
       notes: input.notes ?? null,
       companyId: raw.companyId ?? null,
@@ -522,7 +566,7 @@ export async function updateStand(actor: Actor, standId: string, raw: z.input<ty
       number: input.number,
       exhibitorTypeId: input.exhibitorTypeId,
       hallId: input.hallId ?? null,
-      sizeSqm: input.sizeSqm === null || input.sizeSqm === undefined ? null : String(input.sizeSqm),
+      ...standSizeColumns(input),
       openSides: input.openSides,
       notes: input.notes ?? null,
       companyId,

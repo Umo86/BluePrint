@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useAction } from '@/lib/use-action';
+import { emptyStandForm } from '@/lib/stand-form';
 import { createStandAction } from '../../actions';
 import { StandFields } from '../exhibitors/exhibitor-controls';
 
@@ -57,7 +58,7 @@ export function StandFiltersBar({ types, halls }: { types: Option[]; halls: Opti
 
 export function AddStandButton({ editionId, types, halls }: { editionId: string; types: Option[]; halls: Option[] }) {
   const [open, setOpen] = useState(false);
-  const empty = { number: '', exhibitorTypeId: (types[0]?.value ?? null) as string | null, hallId: null as string | null, sizeSqm: null as number | null, openSides: 1, notes: '' };
+  const empty = emptyStandForm(types[0]?.value ?? null);
   const [v, setV] = useState(empty);
   const create = useAction(createStandAction, {
     onSuccess: () => {

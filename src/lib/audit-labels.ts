@@ -51,6 +51,7 @@ const LABELS: Record<string, string> = {
   'edition.branding_updated': 'Changed show branding',
   'edition.commercial_updated': 'Changed fees and commission',
   'edition.email_settings_updated': 'Changed show email settings',
+  'edition.contacts_updated': 'Changed the show contacts',
   'edition.space_only_rules_updated': 'Changed space-only rules',
   'hall.created': 'Added a hall',
   'hall.renamed': 'Renamed a hall',

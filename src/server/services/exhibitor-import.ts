@@ -10,6 +10,7 @@ import { isValidEmail, normaliseEmail } from '../auth/login';
 import { assertRateLimit } from '../security/rate-limit';
 import { assertSafeZip } from '../security/zip';
 import { parseDelimited } from '@/lib/csv-parse';
+import { standSizeColumns } from './stands';
 import type { Actor } from '../auth/actor';
 
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
@@ -22,6 +23,8 @@ const FIELD_ALIASES: Record<string, string[]> = {
   type: ['type', 'stand type', 'package', 'exhibitor type', 'stand package'],
   hall: ['hall', 'zone', 'area name'],
   size: ['size', 'sqm', 'size sqm', 'size m2', 'm2', 'area', 'stand size', 'square metres', 'square meters'],
+  width: ['width', 'width m', 'stand width', 'frontage', 'frontage m'],
+  depth: ['depth', 'depth m', 'stand depth'],
   openSides: ['open sides', 'sides', 'sides open'],
   contactName: ['contact', 'contact name', 'main contact', 'main contact name', 'name'],
   contactEmail: ['email', 'contact email', 'e mail', 'email address', 'main contact email'],
@@ -111,6 +114,8 @@ export type ImportRow = {
   typeName: string;
   hall: string;
   sizeSqm: number | null;
+  widthM: number | null;
+  depthM: number | null;
   openSides: number;
   contactName: string;
   contactEmail: string;
@@ -139,6 +144,43 @@ function parseSize(v: string): number | null | 'bad' {
   const n = Number(v.replace(/,/g, '').replace(/\s*(m2|m²|sqm|sq m)\s*$/i, ''));
   if (!Number.isFinite(n) || n < 0 || n > 100_000) return 'bad';
   return Math.round(n * 100) / 100;
+}
+
+function parseMetres(v: string): number | null | 'bad' {
+  if (!v) return null;
+  const n = Number(v.replace(/\s*m\s*$/i, ''));
+  if (!Number.isFinite(n) || n <= 0 || n > 500) return 'bad';
+  return Math.round(n * 100) / 100;
+}
+
+/** A size written as width by depth, such as "6 x 3", "6m x 3m" or "6×3". */
+const DIMENSIONS = /^(\d+(?:\.\d+)?)\s*m?\s*[x×*]\s*(\d+(?:\.\d+)?)\s*m?$/i;
+
+/**
+ * The stand's size from the size, width and depth columns. Width and depth win when both are
+ * given, and the area is worked out from them, as it is when the stand is edited by hand.
+ */
+function readSize(sizeRaw: string, widthRaw: string, depthRaw: string): { error: string | null; sizeSqm: number | null; widthM: number | null; depthM: number | null; messages: string[] } {
+  const fail = (error: string) => ({ error, sizeSqm: null, widthM: null, depthM: null, messages: [] });
+  const messages: string[] = [];
+  const dims = DIMENSIONS.exec(sizeRaw);
+  let width = parseMetres(widthRaw);
+  let depth = parseMetres(depthRaw);
+  let size = dims ? null : parseSize(sizeRaw);
+  if (dims && width === null && depth === null) {
+    width = parseMetres(dims[1]);
+    depth = parseMetres(dims[2]);
+  }
+  if (size === 'bad') return fail('Size must be a number of square metres, or width by depth such as 6 x 3.');
+  if (width === 'bad' || depth === 'bad') return fail('Width and depth must be numbers of metres, up to 500.');
+  if ((width === null) !== (depth === null)) return fail('Give both the width and the depth, or neither.');
+  if (width !== null && depth !== null) {
+    const area = Math.round(width * depth * 100) / 100;
+    if (area > 100_000) return fail('Check the width and depth: that stand would be over 100,000 sqm.');
+    if (size !== null && Math.abs(size - area) > 0.01) messages.push(`Size worked out from width × depth: ${area.toLocaleString('en-GB')} sqm.`);
+    size = area;
+  }
+  return { error: null, sizeSqm: size, widthM: width, depthM: depth, messages };
 }
 
 /** Works out exactly what an import would do, row by row, without changing anything. */
@@ -224,7 +266,7 @@ export async function planImport(actor: Actor, editionId: string, rowsIn: string
     const stand = get(r, 'stand');
     const typeRaw = get(r, 'type');
     const hall = get(r, 'hall');
-    const size = parseSize(get(r, 'size'));
+    const size = readSize(get(r, 'size'), get(r, 'width'), get(r, 'depth'));
     const sidesRaw = get(r, 'openSides');
     const sides = sidesRaw ? Number.parseInt(sidesRaw, 10) : 1;
     const emailRaw = get(r, 'contactEmail');
@@ -250,9 +292,11 @@ export async function planImport(actor: Actor, editionId: string, rowsIn: string
       messages.push(typeRaw ? `Unknown stand type “${typeRaw}”. Use one of: ${types.map((t) => t.name).join(', ')}.` : 'Stand type is missing and no default type was chosen.');
       error = true;
     }
-    if (size === 'bad') {
-      messages.push('Size must be a number of square metres.');
+    if (size.error) {
+      messages.push(size.error);
       error = true;
+    } else {
+      messages.push(...size.messages);
     }
     if (!Number.isInteger(sides) || sides < 0 || sides > 4) {
       messages.push('Open sides must be 0 to 4.');
@@ -312,7 +356,9 @@ export async function planImport(actor: Actor, editionId: string, rowsIn: string
       stand,
       typeName: type?.name ?? typeRaw,
       hall,
-      sizeSqm: size === 'bad' ? null : size,
+      sizeSqm: size.sizeSqm,
+      widthM: size.widthM,
+      depthM: size.depthM,
       openSides: Number.isInteger(sides) ? sides : 1,
       contactName: get(r, 'contactName'),
       contactEmail,
@@ -361,6 +407,7 @@ export async function runImport(actor: Actor, editionId: string, rowsIn: string[
   }
 
   const invitesToMake: { email: string; companyId: string }[] = [];
+  const columns = new Set(plan.recognisedColumns);
   const result = await db.transaction(async (tx) => {
     const hallRows = await tx.select().from(halls).where(eq(halls.editionId, editionId));
     const hallByName = new Map(hallRows.map((h) => [normName(h.name), h.id]));
@@ -390,11 +437,12 @@ export async function runImport(actor: Actor, editionId: string, rowsIn: string[
         companyId = c.id;
         newCompanyIds.set(normName(r.company), c.id);
       }
+      // A column the file leaves out, or a size left blank, keeps what an existing stand already has.
       const values = {
         exhibitorTypeId: r.typeId!,
-        hallId: r.hall ? hallByName.get(normName(r.hall)) ?? null : null,
-        sizeSqm: r.sizeSqm === null ? null : String(r.sizeSqm),
-        openSides: r.openSides,
+        ...(columns.has('hall') ? { hallId: r.hall ? (hallByName.get(normName(r.hall)) ?? null) : null } : {}),
+        ...(r.sizeSqm !== null ? standSizeColumns(r) : {}),
+        ...(columns.has('openSides') ? { openSides: r.openSides } : {}),
       };
       const [existing] = await tx
         .select()
@@ -435,8 +483,8 @@ export async function runImport(actor: Actor, editionId: string, rowsIn: string[
 /** A starter file people can fill in. */
 export function importTemplateCsv() {
   return [
-    'Company,Stand,Type,Hall,Size (sqm),Open sides,Contact name,Contact email,Phone,Website,VAT number',
-    'Example Insulation Ltd,N1-110,Shell scheme,N1,9,2,Alex Smith,alex@example.co.uk,020 7946 0000,example.co.uk,GB123456789',
-    'Example Timber Frames,N3-501,Space only,N3,72,3,Sam Jones,sam@example.com,,,',
+    'Company,Stand,Type,Hall,Width (m),Depth (m),Size (sqm),Open sides,Contact name,Contact email,Phone,Website,VAT number',
+    'Example Insulation Ltd,N1-110,Shell scheme,N1,3,3,9,2,Alex Smith,alex@example.co.uk,020 7946 0000,example.co.uk,GB123456789',
+    'Example Timber Frames,N3-501,Space only,N3,12,6,72,3,Sam Jones,sam@example.com,,,',
   ].join('\r\n');
 }

@@ -6,6 +6,7 @@ import { getEditionAccess } from '../authz';
 import { forbidden, notFound } from '../errors';
 import { lineGross } from './orders';
 import type { Actor } from '../auth/actor';
+import { answerText } from '@/lib/order-details';
 
 /**
  * What exhibitors have ordered, laid out for delivery: by hall and stand, and totals by product.
@@ -37,7 +38,7 @@ export function describeLineDetails(line: { options: Record<string, string> | nu
     .map(([k, v]) => {
       const label = k.trim();
       // Questions already end in "?" or ":", so they do not need another colon.
-      return `${label}${/[?:.!]$/.test(label) ? ' ' : ': '}${typeof v === 'string' ? v : Array.isArray(v) ? v.join(', ') : JSON.stringify(v)}`;
+      return `${label}${/[?:.!]$/.test(label) ? ' ' : ': '}${answerText(v)}`;
     })
     .join('; ');
 }

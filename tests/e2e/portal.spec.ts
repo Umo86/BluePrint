@@ -35,6 +35,15 @@ test('the show team builds a manual page and a form task', async ({ page }) => {
     await page.getByRole('button', { name: 'Save page' }).click();
     await expectToast(page, 'Page saved.');
     await expect(page).toHaveURL(/\/manual\/[0-9a-f-]{36}$/);
+    // A second page, so exhibitors can move between them.
+    await page.goto(`${dashboard}/manual/new`);
+    await page.getByLabel('Title').fill('Build-up rules');
+    await page.locator('.ProseMirror').click();
+    await page.keyboard.type('Stands must be finished by 6pm on the last build-up day.');
+    await page.getByLabel('Published').check();
+    await page.getByRole('button', { name: 'Save page' }).click();
+    await expectToast(page, 'Page saved.');
+    await expect(page).toHaveURL(/\/manual\/[0-9a-f-]{36}$/);
   });
 
   await test.step('form task with conditions, an upload and a declaration', async () => {
@@ -89,6 +98,12 @@ test('an exhibitor completes their checklist', async ({ page }) => {
     const res = await page.request.get(href!);
     expect(res.status()).toBe(200);
     expect(res.headers()['content-disposition']).toContain('attachment');
+    // The manual reads straight through with next and previous links.
+    await page.getByRole('navigation', { name: 'Manual pages' }).getByRole('link', { name: /Next.*Build-up rules/ }).click();
+    await expect(page.getByRole('heading', { name: 'Build-up rules' })).toBeVisible();
+    await expect(page.getByText('Stands must be finished by 6pm on the last build-up day.')).toBeVisible();
+    await page.getByRole('navigation', { name: 'Manual pages' }).getByRole('link', { name: /Previous.*Deliveries and access/ }).click();
+    await expect(page.getByRole('heading', { name: 'Deliveries and access' })).toBeVisible();
   });
 
   await test.step('fill in, save and submit the form', async () => {

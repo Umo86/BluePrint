@@ -47,6 +47,7 @@ import {
   moveTypeAction,
   renameHallAction,
   updateBrandingAction,
+  updateContactsAction,
   updateDetailsAction,
   updateEmailSettingsAction,
   updateSpaceOnlyRulesAction,
@@ -58,10 +59,12 @@ type Branding = { primaryColor: string; accentColor: string; footerText: string;
 type TypeRow = { id: string; key: string; name: string; description: string; isSpaceOnly: boolean; builtIn: boolean; standCount: number };
 type HallRow = { id: string; name: string; standCount: number };
 type EmailValues = { senderName: string; senderAddress: string; replyTo: string; campaignSenderAddress: string; platformDefault: string };
+type Contact = { id: string; team: string; name: string; email: string; phone: string; note: string };
 
 const LABELS: Record<string, string> = {
   details: 'Details',
   branding: 'Branding',
+  contacts: 'Contacts',
   types: 'Stand types',
   halls: 'Halls',
   email: 'Email sender',
@@ -79,6 +82,7 @@ export function SettingsTabs(props: {
   halls: HallRow[];
   email: EmailValues;
   spaceOnly: SpaceOnlyRules;
+  contacts: Contact[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -106,6 +110,9 @@ export function SettingsTabs(props: {
       <Tabs.Panel value="branding">
         <BrandingForm editionId={props.editionId} initial={props.branding} />
       </Tabs.Panel>
+      <Tabs.Panel value="contacts">
+        <ContactsForm editionId={props.editionId} initial={props.contacts} />
+      </Tabs.Panel>
       <Tabs.Panel value="types">
         <TypesManager editionId={props.editionId} types={props.types} />
       </Tabs.Panel>
@@ -119,6 +126,86 @@ export function SettingsTabs(props: {
         <SpaceOnlyForm editionId={props.editionId} initial={props.spaceOnly} />
       </Tabs.Panel>
     </Tabs>
+  );
+}
+
+// Contacts -----------------------------------------------------------------------
+
+const newContactId = () => Math.random().toString(36).slice(2, 10);
+
+function ContactsForm({ editionId, initial }: { editionId: string; initial: Contact[] }) {
+  const [rows, setRows] = useState<Contact[]>(initial);
+  const save = useAction(updateContactsAction);
+  const set = (i: number, k: keyof Contact, v: string) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const move = (i: number, by: number) =>
+    setRows((r) => {
+      const next = [...r];
+      const [x] = next.splice(i, 1);
+      next.splice(i + by, 0, x);
+      return next;
+    });
+  return (
+    <Paper withBorder p="lg" maw={900}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.run(editionId, { contacts: rows.map((c) => ({ ...c, name: c.name || undefined, phone: c.phone || undefined, note: c.note || undefined })) });
+        }}
+      >
+        <Stack>
+          <Text fz="sm" c="dimmed">
+            Who exhibitors and stand contractors can contact about this show. They appear on the exhibitor home page, the help page and the contractor’s stand page, in this order.
+          </Text>
+          {rows.map((c, i) => (
+            <Paper key={c.id} withBorder p="md" bg="var(--mantine-color-gray-0)">
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text fw={600} fz="sm">
+                    {c.team || `Contact ${i + 1}`}
+                  </Text>
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" aria-label={`Move ${c.team || `contact ${i + 1}`} up`} disabled={i === 0} onClick={() => move(i, -1)}>
+                      <IconArrowUp size={16} />
+                    </ActionIcon>
+                    <ActionIcon variant="subtle" aria-label={`Move ${c.team || `contact ${i + 1}`} down`} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
+                      <IconArrowDown size={16} />
+                    </ActionIcon>
+                    <ActionIcon variant="subtle" color="red" aria-label={`Remove ${c.team || `contact ${i + 1}`}`} onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
+                </Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }}>
+                  <TextInput
+                    label="What they look after"
+                    description="For example Operations, Sales, Marketing or Venue."
+                    value={c.team}
+                    onChange={(e) => set(i, 'team', e.currentTarget.value)}
+                    maxLength={60}
+                    required
+                    error={save.fieldErrors[`contacts.${i}.team`]}
+                  />
+                  <TextInput label="Name" description="A person or a team." value={c.name} onChange={(e) => set(i, 'name', e.currentTarget.value)} maxLength={100} />
+                  <TextInput label="Email" type="email" value={c.email} onChange={(e) => set(i, 'email', e.currentTarget.value)} maxLength={200} error={save.fieldErrors[`contacts.${i}.email`]} />
+                  <TextInput label="Phone" value={c.phone} onChange={(e) => set(i, 'phone', e.currentTarget.value)} maxLength={40} error={save.fieldErrors[`contacts.${i}.phone`]} />
+                </SimpleGrid>
+                <Textarea label="Note" description="An address or opening hours, if useful." value={c.note} onChange={(e) => set(i, 'note', e.currentTarget.value)} autosize minRows={1} maxLength={300} />
+              </Stack>
+            </Paper>
+          ))}
+          <Group>
+            {rows.length < 8 ? (
+              <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setRows((r) => [...r, { id: newContactId(), team: '', name: '', email: '', phone: '', note: '' }])}>
+                Add a contact
+              </Button>
+            ) : null}
+            <Button type="submit" loading={save.pending}>
+              Save contacts
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Paper>
   );
 }
 

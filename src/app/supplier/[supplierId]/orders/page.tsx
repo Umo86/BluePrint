@@ -8,6 +8,7 @@ import { FulfilmentSelect } from '@/components/fulfilment-select';
 import { FULFILMENT_LABELS, supplierOrders } from '@/server/services/orders';
 import { dateTime, money } from '@/lib/format';
 import { loadSupplier } from '../load';
+import { OrderLineDetails } from '@/components/order-line-details';
 
 export default async function SupplierOrdersPage({ params, searchParams }: PageProps<'/supplier/[supplierId]/orders'>) {
   const { supplierId } = await params;
@@ -82,6 +83,11 @@ export default async function SupplierOrdersPage({ params, searchParams }: PageP
                       <Text fz="sm" fw={500}>
                         {l.description}
                       </Text>
+                      {l.productCode ? (
+                        <Text fz="xs" c="dimmed">
+                          Code {l.productCode}
+                        </Text>
+                      ) : null}
                       {Object.keys(l.options).length ? (
                         <Text fz="xs" c="dimmed">
                           {Object.entries(l.options)
@@ -89,11 +95,7 @@ export default async function SupplierOrdersPage({ params, searchParams }: PageP
                             .join(' · ')}
                         </Text>
                       ) : null}
-                      {Object.keys(l.details).length ? (
-                        <Text fz="xs" c="dimmed" style={{ whiteSpace: 'pre-wrap' }}>
-                          {Object.values(l.details).map(String).join('\n')}
-                        </Text>
-                      ) : null}
+                      <OrderLineDetails details={l.details} />
                       {l.order.status === 'refunded' || l.refundedPence ? (
                         <Text fz="xs" c="grape">
                           Refunded{l.fulfilmentStatus === 'cancelled' ? ': do not supply' : ' in part'}

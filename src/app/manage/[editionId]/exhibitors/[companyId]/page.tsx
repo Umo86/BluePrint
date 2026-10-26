@@ -12,7 +12,8 @@ import { conversationsForCompany } from '@/server/assistant';
 import { TASK_STATE_LABELS, REQUIREMENT_LABELS } from '@/lib/task-labels';
 import { listExhibitorTypes, listHalls } from '@/server/services/show-setup';
 import { AppError } from '@/server/errors';
-import { dateShort, dateTime, money } from '@/lib/format';
+import { dateShort, dateTime, money, standSize } from '@/lib/format';
+import { standFormValues } from '@/lib/stand-form';
 import { resendInvitationAction, revokeInvitationAction } from '@/app/admin/actions';
 import { deleteNoteAction } from '../../../actions';
 import { loadEdition } from '../../load';
@@ -88,7 +89,7 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
                 <TableTd fw={600}>{s.stand.number}</TableTd>
                 <TableTd>{s.type.name}</TableTd>
                 <TableTd>{s.hall?.name ?? '—'}</TableTd>
-                <TableTd>{s.stand.sizeSqm ? `${Number(s.stand.sizeSqm)} sqm` : '—'}</TableTd>
+                <TableTd>{standSize(s.stand) || '—'}</TableTd>
                 <TableTd>{s.stand.openSides}</TableTd>
                 <TableTd>{s.type.isSpaceOnly ? (s.contractor && s.contractor.status !== 'removed' ? `${s.contractor.contractorCompanyName} (${s.contractor.contactEmail})` : 'Not nominated yet') : '—'}</TableTd>
                 <TableTd>
@@ -99,14 +100,7 @@ export default async function ExhibitorPage({ params }: PageProps<'/manage/[edit
                     <EditStandButton
                       editionId={edition.id}
                       standId={s.stand.id}
-                      initial={{
-                        number: s.stand.number,
-                        exhibitorTypeId: s.stand.exhibitorTypeId,
-                        hallId: s.stand.hallId,
-                        sizeSqm: s.stand.sizeSqm === null ? null : Number(s.stand.sizeSqm),
-                        openSides: s.stand.openSides,
-                        notes: s.stand.notes ?? '',
-                      }}
+                      initial={standFormValues(s.stand)}
                       types={typeOptions}
                       halls={hallOptions}
                       status={s.stand.status}

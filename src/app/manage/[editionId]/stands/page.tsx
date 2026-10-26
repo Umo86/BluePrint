@@ -4,7 +4,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { TextLink } from '@/components/links';
 import { listStands } from '@/server/services/stands';
 import { listExhibitorTypes, listHalls } from '@/server/services/show-setup';
-import { plural } from '@/lib/format';
+import { plural, standSize } from '@/lib/format';
+import { standFormValues } from '@/lib/stand-form';
 import { loadEdition } from '../load';
 import { AddStandButton, StandFiltersBar } from './stand-controls';
 import { EditStandButton } from '../exhibitors/[companyId]/exhibitor-detail-controls';
@@ -60,7 +61,7 @@ export default async function StandsPage({ params, searchParams }: PageProps<'/m
                   </Badge>
                 </TableTd>
                 <TableTd>{hall?.name ?? '—'}</TableTd>
-                <TableTd>{stand.sizeSqm ? `${Number(stand.sizeSqm)} sqm` : '—'}</TableTd>
+                <TableTd>{standSize(stand) || '—'}</TableTd>
                 <TableTd>{stand.openSides}</TableTd>
                 <TableTd>
                   {company ? (
@@ -81,7 +82,7 @@ export default async function StandsPage({ params, searchParams }: PageProps<'/m
                     <EditStandButton
                       editionId={edition.id}
                       standId={stand.id}
-                      initial={{ number: stand.number, exhibitorTypeId: stand.exhibitorTypeId, hallId: stand.hallId, sizeSqm: stand.sizeSqm === null ? null : Number(stand.sizeSqm), openSides: stand.openSides, notes: stand.notes ?? '' }}
+                      initial={standFormValues(stand)}
                       types={typeOptions}
                       halls={hallOptions}
                       status={stand.status}

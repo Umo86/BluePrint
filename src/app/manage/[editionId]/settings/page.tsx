@@ -15,7 +15,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<'
   const p = access.permissions;
   const tabs = [
     ...(isAdmin ? ['details'] : []),
-    ...(p.has('edit_content') ? ['branding'] : []),
+    ...(p.has('edit_content') ? ['branding', 'contacts'] : []),
     ...(isAdmin ? ['types'] : []),
     ...(p.has('manage_exhibitors') ? ['halls'] : []),
     ...(isAdmin ? ['email', 'space_only'] : []),
@@ -27,7 +27,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<'
   const header = edition.branding.headerImageFileId ? await getFile(edition.branding.headerImageFileId) : null;
   return (
     <Stack>
-      <PageHeader title="Show settings" description="How this edition looks, its stand types and halls, who emails come from and the rules for space-only stands." />
+      <PageHeader title="Show settings" description="How this edition looks, who exhibitors can contact, its stand types and halls, who emails come from and the rules for space-only stands." />
       <SettingsTabs
         editionId={edition.id}
         tabs={tabs}
@@ -65,6 +65,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<'
           platformDefault: platform.emailDefaults.senderAddress || 'the platform default',
         }}
         spaceOnly={edition.spaceOnlyRules ?? DEFAULT_SPACE_ONLY_RULES}
+        contacts={edition.contacts.map((c) => ({ id: c.id, team: c.team, name: c.name ?? '', email: c.email ?? '', phone: c.phone ?? '', note: c.note ?? '' }))}
       />
     </Stack>
   );

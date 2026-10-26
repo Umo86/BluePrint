@@ -5,7 +5,7 @@ import { DownloadButton, TextLink } from '@/components/links';
 import { packForReview } from '@/server/services/space-only';
 import { AppError } from '@/server/errors';
 import { checkPack, PACK_STATUS_LABELS, SPACE_ONLY_DOC_LABELS } from '@/lib/space-only';
-import { dateTime } from '@/lib/format';
+import { dateTime, plural, standSize } from '@/lib/format';
 import { formatBytes } from '@/lib/upload-rules';
 import { loadEdition } from '../../load';
 import { ReviewForm } from './review-form';
@@ -47,6 +47,7 @@ export default async function ReviewPackPage({ params }: PageProps<'/manage/[edi
       <PageHeader
         eyebrow="Space-only stand"
         title={`Stand ${d.stand.number} · ${d.company?.name ?? ''}`}
+        description={[standSize(d.stand), plural(d.stand.openSides, 'open side')].filter(Boolean).join(' · ')}
         actions={
           <Group gap="xs">
             <Badge size="lg" variant="light" color={status.color}>

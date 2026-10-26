@@ -3,7 +3,9 @@ import { Paper, Stack, Text, Title } from '@mantine/core';
 import { TextLink } from '@/components/links';
 import { RichHtml } from '@/components/rich-html';
 import { pageForType, pagesForType } from '@/server/services/manual';
+import { ManualPager } from '@/components/manual-pager';
 import { dateLong } from '@/lib/format';
+import { neighbours } from '@/lib/manual-order';
 import { loadPortal } from '../../load';
 
 export default async function ManualPage({ params }: PageProps<'/portal/[slug]/manual/[pageSlug]'>) {
@@ -14,7 +16,10 @@ export default async function ManualPage({ params }: PageProps<'/portal/[slug]/m
   if (!page) notFound();
   const all = await pagesForType(ctx.edition.id, ctx.stand.typeId);
   const children = all.filter((p) => p.parentId === page.id);
-  const parent = page.parentId ? all.find((p) => p.id === page.parentId) : null;
+  // pagesForType moves a page out of a hidden section, so its parent comes from there.
+  const placed = all.find((p) => p.id === page.id);
+  const parent = placed?.parentId ? all.find((p) => p.id === placed.parentId) : null;
+  const { previous, next } = neighbours(all, page.id);
   const base = `/portal/${ctx.edition.slug}/manual`;
   return (
     <Stack maw={860}>
@@ -42,6 +47,7 @@ export default async function ManualPage({ params }: PageProps<'/portal/[slug]/m
           </Stack>
         </Paper>
       ) : null}
+      <ManualPager base={base} previous={previous} next={next} />
       <Text fz="xs" c="dimmed">
         Last updated {dateLong(page.updatedAt)}
       </Text>

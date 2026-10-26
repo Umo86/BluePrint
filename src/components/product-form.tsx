@@ -86,6 +86,7 @@ export function ProductForm({
     const base = {
       categoryId: v.categoryId,
       name: v.name,
+      code: v.code.trim() || null,
       description: v.description || null,
       imageFileId: v.imageFileId,
       unit: v.unit || 'each',
@@ -139,7 +140,19 @@ export function ProductForm({
               Product
             </Title>
             <Select label="Category" data={categories} value={v.categoryId} onChange={(x) => x && set('categoryId', x)} allowDeselect={false} error={errors.categoryId} required />
-            <TextInput label="Name" value={v.name} onChange={(e) => set('name', e.currentTarget.value)} maxLength={200} error={errors.name} required />
+            <Group align="flex-start" grow wrap="wrap">
+              <TextInput label="Name" value={v.name} onChange={(e) => set('name', e.currentTarget.value)} maxLength={200} error={errors.name} required miw={240} />
+              <TextInput
+                label="Product code"
+                description="The supplier’s own code, if they use one."
+                value={v.code}
+                onChange={(e) => set('code', e.currentTarget.value)}
+                maxLength={40}
+                error={errors.code}
+                miw={200}
+                maw={260}
+              />
+            </Group>
             <Textarea label="Description" description="What is included, sizes, delivery times." value={v.description} onChange={(e) => set('description', e.currentTarget.value)} autosize minRows={3} maxLength={4000} />
             <div>
               <Text fz="sm" fw={500} mb={4}>
@@ -214,7 +227,7 @@ export function ProductForm({
                 Choices and questions
               </Title>
               <Text fz="sm" c="dimmed">
-                Options the exhibitor picks (such as colour), and anything you need to know to deliver it.
+                Options the exhibitor picks (such as colour), and anything you need to know to deliver it. Ask for a file upload for artwork (PDF, image, TIFF, EPS, AI or Photoshop, up to 100 MB).
               </Text>
             </div>
             {v.options.map((o, i) => (
@@ -295,16 +308,17 @@ export function ProductForm({
                   data={[
                     { value: 'text', label: 'Short' },
                     { value: 'textarea', label: 'Long' },
+                    { value: 'file', label: 'File upload' },
                   ]}
                   value={q.type}
                   onChange={(x) =>
                     set(
                       'requiredDetails',
-                      v.requiredDetails.map((y, j) => (j === i ? { ...y, type: x === 'textarea' ? 'textarea' : 'text' } : y)),
+                      v.requiredDetails.map((y, j) => (j === i ? { ...y, type: x === 'textarea' || x === 'file' ? x : 'text' } : y)),
                     )
                   }
                   allowDeselect={false}
-                  w={110}
+                  w={140}
                 />
                 <Checkbox
                   label="Required"

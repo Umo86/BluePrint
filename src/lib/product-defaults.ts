@@ -2,6 +2,7 @@
 export type ProductFormValues = {
   categoryId: string;
   name: string;
+  code: string;
   description: string;
   imageFileId: string | null;
   unit: string;
@@ -12,7 +13,7 @@ export type ProductFormValues = {
   lateFromOffsetDays: number | null;
   vatRateBps: number;
   options: { name: string; values: string[] }[];
-  requiredDetails: { id: string; label: string; type: 'text' | 'textarea'; required?: boolean }[];
+  requiredDetails: { id: string; label: string; type: 'text' | 'textarea' | 'file'; required?: boolean }[];
   stockLimit: number | null;
   visibleToTypes: string[];
   commissionType: 'percent' | 'fixed' | null;
@@ -23,6 +24,7 @@ export function emptyProduct(categoryId: string, vatRateBps: number): ProductFor
   return {
     categoryId,
     name: '',
+    code: '',
     description: '',
     imageFileId: null,
     unit: 'each',
