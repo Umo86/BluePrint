@@ -11,7 +11,6 @@ const nextConfig: NextConfig = {
     'mjml',
     'exceljs',
     'pdf-lib',
-    'sanitize-html',
   ],
   experimental: {
     serverActions: {

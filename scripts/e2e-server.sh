@@ -10,6 +10,9 @@ export SEED_TOTP_SECRET="${E2E_TOTP_SECRET:-JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP}"
 rm -rf "$PGLITE_DIR"
 npx tsx --conditions=react-server scripts/seed.ts
 if [ "${E2E_MODE:-dev}" = "production" ]; then
+  # Vercel's functions cannot require() ES modules, so neither can this server: a package that
+  # only works because Node can do that here fails these tests instead of the live site.
+  export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-require-module"
   export BLUEPRINT_ALLOW_LOCAL_PRODUCTION=true
   export APP_URL="http://localhost:$PORT"
   exec npx next start -p "$PORT"
