@@ -54,6 +54,11 @@ const schema = z.object({
 
   // First super admin, created by `npm run bootstrap`
   BOOTSTRAP_SUPER_ADMIN_EMAIL: z.string().email().optional(),
+
+  // A test login shown on the sign-in page while the site is being tried out. Remove both (and the
+  // account) when testing is over.
+  TEST_LOGIN_EMAIL: z.string().trim().email().optional(),
+  TEST_LOGIN_PASSWORD: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

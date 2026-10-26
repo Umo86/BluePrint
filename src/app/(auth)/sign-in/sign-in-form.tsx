@@ -1,11 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert, Anchor, Button, PasswordInput, PinInput, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Anchor, Button, Code, PasswordInput, PinInput, Stack, Text, TextInput } from '@mantine/core';
 import { useAction } from '@/lib/use-action';
 import { passwordSignInAction, requestCodeAction, verifyCodeAction } from '../actions';
 
-export function SignInForm({ next, signedOut }: { next: string; signedOut?: boolean }) {
+type TestLogin = { email: string; password: string } | null;
+
+/** The test login box, shown only while TEST_LOGIN_EMAIL and TEST_LOGIN_PASSWORD are set. */
+function TestLoginBox({ login, onUse }: { login: NonNullable<TestLogin>; onUse: () => void }) {
+  return (
+    <Alert color="yellow" title="Test login" role="note">
+      <Stack gap={6}>
+        <Text fz="sm">
+          Email: <Code>{login.email}</Code>
+          <br />
+          Password: <Code>{login.password}</Code>
+        </Text>
+        <Text fz="xs" c="dimmed">
+          For testing only. The first sign-in links an authenticator app to this account.
+        </Text>
+        <Button size="xs" variant="light" color="yellow" onClick={onUse} style={{ alignSelf: 'flex-start' }}>
+          Use the test login
+        </Button>
+      </Stack>
+    </Alert>
+  );
+}
+
+export function SignInForm({ next, signedOut, testLogin = null }: { next: string; signedOut?: boolean; testLogin?: TestLogin }) {
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'email' | 'code' | 'password'>('email');
   const [code, setCode] = useState('');
@@ -80,6 +103,16 @@ export function SignInForm({ next, signedOut }: { next: string; signedOut?: bool
     >
       <Stack>
         {signedOut ? <Alert color="green">You have signed out.</Alert> : null}
+        {testLogin ? (
+          <TestLoginBox
+            login={testLogin}
+            onUse={() => {
+              setEmail(testLogin.email);
+              setPassword(testLogin.password);
+              setStep('password');
+            }}
+          />
+        ) : null}
         <TextInput
           label="Work email"
           type="email"
