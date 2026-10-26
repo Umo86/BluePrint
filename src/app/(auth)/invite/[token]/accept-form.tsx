@@ -54,7 +54,7 @@ export function AcceptInviteForm({ token, needsEmailCode, existingName, kind }: 
           </>
         ) : null}
         {accept.error ? <Alert color="red">{accept.error}</Alert> : null}
-        <Button type="submit" loading={accept.pending} disabled={needsEmailCode && !codeSent}>
+        <Button type="submit" size="md" className="bp-notch" loading={accept.pending} disabled={needsEmailCode && !codeSent}>
           Accept and continue
         </Button>
       </Stack>

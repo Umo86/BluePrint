@@ -30,7 +30,7 @@ export default async function TaskPage({ params }: PageProps<'/portal/[slug]/tas
       </TextLink>
       <div>
         <Group gap="xs">
-          <Title order={1} fz={26}>
+          <Title order={1} fz={30}>
             {t.task.title}
           </Title>
           <Badge variant="light" color={TASK_STATE_LABELS[t.state].color}>

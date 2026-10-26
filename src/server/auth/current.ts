@@ -150,14 +150,19 @@ export function twoFactorJustTurnedOn(user: { totpEnabledAt: Date | null }) {
   return Boolean(user.totpEnabledAt && Date.now() - user.totpEnabledAt.getTime() < 10 * 60 * 1000);
 }
 
-/** Only relative paths inside the app, so the sign-in page cannot be used as an open redirect. */
-export function safeNextPath(next: string | null | undefined, fallback = '/'): string {
-  return localPath(next) ?? fallback;
+/**
+ * Only relative paths inside the app, so the sign-in page cannot be used as an open redirect.
+ * The homepage is the public front page, so after signing in people go to their workspace instead.
+ */
+export function safeNextPath(next: string | null | undefined, fallback = '/start'): string {
+  const path = localPath(next);
+  if (!path || path === '/' || path.startsWith('/?') || path.startsWith('/#')) return fallback;
+  return path;
 }
 
 async function currentPath() {
   const h = await headers();
-  return safeNextPath(h.get('x-pathname'), '/');
+  return safeNextPath(h.get('x-pathname'));
 }
 
 /**

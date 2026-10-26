@@ -26,7 +26,7 @@ export default async function ManualPage({ params }: PageProps<'/portal/[slug]/m
       <TextLink href={parent ? `${base}/${parent.slug}` : base} fz="sm">
         ← {parent ? parent.title : 'Exhibitor manual'}
       </TextLink>
-      <Title order={1} fz={26}>
+      <Title order={1} fz={30}>
         {page.title}
       </Title>
       <Paper withBorder p="lg">

@@ -10,7 +10,7 @@ type TestLogin = { email: string; password: string } | null;
 /** The test login box, shown only while TEST_LOGIN_EMAIL and TEST_LOGIN_PASSWORD are set. */
 function TestLoginBox({ login, onUse }: { login: NonNullable<TestLogin>; onUse: () => void }) {
   return (
-    <Alert color="yellow" title="Test login" role="note">
+    <Alert color="blueprint" title="Test login" role="note" styles={{ root: { border: '1px dashed var(--mantine-color-blueprint-6)' } }}>
       <Stack gap={6}>
         <Text fz="sm">
           Email: <Code>{login.email}</Code>
@@ -20,7 +20,7 @@ function TestLoginBox({ login, onUse }: { login: NonNullable<TestLogin>; onUse: 
         <Text fz="xs" c="dimmed">
           For testing only. The first sign-in links an authenticator app to this account.
         </Text>
-        <Button size="xs" variant="light" color="yellow" onClick={onUse} style={{ alignSelf: 'flex-start' }}>
+        <Button size="xs" variant="default" onClick={onUse} style={{ alignSelf: 'flex-start' }}>
           Use the test login
         </Button>
       </Stack>
@@ -57,7 +57,7 @@ export function SignInForm({ next, signedOut, testLogin = null }: { next: string
             <PinInput id="code" length={6} type="number" oneTimeCode value={code} onChange={setCode} aria-label="Six-digit code" autoFocus />
           </div>
           {verify.error ? <Alert color="red">{verify.error}</Alert> : null}
-          <Button type="submit" loading={verify.pending} disabled={code.length !== 6}>
+          <Button type="submit" size="md" className="bp-notch" loading={verify.pending} disabled={code.length !== 6}>
             Sign in
           </Button>
           <Anchor component="button" type="button" fz="sm" onClick={() => request.run(email)}>
@@ -83,7 +83,7 @@ export function SignInForm({ next, signedOut, testLogin = null }: { next: string
           <TextInput label="Email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
           <PasswordInput label="Password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
           {withPassword.error ? <Alert color="red">{withPassword.error}</Alert> : null}
-          <Button type="submit" loading={withPassword.pending}>
+          <Button type="submit" size="md" className="bp-notch" loading={withPassword.pending}>
             Sign in
           </Button>
           <Anchor component="button" type="button" fz="sm" onClick={() => setStep('email')}>
@@ -123,7 +123,7 @@ export function SignInForm({ next, signedOut, testLogin = null }: { next: string
           onChange={(e) => setEmail(e.currentTarget.value)}
           error={request.fieldErrors.email}
         />
-        <Button type="submit" loading={request.pending}>
+        <Button type="submit" size="md" className="bp-notch" loading={request.pending}>
           Email me a code
         </Button>
         <Anchor component="button" type="button" fz="sm" onClick={() => setStep('password')}>

@@ -12,11 +12,11 @@ import { EmailStandsButton } from './overview-controls';
 function Attention({ label, value, href, tone }: { label: string; value: number; href: string; tone: 'red' | 'blue' | 'orange' | 'gray' }) {
   return (
     <Paper withBorder p="sm">
-      <Text fz="xs" fw={700} c="dimmed" tt="uppercase" lh={1.3}>
+      <Text fz="sm" fw={500} c="dimmed" lh={1.3}>
         {label}
       </Text>
       <Group justify="space-between" align="flex-end" mt={4} wrap="nowrap">
-        <Text fz={24} fw={700} lh={1.1} c={value ? tone : undefined}>
+        <Text className="bp-figure" fz={30} c={value ? tone : undefined}>
           {value}
         </Text>
         {value ? (
@@ -217,26 +217,26 @@ export default async function EditionOverview({ params }: PageProps<'/manage/[ed
             </Group>
             <SimpleGrid cols={3}>
               <div>
-                <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+                <Text fz="sm" c="dimmed" fw={500}>
                   Orders
                 </Text>
-                <Text fz="xl" fw={700}>
+                <Text className="bp-figure" fz={26}>
                   {o.shop.orders}
                 </Text>
               </div>
               <div>
-                <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+                <Text fz="sm" c="dimmed" fw={500}>
                   Sales
                 </Text>
-                <Text fz="xl" fw={700}>
+                <Text className="bp-figure" fz={26}>
                   {money(o.shop.salesPence)}
                 </Text>
               </div>
               <div>
-                <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+                <Text fz="sm" c="dimmed" fw={500}>
                   Unpaid invoices
                 </Text>
-                <Text fz="xl" fw={700}>
+                <Text className="bp-figure" fz={26}>
                   {money(o.shop.awaitingPence)}
                 </Text>
               </div>
@@ -286,7 +286,7 @@ export default async function EditionOverview({ params }: PageProps<'/manage/[ed
             ['Breakdown ends', edition.breakdownEndsAt],
           ].map(([label, d]) => (
             <div key={String(label)}>
-              <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+              <Text fz="sm" c="dimmed" fw={500}>
                 {String(label)}
               </Text>
               <Text fz="sm">{d ? dateLong(d as Date) : 'Not set'}</Text>

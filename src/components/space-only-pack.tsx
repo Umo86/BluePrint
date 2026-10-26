@@ -217,7 +217,7 @@ export function SpaceOnlyPack(p: PackProps) {
       <Paper withBorder p="md">
         <Group justify="space-between">
           <div>
-            <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+            <Text fz="sm" fw={500} c="dimmed">
               Stand approval
             </Text>
             <Group gap="xs" mt={4}>

@@ -40,7 +40,7 @@ async function startSessionAndGo(userId: string, next: string | null) {
   if (previous) await revokeSession(previous.session.id);
   const { token, expiresAt, session } = await createSession(userId, ctx);
   await setSessionCookie(token, expiresAt);
-  const target = safeNextPath(next, '/');
+  const target = safeNextPath(next);
   if (!session.twoFactorVerified) redirect(`/two-factor?next=${encodeURIComponent(target)}`);
   redirect(target);
 }
@@ -67,7 +67,7 @@ export async function twoFactorAction(code: string, next: string | null): Promis
     const ok = await verifySecondFactor(auth.user.id, String(code), await requestContext());
     if (!ok) throw invalid('That code did not work. Try the newest code from your app, or a recovery code.');
     await renewSession(auth, { twoFactorVerified: true });
-    redirect(safeNextPath(next, '/'));
+    redirect(safeNextPath(next));
   });
 }
 
@@ -119,6 +119,6 @@ export async function acceptInviteAction(token: string, name: string, code: stri
     });
     // Any earlier session in this browser belongs to someone else; start fresh.
     await signOutCurrentSession();
-    await startSessionAndGo(user.id, '/');
+    await startSessionAndGo(user.id, '/start');
   });
 }

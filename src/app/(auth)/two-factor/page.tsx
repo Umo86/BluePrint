@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Two-factor check' };
 
 export default async function TwoFactorPage({ searchParams }: PageProps<'/two-factor'>) {
   const params = await searchParams;
-  const next = safeNextPath(typeof params.next === 'string' ? params.next : null, '/');
+  const next = safeNextPath(typeof params.next === 'string' ? params.next : null);
   const auth = await getCurrentAuth();
   if (!auth) redirect('/sign-in');
   if (auth.needsTwoFactorSetup) redirect('/two-factor-setup');

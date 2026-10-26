@@ -11,7 +11,7 @@ export default async function ContractorHome() {
   return (
     <Stack>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           Your stands
         </Title>
         <Text c="dimmed">The space-only stands you have been nominated to build. Send each stand’s pack for approval before build-up.</Text>

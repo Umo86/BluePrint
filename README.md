@@ -29,7 +29,7 @@ npm run seed    # demo shows, exhibitors, suppliers and staff
 npm run dev
 ```
 
-Open http://localhost:3000 and sign in as `admin@blueprint.test`. Sign-in codes appear in the local mailbox at http://localhost:3000/dev/mailbox, and the seed prints the two-factor key to add to an authenticator app. It also prints demo exhibitor, supplier and show admin accounts.
+Open http://localhost:3000 (the public homepage; the about page is at `/about`), choose **Sign in** and sign in as `admin@blueprint.test`. Sign-in codes appear in the local mailbox at http://localhost:3000/dev/mailbox, and the seed prints the two-factor key to add to an authenticator app. It also prints demo exhibitor, supplier and show admin accounts.
 
 On your computer BluePrint needs no accounts or keys: the database is an embedded Postgres in `.data/`, files are kept in `.data/files`, email goes to the local mailbox, a payment simulator stands in for Stripe and the assistant runs in practice mode. None of these stand-ins can run on a live site.
 
@@ -43,7 +43,11 @@ npm run test:e2e    # browser tests (Playwright) against a freshly seeded develo
 npm run build && E2E_MODE=production npm run test:e2e   # the same against a production build
 ```
 
-The browser tests include automated accessibility checks (WCAG 2.2 A and AA rules, using axe) on every main page of the exhibitor portal, the supplier portal, the show dashboard and the super admin dashboard. Colours meet the AA contrast ratio, every control has a name for screen readers, and links in text are underlined.
+The browser tests include automated accessibility checks (WCAG 2.2 A and AA rules, using axe) on the public pages, sign-in and every main page of the exhibitor portal, the supplier portal, the show dashboard and the super admin dashboard. Colours meet the AA contrast ratio, every control has a name for screen readers, and links in text are underlined.
+
+## Look and feel
+
+Black and white with plenty of space, hairlines rather than shadows, and one drafting blue (`#2b50e0`) for links, line drawings and keyboard focus. Titles use Aleo (light), everything else Host Grotesk, and buttons on the public pages Azeret Mono. The fonts are served from the site itself (`@fontsource-variable` packages), so pages make no requests to font services. Colours and fonts are set in `src/theme.ts` and `src/app/globals.css`; the public pages have their own styles in `src/components/site/site.module.css`.
 
 ## Changing the database
 
@@ -53,6 +57,8 @@ Edit the schema in `src/server/db/schema/`, then run `npm run db:generate -- --n
 
 | Folder | What |
 | --- | --- |
+| `src/app/page.tsx`, `src/app/about`, `src/components/site` | Public homepage and about page |
+| `src/app/start` | Where signing in leads: the person's workspace, or a choice of workspaces |
 | `src/app/portal` | Exhibitor portal |
 | `src/app/manage` | Show dashboard for the show team |
 | `src/app/admin` | Super admin dashboard |

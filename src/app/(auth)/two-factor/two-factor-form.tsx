@@ -28,7 +28,7 @@ export function TwoFactorForm({ next }: { next: string }) {
           maxLength={20}
         />
         {check.error ? <Alert color="red">{check.error}</Alert> : null}
-        <Button type="submit" loading={check.pending}>
+        <Button type="submit" size="md" className="bp-notch" loading={check.pending}>
           Continue
         </Button>
         <Text fz="xs" c="dimmed">

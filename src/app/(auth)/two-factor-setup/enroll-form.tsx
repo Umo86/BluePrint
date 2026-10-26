@@ -43,7 +43,9 @@ export function EnrollForm() {
             </Button>
           )}
         </CopyButton>
-        <Button onClick={() => router.replace('/')}>I have saved my codes</Button>
+        <Button size="md" className="bp-notch" onClick={() => router.replace('/start')}>
+          I have saved my codes
+        </Button>
       </Stack>
     );
   }
@@ -77,7 +79,7 @@ export function EnrollForm() {
         </Text>
         <TextInput label="Six-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={code} onChange={(e) => setCode(e.currentTarget.value)} />
         {confirm.error ? <Alert color="red">{confirm.error}</Alert> : null}
-        <Button type="submit" loading={confirm.pending}>
+        <Button type="submit" size="md" className="bp-notch" loading={confirm.pending}>
           Turn on two-factor sign-in
         </Button>
       </Stack>

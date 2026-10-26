@@ -10,7 +10,7 @@ export default async function TwoFactorSetupPage() {
   const auth = await getCurrentAuth();
   if (!auth) redirect('/sign-in');
   // Just turned on: stay on this page so the person can save their recovery codes.
-  if (auth.user.totpEnabledAt && !twoFactorJustTurnedOn(auth.user)) redirect('/');
+  if (auth.user.totpEnabledAt && !twoFactorJustTurnedOn(auth.user)) redirect('/start');
   return (
     <AuthCard
       title="Set up two-factor sign-in"

@@ -18,7 +18,7 @@ export default async function Checklist({ params }: PageProps<'/portal/[slug]/ch
   return (
     <Stack>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           Your checklist
         </Title>
         <Text c="dimmed">Everything you need to do for stand {ctx.stand.number}, in order. Required tasks must be done by their deadline.</Text>

@@ -35,7 +35,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
   return (
     <Stack>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           {firstName ? `Welcome, ${firstName}` : 'Welcome'}
         </Title>
         <Text c="dimmed">
@@ -75,10 +75,10 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
 
       <SimpleGrid cols={{ base: 1, md: 3 }}>
         <Paper withBorder p="md">
-          <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+          <Text fz="sm" fw={500} c="dimmed">
             Your checklist
           </Text>
-          <Text fz={28} fw={700}>
+          <Text className="bp-figure" fz={32}>
             {pct}%
           </Text>
           <Progress value={pct} color={brand} mb={6} aria-label={`${pct}% of required tasks done`} />
@@ -87,10 +87,10 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
           </Text>
         </Paper>
         <Paper withBorder p="md">
-          <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+          <Text fz="sm" fw={500} c="dimmed">
             Show opens
           </Text>
-          <Text fz={28} fw={700}>
+          <Text className="bp-figure" fz={32}>
             {toShow === null ? '—' : toShow > 0 ? `${toShow} days` : toShow === 0 ? 'Today' : 'Open'}
           </Text>
           <Text fz="sm" c="dimmed">
@@ -98,7 +98,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
           </Text>
         </Paper>
         <Paper withBorder p="md">
-          <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+          <Text fz="sm" fw={500} c="dimmed">
             Build-up
           </Text>
           <Text fz="sm" mt={6}>

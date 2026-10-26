@@ -27,5 +27,5 @@ export async function stopViewAsAction() {
     });
     if (auth.session.viewAsEditionId) redirect(`/manage/${auth.session.viewAsEditionId}/exhibitors`);
   }
-  redirect('/');
+  redirect('/start');
 }

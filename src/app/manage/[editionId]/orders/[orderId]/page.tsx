@@ -68,7 +68,7 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
 
       <SimpleGrid cols={{ base: 1, md: 3 }}>
         <Paper withBorder p="md">
-          <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+          <Text fz="sm" c="dimmed" fw={500}>
             Exhibitor
           </Text>
           <Text fw={600}>{d.company?.name ?? '—'}</Text>
@@ -93,7 +93,7 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
           ) : null}
         </Paper>
         <Paper withBorder p="md">
-          <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+          <Text fz="sm" c="dimmed" fw={500}>
             Payment
           </Text>
           <Text fw={600}>{o.paymentMethod === 'card' ? 'Card' : 'Invoice'}</Text>
@@ -113,7 +113,7 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
           ) : null}
         </Paper>
         <Paper withBorder p="md">
-          <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+          <Text fz="sm" c="dimmed" fw={500}>
             Documents
           </Text>
           {d.documents.length ? (

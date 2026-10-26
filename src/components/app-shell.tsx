@@ -57,12 +57,12 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Open navigation" />
-            <Link href="/" aria-label="BluePrint home" style={{ textDecoration: 'none' }}>
+            <Link href="/start" aria-label="BluePrint home" style={{ textDecoration: 'none' }}>
               {brand?.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={brand.logoUrl} alt="Show logo" style={{ height: 36, maxWidth: 160, objectFit: 'contain', background: 'white', borderRadius: 4, padding: 2 }} />
               ) : (
-                <BrandMark size="md" />
+                <BrandMark size="md" tone={branded ? 'white' : 'ink'} />
               )}
             </Link>
             <Divider orientation="vertical" visibleFrom="sm" />
@@ -141,7 +141,7 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
               return (
                 <div key={item.href}>
                   {header ? (
-                    <Text fz={11} fw={700} c="dimmed" tt="uppercase" mt="sm" mb={4} px="sm">
+                    <Text fz={12} fw={500} c="dimmed" mt="md" mb={4} px="sm">
                       {header}
                     </Text>
                   ) : null}
@@ -153,7 +153,7 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
                     active={active}
                     onClick={close}
                     rightSection={item.badge ? <Badge size="sm" variant="light">{item.badge}</Badge> : null}
-                    styles={{ root: { borderRadius: 6 } }}
+                    styles={{ root: { borderRadius: 4 } }}
                   />
                 </div>
               );

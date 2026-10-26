@@ -31,7 +31,7 @@ export default async function ContractorManualPage({ params }: PageProps<'/contr
       <TextLink href={`/contractor/${standId}`} fz="sm">
         ← Stand {view.stand.number}
       </TextLink>
-      <Title order={1} fz={26}>
+      <Title order={1} fz={30}>
         {page.title}
       </Title>
       <Paper withBorder p="lg">

@@ -1,0 +1,132 @@
+/* Sign-in and the other short pages around it: a card on a light drafting grid. */
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bp-mist);
+  color: var(--bp-ink);
+  overflow-x: hidden;
+}
+
+/* The grid fades out towards the middle, so the card sits on a clear patch. */
+.page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(43, 80, 224, 0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(43, 80, 224, 0.09) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: center top;
+  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, transparent 30%, #000 100%);
+  mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, transparent 30%, #000 100%);
+}
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 24px;
+}
+
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+.headerLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  font: 500 12px/1 var(--bp-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bp-ink);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.headerLink:hover {
+  background: rgba(28, 28, 28, 0.06);
+}
+
+.brandLink:focus-visible,
+.headerLink:focus-visible {
+  outline: 2px solid var(--bp-accent);
+  outline-offset: 3px;
+}
+
+.main {
+  position: relative;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 16px 64px;
+}
+
+.column {
+  width: 100%;
+  max-width: 460px;
+}
+
+.card {
+  background: var(--bp-paper);
+  border: 1px solid var(--bp-line);
+  border-radius: 10px;
+  box-shadow: 0 10px 64px rgba(0, 0, 0, 0.07);
+  padding: 36px 36px 32px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--bp-font-serif);
+  font-weight: 300;
+  font-size: 34px;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--bp-muted);
+}
+
+.body {
+  margin-top: 28px;
+}
+
+.foot {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--bp-muted);
+}
+
+@media (max-width: 520px) {
+  .header {
+    padding: 0 16px;
+  }
+  .main {
+    padding-top: 16px;
+  }
+  .card {
+    padding: 28px 20px 24px;
+  }
+  .title {
+    font-size: 30px;
+  }
+}

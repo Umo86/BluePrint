@@ -28,7 +28,7 @@ export default async function ContractorStand({ params }: PageProps<'/contractor
         ← Your stands
       </TextLink>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           Stand {view.stand.number} · {view.company.name}
         </Title>
         <Text c="dimmed">
@@ -39,14 +39,14 @@ export default async function ContractorStand({ params }: PageProps<'/contractor
       </div>
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Paper withBorder p="md">
-          <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+          <Text fz="sm" fw={500} c="dimmed">
             Build-up and breakdown
           </Text>
           <Text fz="sm">Build-up starts {view.edition.buildUpStartsAt ? dateTime(view.edition.buildUpStartsAt) : 'to be confirmed'}</Text>
           <Text fz="sm">Breakdown ends {view.edition.breakdownEndsAt ? dateTime(view.edition.breakdownEndsAt) : 'to be confirmed'}</Text>
         </Paper>
         <Paper withBorder p="md">
-          <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+          <Text fz="sm" fw={500} c="dimmed">
             Rules for building
           </Text>
           <Group gap="sm" mt={4}>

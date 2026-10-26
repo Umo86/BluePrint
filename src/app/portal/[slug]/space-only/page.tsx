@@ -21,7 +21,7 @@ export default async function SpaceOnlyPage({ params }: PageProps<'/portal/[slug
   return (
     <Stack maw={900}>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           Space-only stand approval
         </Title>
         <Text c="dimmed">

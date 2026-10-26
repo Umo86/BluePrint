@@ -50,7 +50,7 @@ export default async function MyOrder({ params, searchParams }: PageProps<'/port
       ) : null}
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Paper withBorder p="md">
-          <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+          <Text fz="sm" c="dimmed" fw={500}>
             Payment
           </Text>
           <Text fw={600}>{o.paymentMethod === 'card' ? 'Card' : 'Invoice'}</Text>
@@ -59,7 +59,7 @@ export default async function MyOrder({ params, searchParams }: PageProps<'/port
           {o.status === 'invoiced' && o.dueAt ? <Text fz="sm">Payment due {dateLong(o.dueAt, tz)}</Text> : null}
         </Paper>
         <Paper withBorder p="md">
-          <Text fz="xs" c="dimmed" fw={600} tt="uppercase">
+          <Text fz="sm" c="dimmed" fw={500}>
             Invoices and credit notes
           </Text>
           {view.documents.length ? (

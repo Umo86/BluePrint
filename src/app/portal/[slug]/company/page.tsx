@@ -15,7 +15,7 @@ export default async function CompanyPage({ params }: PageProps<'/portal/[slug]/
   return (
     <Stack>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           Your company and team
         </Title>
         <Text c="dimmed">

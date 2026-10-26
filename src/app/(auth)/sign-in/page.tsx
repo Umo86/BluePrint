@@ -15,7 +15,7 @@ function testLogin() {
 
 export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>) {
   const params = await searchParams;
-  const next = safeNextPath(typeof params.next === 'string' ? params.next : null, '/');
+  const next = safeNextPath(typeof params.next === 'string' ? params.next : null);
   const auth = await getCurrentAuth();
   if (auth && !auth.needsSecondFactor && !auth.needsTwoFactorSetup) redirect(next);
   return (

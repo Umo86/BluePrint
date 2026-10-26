@@ -12,7 +12,7 @@ export default async function ManualIndex({ params }: PageProps<'/portal/[slug]/
   return (
     <Stack maw={860}>
       <div>
-        <Title order={1} fz={26}>
+        <Title order={1} fz={30}>
           Exhibitor manual
         </Title>
         <Text c="dimmed">Rules and information for {ctx.stand.typeName.toLowerCase()} stands at {ctx.edition.name}.</Text>

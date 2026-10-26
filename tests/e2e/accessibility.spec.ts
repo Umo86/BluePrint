@@ -42,10 +42,13 @@ async function auditPages(page: Page, base: string, pages: [string, string][]) {
 
 test.describe.configure({ mode: 'serial' });
 
-test('sign-in and the exhibitor portal', async ({ page }) => {
+test('the public pages, sign-in and the exhibitor portal', async ({ page }) => {
   test.setTimeout(300_000);
-  await page.goto('/sign-in');
-  const problems = await audit(page, 'sign in');
+  const problems = await auditPages(page, '', [
+    ['home', '/'],
+    ['about', '/about'],
+    ['sign in', '/sign-in'],
+  ]);
 
   await signInWithCode(page, 'chloe@cladtech.test');
   await page.waitForURL(/\/portal\/[^/]+$/);

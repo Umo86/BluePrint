@@ -89,7 +89,7 @@ export function EmailBlockEditor({
       {blocks.map((b, i) => (
         <Paper key={i} withBorder p="sm">
           <Group justify="space-between" mb={6}>
-            <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+            <Text fz="sm" fw={500} c="dimmed">
               {LABELS[b.type]}
             </Text>
             <Group gap={2}>

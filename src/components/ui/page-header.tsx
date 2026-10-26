@@ -5,11 +5,11 @@ export function PageHeader({ title, description, actions, eyebrow }: { title: st
     <Group justify="space-between" align="flex-start" mb="lg" wrap="wrap" gap="md">
       <Stack gap={4} style={{ minWidth: 0, flex: 1 }}>
         {eyebrow ? (
-          <Text fz="xs" fw={700} c="dimmed" tt="uppercase">
+          <Text fz="sm" fw={500} c="dimmed">
             {eyebrow}
           </Text>
         ) : null}
-        <Title order={1} fz={26} lh={1.2}>
+        <Title order={1} fz={30} lh={1.15}>
           {title}
         </Title>
         {description ? (

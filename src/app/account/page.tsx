@@ -25,7 +25,7 @@ export default async function AccountPage() {
     >
       <Container size="sm" px={0}>
         <Stack>
-          <Title order={1} fz={26}>
+          <Title order={1} fz={30}>
             Account and security
           </Title>
           <AccountForms

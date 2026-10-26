@@ -6,7 +6,7 @@ import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
 import { DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/en-gb';
-import { theme } from '@/theme';
+import { cssVariablesResolver, theme } from '@/theme';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Marks the page as interactive (used by automated browser tests to avoid typing before React is ready).
@@ -14,7 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.ready = 'true';
   }, []);
   return (
-    <MantineProvider theme={theme} defaultColorScheme="light" forceColorScheme="light">
+    <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver} defaultColorScheme="light" forceColorScheme="light">
       <DatesProvider settings={{ locale: 'en-gb', firstDayOfWeek: 1 }}>
         <ModalsProvider>
           <Notifications position="top-right" limit={4} />

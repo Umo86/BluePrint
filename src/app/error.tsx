@@ -11,13 +11,13 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
     console.error(error);
   }, [error]);
   return (
-    <Center mih="70vh" py="xl">
+    <Center mih="70vh" py="xl" bg="var(--bp-mist)">
       <Container size={480} w="100%">
         <Stack gap="lg" align="center">
           <BrandMark />
-          <Paper withBorder p="xl" radius="md" w="100%">
+          <Paper withBorder p="xl" radius="lg" w="100%" shadow="xl">
             <Stack gap="sm">
-              <Title order={1} fz={22}>
+              <Title order={1} fz={30}>
                 Something went wrong
               </Title>
               <Text c="dimmed" fz="sm">
@@ -29,8 +29,10 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
                 </Text>
               ) : null}
               <Group>
-                <Button onClick={() => retry()}>Try again</Button>
-                <Button component="a" href="/" variant="default">
+                <Button className="bp-notch" onClick={() => retry()}>
+                  Try again
+                </Button>
+                <Button component="a" href="/start" variant="default">
                   Go to my BluePrint
                 </Button>
               </Group>
