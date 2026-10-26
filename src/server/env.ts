@@ -66,6 +66,9 @@ const schema = z.object({
   // account) when testing is over.
   TEST_LOGIN_EMAIL: z.string().trim().email().optional(),
   TEST_LOGIN_PASSWORD: z.string().optional(),
+  // More test logins, one per kind of account, as JSON: [{"role":"Show admin","email":"…","password":"…"}].
+  // Shown on the sign-in page; `npm run demo` gives the demo accounts these passwords.
+  TEST_LOGINS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

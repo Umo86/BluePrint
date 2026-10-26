@@ -71,7 +71,9 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | For card payments | See [payments](payments.md). Without them card payment is off, and only companies allowed to pay on invoice can order. |
 | `ANTHROPIC_API_KEY` | For the assistant | See [assistant](assistant.md). Without it the assistant is hidden. |
 | `TWO_FACTOR` | No | `off` switches two-factor sign-in off for everyone, for example while the site is being tried out. Leave it unset (on) for a live site. |
-| `TEST_LOGIN_EMAIL`, `TEST_LOGIN_PASSWORD` | No | A test account shown on the sign-in page while the site is being tried out. Remove both, and the account, when testing ends. |
+| `TEST_LOGIN_EMAIL`, `TEST_LOGIN_PASSWORD` | No | A test account shown on the sign-in page (as the super admin) while the site is being tried out. |
+| `TEST_LOGINS` | No | More test accounts for the sign-in page, one per kind of account, as JSON: `[{"role":"Show admin","email":"olivia@buildexpo.test","password":"…"}]`. Each one signs straight in. |
+| `DEMO_DATA` | No | `load` adds the demo data during the build (`npm run demo`): an invented organiser's two shows with a show team, exhibitors, a contractor, suppliers, orders and questions, and gives the `TEST_LOGINS` accounts their passwords. It adds the shows once; later builds only refresh the passwords. |
 
    The site refuses to start if a required value is missing, and says which one.
 
@@ -106,7 +108,7 @@ It prints an invitation link that works for 48 hours. Open it, enter the code em
 - [ ] On the staging site with Stripe test keys: pay for an order by card, refund part of it, and check the supplier's transfer and the credit note.
 - [ ] Finance has agreed the money model in [payments](payments.md): commission, supplier VAT status, the card fee and its VAT treatment, invoice bank details and payment terms.
 - [ ] Your privacy notice lists the sub-processors (Vercel, Neon, Cloudflare, Resend, Stripe, and Anthropic if the assistant is on) and the retention periods in Platform settings.
-- [ ] Two-factor sign-in is on (`TWO_FACTOR` not set to `off`) and the test login settings are removed.
+- [ ] Two-factor sign-in is on (`TWO_FACTOR` not set to `off`), the test login settings (`TEST_LOGIN_*`, `TEST_LOGINS`) and `DEMO_DATA` are removed, and the demo shows (BuildExpo, Green Homes Live) are deleted in **Super admin → Shows** and their accounts disabled in **Super admin → Users**.
 - [ ] At least two super admins, both with two-factor.
 
 ## Running BluePrint

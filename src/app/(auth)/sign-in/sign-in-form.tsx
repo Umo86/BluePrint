@@ -1,28 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert, Anchor, Button, Code, PasswordInput, PinInput, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Anchor, Button, Code, Group, PasswordInput, PinInput, Stack, Text, TextInput } from '@mantine/core';
 import { useAction } from '@/lib/use-action';
 import { passwordSignInAction, requestCodeAction, verifyCodeAction } from '../actions';
 
-type TestLogin = { email: string; password: string } | null;
+type TestLogin = { role: string; email: string; password: string };
 
-/** The test login, shown under the form only while TEST_LOGIN_EMAIL and TEST_LOGIN_PASSWORD are set. */
-function TestLoginBox({ login, onUse }: { login: NonNullable<TestLogin>; onUse: () => void }) {
+/**
+ * Test logins, one per kind of account, shown under the form while the site is being tried out
+ * (TEST_LOGINS). Each one signs straight in as that account.
+ */
+function TestLogins({ logins, onUse, busy }: { logins: TestLogin[]; onUse: (l: TestLogin) => void; busy: string | null }) {
   return (
-    <Alert color="blueprint" title="Test login" role="note" styles={{ root: { border: '1px dashed var(--mantine-color-blueprint-6)' } }}>
-      <Stack gap={6}>
-        <Text fz="sm">
-          Email: <Code>{login.email}</Code>
-          <br />
-          Password: <Code>{login.password}</Code>
+    <Alert color="blueprint" title="Test logins" role="note" styles={{ root: { border: '1px dashed var(--mantine-color-blueprint-6)' } }}>
+      <Stack gap={0}>
+        <Text fz="xs" c="dimmed" mb={6}>
+          For testing only. Each account sees BluePrint as that kind of user, with demo data.
         </Text>
-        <Text fz="xs" c="dimmed">
-          For testing only.
-        </Text>
-        <Button size="xs" variant="default" onClick={onUse} style={{ alignSelf: 'flex-start' }}>
-          Use the test login
-        </Button>
+        {logins.map((l) => (
+          <Group key={l.email} justify="space-between" wrap="nowrap" gap="sm" py={8} style={{ borderTop: '1px solid var(--mantine-color-blueprint-2)' }}>
+            <div style={{ minWidth: 0 }}>
+              <Text fz="sm" fw={600}>
+                {l.role}
+              </Text>
+              <Text fz="xs" truncate>
+                {l.email}
+              </Text>
+              <Text fz="xs">
+                Password: <Code fz="xs">{l.password}</Code>
+              </Text>
+            </div>
+            <Button size="xs" variant="default" onClick={() => onUse(l)} loading={busy === l.email} disabled={Boolean(busy) && busy !== l.email} aria-label={`Sign in as ${l.role}`} style={{ flexShrink: 0 }}>
+              Sign in
+            </Button>
+          </Group>
+        ))}
       </Stack>
     </Alert>
   );
@@ -32,11 +45,13 @@ function TestLoginBox({ login, onUse }: { login: NonNullable<TestLogin>; onUse: 
  * One screen: email and password. People without a password can have a code emailed instead, when
  * email sending is set up (`codes`).
  */
-export function SignInForm({ next, signedOut, testLogin = null, codes = false }: { next: string; signedOut?: boolean; testLogin?: TestLogin; codes?: boolean }) {
+export function SignInForm({ next, signedOut, testLogins = [], codes = false }: { next: string; signedOut?: boolean; testLogins?: TestLogin[]; codes?: boolean }) {
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'password' | 'email' | 'code'>('password');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  // Which test login is signing in, so its button can show progress.
+  const [testing, setTesting] = useState<string | null>(null);
 
   const request = useAction(requestCodeAction, { onSuccess: () => setStep('code') });
   // These show their errors in the form, so no pop-up as well.
@@ -129,12 +144,15 @@ export function SignInForm({ next, signedOut, testLogin = null, codes = false }:
           ) : null}
         </Stack>
       </form>
-      {testLogin ? (
-        <TestLoginBox
-          login={testLogin}
-          onUse={() => {
-            setEmail(testLogin.email);
-            setPassword(testLogin.password);
+      {testLogins.length ? (
+        <TestLogins
+          logins={testLogins}
+          busy={withPassword.pending ? testing : null}
+          onUse={(l) => {
+            setEmail(l.email);
+            setPassword(l.password);
+            setTesting(l.email);
+            void withPassword.run(l.email, l.password, next);
           }}
         />
       ) : null}

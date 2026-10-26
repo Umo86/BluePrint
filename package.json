@@ -14,6 +14,7 @@
     "db:migrate": "tsx --conditions=react-server scripts/migrate.ts",
     "seed": "tsx --conditions=react-server scripts/seed.ts",
     "bootstrap": "tsx --conditions=react-server scripts/bootstrap.ts",
+    "demo": "tsx --conditions=react-server scripts/demo.ts",
     "secrets:reencrypt": "tsx --conditions=react-server scripts/reencrypt-secrets.ts"
   },
   "overrides": {
