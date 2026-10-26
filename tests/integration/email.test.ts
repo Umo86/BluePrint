@@ -352,3 +352,31 @@ describe('codes and personal links in the email record', () => {
     expect(row.replyTo).toBeNull();
   });
 });
+
+describe('before email sending is set up', () => {
+  it('records each email as not sent, with codes and personal links taken out of the copy', async () => {
+    setEmailProviderForTests({
+      name: 'off',
+      send: async () => {
+        throw new Error('Nothing should be sent');
+      },
+    });
+    try {
+      const res = await sendEmail({
+        to: 'Early@Example.com',
+        templateKey: 'sign_in_code',
+        category: 'security',
+        subject: '123456 is your BluePrint sign-in code',
+        html: '<p>Your code is 123456.</p><p><a href="https://blueprint.example/invite/abcdefghijklmnopqrstuvwxyz012345">Accept</a></p>',
+        text: 'Your code is 123456.',
+      });
+      expect(res.status).toBe('suppressed');
+      const [row] = await mailTo('early@example.com');
+      expect(row).toMatchObject({ status: 'suppressed', error: 'Not sent: email sending is not set up yet' });
+      expect(`${row.subject} ${row.html} ${row.text}`).not.toContain('123456');
+      expect(row.html).toContain('/invite/[hidden]');
+    } finally {
+      setEmailProviderForTests(null);
+    }
+  });
+});

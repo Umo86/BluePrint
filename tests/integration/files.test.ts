@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { closeDb, getDb, useInMemoryDatabaseForTests } from '@/server/db/client';
 import { files, standContractors } from '@/server/db/schema';
 import { beginUpload, canReadFile, completeUpload, getFile, receiveLocalUpload, requireOwnVerifiedFile } from '@/server/services/files';
-import { MemoryStorage, setStorageForTests, contentDisposition, assertSafeKey } from '@/server/storage';
+import { MemoryStorage, NoStorage, setStorageForTests, contentDisposition, assertSafeKey } from '@/server/storage';
 import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
 
 // The smallest valid PNG (1x1 pixel).
@@ -23,6 +23,16 @@ function freshStorage() {
 }
 
 describe('uploads', () => {
+  it('says plainly that uploads are off before file storage is set up', async () => {
+    setStorageForTests(new NoStorage());
+    const { edition } = await makeEdition();
+    const content = await makeStaff(edition.id, 'show_team', ['edit_content']);
+    await expect(beginUpload(actorFor(content), { purpose: 'branding', filename: 'logo.png', contentType: 'image/png', size: 40, editionId: edition.id })).rejects.toThrow(/not switched on yet/);
+    // Nothing is half-made in the meantime.
+    const db = await getDb();
+    expect(await db.select().from(files).where(eq(files.editionId, edition.id))).toHaveLength(0);
+  });
+
   it('accepts a real image for branding and serves it publicly', async () => {
     freshStorage();
     const { edition } = await makeEdition();

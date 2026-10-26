@@ -2,7 +2,7 @@ import 'server-only';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { editions, emailOutbox, emailSuppressions, unsubscribes } from '../db/schema';
-import { emailProvider } from './provider';
+import { EMAIL_OFF_REASON, emailProvider } from './provider';
 import { senderFor } from './templates';
 
 export type EmailCategory = 'transactional' | 'reminder' | 'campaign' | 'security';
@@ -82,6 +82,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
       .limit(1);
     if (u) suppressedReason = 'Unsubscribed from campaigns';
   }
+  // A live site without email sending yet records the email as not sent. The copy is only a record,
+  // so codes and personal links come out of it, as they do once an email has really gone.
+  const off = emailProvider().name === 'off';
+  if (off) suppressedReason = EMAIL_OFF_REASON;
+  const keep = (value: string) => (off ? hideSecrets(value, input.category) : value);
 
   const [row] = await db
     .insert(emailOutbox)
@@ -95,14 +100,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
       category: input.category,
       fromAddress: from,
       replyTo,
-      subject,
-      html: input.html,
-      text: input.text,
+      subject: keep(subject),
+      html: keep(input.html),
+      text: keep(input.text),
       status: suppressedReason ? 'suppressed' : 'queued',
       error: suppressedReason,
       campaignId: input.campaignId ?? null,
       sentBy: input.sentBy ?? null,
-      headers: input.headers ?? null,
+      headers: input.headers ? (off ? Object.fromEntries(Object.entries(input.headers).map(([k, v]) => [k, hideSecrets(v, input.category)])) : input.headers) : null,
     })
     .returning({ id: emailOutbox.id });
 

@@ -4,7 +4,7 @@ import { getDb } from '../db/client';
 import { cronRuns, emailOutbox, emailSuppressions, stripeEvents } from '../db/schema';
 import { assertSuperAdmin } from '../authz';
 import { audit } from '../audit';
-import { env } from '../env';
+import { emailMode, env, storageMode } from '../env';
 import { deliverOutboxEmail } from '../email/send';
 import type { Actor } from '../auth/actor';
 
@@ -34,9 +34,9 @@ export async function systemStatus(actor: Actor) {
   const e = env();
   const config = {
     database: e.DATABASE_URL ? 'Postgres (Neon)' : 'Local PGlite',
-    email: e.EMAIL_PROVIDER === 'resend' ? (e.RESEND_API_KEY ? 'Resend (key set)' : 'Resend (key missing)') : 'Local outbox only',
+    email: { resend: 'Resend (key set)', outbox: 'Local outbox only', off: 'Not set up: emails are recorded but not sent' }[emailMode()],
     emailWebhooks: e.RESEND_WEBHOOK_SECRET ? 'Signed webhooks on' : 'Not set up',
-    storage: e.STORAGE_PROVIDER === 'r2' ? 'Cloudflare R2' : 'Local disk',
+    storage: { r2: 'Cloudflare R2', local: 'Local disk', off: 'Not set up: uploads are switched off' }[storageMode()],
     payments: e.STRIPE_SECRET_KEY ? (e.STRIPE_SECRET_KEY.startsWith('sk_live') ? 'Stripe (live)' : 'Stripe (test mode)') : 'Not connected',
     paymentWebhooks: e.STRIPE_WEBHOOK_SECRET ? 'Signed webhooks on' : 'Not set up',
     assistant: e.ANTHROPIC_API_KEY ? 'Claude (key set)' : e.NODE_ENV === 'production' ? 'Not set up (no Claude API key)' : 'Practice mode (no Claude API key)',

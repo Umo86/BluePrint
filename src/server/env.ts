@@ -74,13 +74,9 @@ export function env(): Env {
     if (!value.DATABASE_URL) missing.push('DATABASE_URL');
     if (!value.APP_ENCRYPTION_KEY) missing.push('APP_ENCRYPTION_KEY');
     if (!value.CRON_SECRET) missing.push('CRON_SECRET');
-    // A real deployment must send real email and keep files in R2 (a server's own disk is wiped).
-    if (value.EMAIL_PROVIDER !== 'resend') missing.push('EMAIL_PROVIDER=resend');
-    if (!value.RESEND_API_KEY) missing.push('RESEND_API_KEY');
-    if (value.STORAGE_PROVIDER !== 'r2') missing.push('STORAGE_PROVIDER=r2');
-    for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'] as const) {
-      if (!value[k]) missing.push(k);
-    }
+    // Email (Resend) and file storage (R2) can be added later. Until then a live site records emails
+    // without sending them and switches uploads off (see emailMode and storageMode), and the super
+    // admin overview lists what is still to set up. It never falls back to a server's own disk.
     // Card payments are optional, but once switched on the webhook secret is needed to confirm them.
     if (value.STRIPE_SECRET_KEY && !value.STRIPE_WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET');
     if (value.STRIPE_SECRET_KEY && /^pk_/.test(value.STRIPE_SECRET_KEY)) missing.push('STRIPE_SECRET_KEY (a publishable key was given; use the secret or restricted key)');
@@ -104,6 +100,35 @@ export function localProductionAllowed() {
 
 export function isProduction() {
   return env().NODE_ENV === 'production';
+}
+
+/** A live site, as opposed to development, tests or a production build tried on this computer. */
+function liveSite(e: Env) {
+  return e.NODE_ENV === 'production' && !localProductionAllowed();
+}
+
+/**
+ * How email goes out: through Resend once its key is set; kept in the outbox for development and
+ * tests; or "off" on a live site that has no Resend key yet, where each email is recorded as not
+ * sent (with any sign-in code or personal link taken out of the copy).
+ */
+export function emailMode(): 'resend' | 'outbox' | 'off' {
+  const e = env();
+  if (e.EMAIL_PROVIDER === 'resend' && e.RESEND_API_KEY) return 'resend';
+  if (liveSite(e) || e.EMAIL_PROVIDER === 'resend') return 'off';
+  return 'outbox';
+}
+
+/**
+ * Where files are kept: Cloudflare R2 once all its settings are in; a local folder for development;
+ * or "off" on a live site without R2, where uploads are refused with a clear message (a server's
+ * own disk is wiped, so files must never be kept there).
+ */
+export function storageMode(): 'r2' | 'local' | 'off' {
+  const e = env();
+  if (e.STORAGE_PROVIDER === 'r2' && e.R2_ACCOUNT_ID && e.R2_ACCESS_KEY_ID && e.R2_SECRET_ACCESS_KEY && e.R2_BUCKET) return 'r2';
+  if (liveSite(e) || e.STORAGE_PROVIDER === 'r2') return 'off';
+  return 'local';
 }
 
 /** For tests only. */

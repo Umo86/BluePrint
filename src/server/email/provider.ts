@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { env } from '../env';
+import { emailMode, env } from '../env';
 
 export type OutgoingEmail = {
   from: string;
@@ -47,6 +47,16 @@ class OutboxOnlyProvider implements EmailProvider {
   }
 }
 
+export const EMAIL_OFF_REASON = 'Not sent: email sending is not set up yet';
+
+/** A live site with no Resend key yet: nothing is sent (sendEmail records these as not sent). */
+class NotSetUpProvider implements EmailProvider {
+  readonly name = 'off';
+  async send(): Promise<{ id: string }> {
+    throw new Error(EMAIL_OFF_REASON);
+  }
+}
+
 let override: EmailProvider | null = null;
 
 /** Tests can swap in a fake provider. */
@@ -56,10 +66,8 @@ export function setEmailProviderForTests(p: EmailProvider | null) {
 
 export function emailProvider(): EmailProvider {
   if (override) return override;
-  const e = env();
-  if (e.EMAIL_PROVIDER === 'resend') {
-    if (!e.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set');
-    return new ResendProvider(e.RESEND_API_KEY);
-  }
-  return new OutboxOnlyProvider();
+  const mode = emailMode();
+  if (mode === 'resend') return new ResendProvider(env().RESEND_API_KEY!);
+  if (mode === 'outbox') return new OutboxOnlyProvider();
+  return new NotSetUpProvider();
 }

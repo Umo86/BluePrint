@@ -17,10 +17,10 @@ import {
   supplierIdsFor,
   type EditionAccess,
 } from '../authz';
-import { forbidden, invalid, notFound } from '../errors';
+import { AppError, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { assertRateLimit } from '../security/rate-limit';
-import { storage } from '../storage';
+import { STORAGE_OFF_MESSAGE, storage } from '../storage';
 import type { Actor } from '../auth/actor';
 import { DRAWING_TYPES, UPLOAD_RULES, typeFromName } from '@/lib/upload-rules';
 
@@ -120,6 +120,7 @@ async function authorizeUpload(actor: Actor, input: z.infer<typeof beginUploadSc
  */
 export async function beginUpload(actor: Actor, raw: z.input<typeof beginUploadSchema>) {
   const input = beginUploadSchema.parse(raw);
+  if (storage().kind === 'off') throw new AppError(STORAGE_OFF_MESSAGE, 'unavailable');
   const rules = UPLOAD_RULES[input.purpose];
   if (input.size > rules.maxBytes) throw invalid(`That file is too big. Allowed: ${rules.label}.`);
   const acceptsDrawings = rules.types.includes('image/vnd.dwg');

@@ -60,17 +60,19 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 | `DATABASE_URL` | Yes | Neon's pooled connection string (step 2). |
 | `APP_ENCRYPTION_KEY` | Yes | 32 random bytes, base64: `openssl rand -base64 32`. Encrypts two-factor keys. Keep a copy in the company password manager. |
 | `CRON_SECRET` | Yes | A long random value: `openssl rand -hex 32`. Vercel sends it with each scheduled job. |
-| `EMAIL_PROVIDER` | Yes | `resend` |
-| `RESEND_API_KEY` | Yes | Sending-only key (step 4). |
-| `RESEND_WEBHOOK_SECRET` | Yes | From the Resend webhook ([email guide](email.md), section 3). |
-| `EMAIL_DEFAULT_FROM` | Yes | Fallback sender on a verified domain, for example `BluePrint <no-reply@mail.media10.co.uk>`. |
-| `STORAGE_PROVIDER` | Yes | `r2` |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Yes | From step 3. |
+| `EMAIL_PROVIDER` | For email | `resend` |
+| `RESEND_API_KEY` | For email | Sending-only key (step 4). |
+| `RESEND_WEBHOOK_SECRET` | For email | From the Resend webhook ([email guide](email.md), section 3). |
+| `EMAIL_DEFAULT_FROM` | For email | Fallback sender on a verified domain, for example `BluePrint <no-reply@mail.media10.co.uk>`. |
+| `STORAGE_PROVIDER` | For files | `r2` |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | For files | From step 3. |
 | `R2_JURISDICTION` | If EU | `eu` when the bucket uses the EU jurisdiction. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | For card payments | See [payments](payments.md). Without them card payment is off, and only companies allowed to pay on invoice can order. |
 | `ANTHROPIC_API_KEY` | For the assistant | See [assistant](assistant.md). Without it the assistant is hidden. |
 
    The site refuses to start if a required value is missing, and says which one.
+
+   Email and file storage can be added later. Until `RESEND_API_KEY` is set, emails are recorded on each person's record as not sent (with sign-in codes and links taken out), so nobody receives sign-in codes: people who have set a password can still sign in with it. Until all the R2 settings are in, uploads are switched off with a message, and invoices and permission-to-build certificates are not stored. The super admin overview lists what is still to set up. Redeploy after adding them.
 4. **Deploy**, then **Settings → Domains**: add your address (for example `blueprint.media10.co.uk`) and create the DNS record Vercel shows. `APP_URL` must match it exactly.
 5. Keep **Deployment Protection** on for preview deployments.
 
