@@ -6,19 +6,8 @@ import { ActionButton } from '@/components/action-button';
 import { requireSuperAdmin } from '@/server/auth/current';
 import { systemStatus } from '@/server/services/system';
 import { dateTime } from '@/lib/format';
+import { CONFIG_LABELS } from '@/lib/system-labels';
 import { removeSuppressionAction, retryEmailsAction, runCronJobAction } from '../actions';
-
-const CONFIG_LABELS: Record<string, string> = {
-  database: 'Database',
-  email: 'Email sending',
-  emailWebhooks: 'Email delivery events',
-  storage: 'File storage',
-  payments: 'Payments',
-  paymentWebhooks: 'Payment events',
-  assistant: 'Assistant',
-  cron: 'Scheduled jobs',
-  encryptionKey: 'Encryption key',
-};
 
 const WARN = /missing|Not set up|Not connected|Development key|Local/;
 

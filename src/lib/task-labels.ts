@@ -25,6 +25,13 @@ export const REQUIREMENT_LABELS: Record<string, string> = {
   hidden: 'Not shown',
 };
 
+/** The same, worded for the exhibitor reading their own checklist. */
+export const EXHIBITOR_REQUIREMENT_LABELS: Record<string, string> = {
+  required: 'Required',
+  if_applicable: 'If it applies to you',
+  optional: 'Optional',
+};
+
 export const TASK_STATE_LABELS: Record<string, { label: string; color: string }> = {
   to_do: { label: 'To do', color: 'gray' },
   overdue: { label: 'Overdue', color: 'red' },

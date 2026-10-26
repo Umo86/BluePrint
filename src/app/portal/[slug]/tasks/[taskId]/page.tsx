@@ -5,7 +5,7 @@ import { RichHtml } from '@/components/rich-html';
 import { taskForStand } from '@/server/services/submissions';
 import { AppError } from '@/server/errors';
 import { dateTime } from '@/lib/format';
-import { REQUIREMENT_LABELS, TASK_STATE_LABELS } from '@/lib/task-labels';
+import { EXHIBITOR_REQUIREMENT_LABELS, TASK_STATE_LABELS } from '@/lib/task-labels';
 import { loadPortal } from '../../load';
 import { TaskForm, TaskMarkButtons } from './task-form';
 
@@ -38,7 +38,7 @@ export default async function TaskPage({ params }: PageProps<'/portal/[slug]/tas
           </Badge>
         </Group>
         <Text c="dimmed" fz="sm">
-          {REQUIREMENT_LABELS[t.requirement]}
+          {EXHIBITOR_REQUIREMENT_LABELS[t.requirement]}
           {t.deadline ? ` · deadline ${dateTime(t.deadline)}` : ''}
           {t.submission?.submittedAt ? ` · last sent ${dateTime(t.submission.submittedAt)}` : ''}
         </Text>

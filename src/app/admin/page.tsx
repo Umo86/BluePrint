@@ -11,6 +11,8 @@ import { systemStatus } from '@/server/services/system';
 import { getDb } from '@/server/db/client';
 import { auditLog } from '@/server/db/schema';
 import { dateShort, dateTime, money } from '@/lib/format';
+import { auditActionLabel } from '@/lib/audit-labels';
+import { CONFIG_LABELS } from '@/lib/system-labels';
 
 export default async function AdminOverview() {
   const actor = await requireSuperAdmin();
@@ -38,7 +40,7 @@ export default async function AdminOverview() {
           </Text>
           {warnings.map(([k, v]) => (
             <Text key={k} fz="sm">
-              {k}: {v}
+              {CONFIG_LABELS[k] ?? k}: {v}
             </Text>
           ))}
           <TextLink href="/admin/system" fz="sm">
@@ -122,7 +124,7 @@ export default async function AdminOverview() {
                   </Text>
                 </TableTd>
                 <TableTd>
-                  <Text fz="sm">{r.action}</Text>
+                  <Text fz="sm">{auditActionLabel(r.action)}</Text>
                 </TableTd>
                 <TableTd>
                   <Text fz="sm" c="dimmed">

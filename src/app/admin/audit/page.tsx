@@ -6,6 +6,7 @@ import { requireSuperAdmin } from '@/server/auth/current';
 import { queryAuditLog, type AuditFilters } from '@/server/services/audit-log';
 import { listShowsWithEditions } from '@/server/services/editions';
 import { dateTime } from '@/lib/format';
+import { auditActionLabel, auditDetailLines } from '@/lib/audit-labels';
 import { AuditFilterForm } from './audit-filters';
 
 function str(v: string | string[] | undefined, max = 200) {
@@ -79,7 +80,8 @@ export default async function AuditPage({ searchParams }: PageProps<'/admin/audi
                   ) : null}
                 </TableTd>
                 <TableTd>
-                  <Code>{r.action}</Code>
+                  <Text fz="sm">{auditActionLabel(r.action)}</Text>
+                  <Code fz="xs">{r.action}</Code>
                   {r.entityType ? (
                     <Text fz="xs" c="dimmed">
                       {r.entityType}
@@ -91,9 +93,11 @@ export default async function AuditPage({ searchParams }: PageProps<'/admin/audi
                 <TableTd>
                   {r.details && Object.keys(r.details).length ? (
                     // Scrollable, so it can take keyboard focus and be scrolled without a mouse.
-                    <Code block fz="xs" mah={90} style={{ overflow: 'auto', maxWidth: 380 }} tabIndex={0} aria-label="Details">
-                      {JSON.stringify(r.details)}
-                    </Code>
+                    <Text component="div" fz="xs" mah={90} style={{ overflow: 'auto', maxWidth: 380, overflowWrap: 'anywhere' }} tabIndex={0} aria-label="Details">
+                      {auditDetailLines(r.details).map((line) => (
+                        <div key={line}>{line}</div>
+                      ))}
+                    </Text>
                   ) : null}
                 </TableTd>
               </TableTr>

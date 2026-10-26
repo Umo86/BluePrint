@@ -151,10 +151,14 @@ test('super admin dashboard: every page works and changes are saved', async ({ p
 
   await test.step('audit log, CSV download, system and privacy pages', async () => {
     await page.goto('/admin/audit');
+    // Each entry reads in plain English, with its code beside it.
+    await expect(page.getByText('Changed platform settings').first()).toBeVisible();
     await expect(page.getByText('settings.updated').first()).toBeVisible();
-    await page.getByLabel('Action starts with').fill('company.');
+    await page.getByRole('combobox', { name: 'What' }).click();
+    await page.getByRole('option', { name: 'Companies' }).click();
     await page.getByRole('button', { name: 'Filter' }).click();
     await expect(page).toHaveURL(/action=company\./);
+    await expect(page.getByText('Added a company').first()).toBeVisible();
     await expect(page.getByText('company.created').first()).toBeVisible();
     const csv = await page.request.get('/admin/audit/export?action=company.');
     expect(csv.status()).toBe(200);

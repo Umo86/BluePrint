@@ -2,7 +2,7 @@ import { Badge, Group, Paper, Progress, Stack, Text, Title } from '@mantine/core
 import { TextLink } from '@/components/links';
 import { checklistForStand } from '@/server/services/submissions';
 import { dateTime } from '@/lib/format';
-import { REQUIREMENT_LABELS, TASK_KIND_LABELS, TASK_STATE_LABELS } from '@/lib/task-labels';
+import { EXHIBITOR_REQUIREMENT_LABELS, TASK_KIND_LABELS, TASK_STATE_LABELS } from '@/lib/task-labels';
 import { loadPortal } from '../load';
 
 export default async function Checklist({ params }: PageProps<'/portal/[slug]/checklist'>) {
@@ -54,7 +54,7 @@ export default async function Checklist({ params }: PageProps<'/portal/[slug]/ch
                       {i.task.title}
                     </TextLink>
                     <Text fz="xs" c="dimmed">
-                      {TASK_KIND_LABELS[i.task.kind]} · {REQUIREMENT_LABELS[i.requirement]}
+                      {TASK_KIND_LABELS[i.task.kind]} · {EXHIBITOR_REQUIREMENT_LABELS[i.requirement]}
                       {i.deadline ? ` · due ${dateTime(i.deadline)}` : ''}
                     </Text>
                   </div>

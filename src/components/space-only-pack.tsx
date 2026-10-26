@@ -144,6 +144,8 @@ export function SpaceOnlyPack(p: PackProps) {
   const payload = () => ({ heightM: declared.heightM, platformMm: declared.platformMm, hasSteps: declared.hasSteps, insuranceCoverGbp: declared.insuranceCoverGbp, insuranceExpiresOn: declared.insuranceExpiresOn, documents: docs });
   const otherDocs = SPACE_ONLY_DOCS.filter((d) => !check.neededDocs.includes(d.key));
   const ro = !p.editable;
+  // Once the pack is with the show team (or approved), the "ready to send" prompt no longer applies.
+  const sent = ro && (['submitted', 'under_review'].includes(p.status) || p.status.startsWith('approved'));
 
   const docBlock = (key: string, label: string, help: string, required: boolean) => (
     <Paper key={key} withBorder p="sm" data-testid={`doc-${key}`}>
@@ -290,9 +292,9 @@ export function SpaceOnlyPack(p: PackProps) {
 
       <Paper withBorder p="md">
         <Title order={2} fz="md" mb="sm">
-          {check.complete ? 'Ready to send' : 'Still needed before you can send'}
+          {sent ? (p.status.startsWith('approved') ? 'Approved' : 'Sent for review') : check.complete ? 'Ready to send' : 'Still needed before you can send'}
         </Title>
-        {check.missing.length ? (
+        {sent ? null : check.missing.length ? (
           <List size="sm" spacing={4} icon={<IconCircleDashed size={14} />}>
             {check.missing.map((m) => (
               <ListItem key={m}>{m}</ListItem>
