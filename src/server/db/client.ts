@@ -27,6 +27,10 @@ async function createPostgres(url: string): Promise<Holder> {
     // Neon requires TLS; the connection string carries sslmode=require.
     idleTimeoutMillis: 10_000,
   });
+  // On Vercel (Fluid compute) this keeps a function alive just long enough to close idle
+  // connections before it is suspended, so connections are not left open on Neon.
+  const { attachDatabasePool } = await import('@vercel/functions');
+  attachDatabasePool(pool);
   const db = drizzle({ client: pool, schema }) as unknown as Db;
   return { db, ready: Promise.resolve(), close: () => pool.end() };
 }

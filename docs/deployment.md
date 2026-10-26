@@ -58,6 +58,7 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 | --- | --- | --- |
 | `APP_URL` | Yes | The site's address, for example `https://blueprint.media10.co.uk`. Used in email links and to check that requests come from the site itself. Before you add your own domain, use the production address under **Settings → Domains** (such as `https://blue-print-xyz.vercel.app`), not a deployment's own address: Vercel puts those behind its sign-in. |
 | `DATABASE_URL` | Yes | Neon's pooled connection string (step 2). |
+| `DATABASE_URL_UNPOOLED` | No | Neon's direct connection string. When set, database changes during deployment use it, as Neon recommends; otherwise they use `DATABASE_URL`. |
 | `APP_ENCRYPTION_KEY` | Yes | 32 random bytes, base64: `openssl rand -base64 32`. Encrypts two-factor keys. Keep a copy in the company password manager. |
 | `CRON_SECRET` | Yes | A long random value: `openssl rand -hex 32`. Vercel sends it with each scheduled job. |
 | `EMAIL_PROVIDER` | For email | `resend` |
