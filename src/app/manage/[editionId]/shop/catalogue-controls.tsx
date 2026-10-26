@@ -91,13 +91,13 @@ export function CategoryButton({
             <Textarea label="Description" value={v.description} onChange={(e) => setV({ ...v, description: e.currentTarget.value })} autosize minRows={2} maxLength={2000} />
             <Select
               label="Supplied by"
-              description="Orders in this category go to this supplier, who is paid through Stripe. Leave empty if Media10 provides it."
+              description="Orders in this category go to this supplier, who is paid through Stripe. Leave empty if you provide it yourselves."
               data={suppliers}
               value={v.supplierId}
               onChange={(x) => setV({ ...v, supplierId: x })}
               clearable
               searchable
-              placeholder="Media10"
+              placeholder="Provided by you"
             />
             <NumberInput
               label="Order by (days before build-up)"

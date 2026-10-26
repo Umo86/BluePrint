@@ -114,7 +114,7 @@ export async function buildWorkbook(sheets: SheetSpec[], about: { title: string;
     ['Downloaded', toLocalDateTimeString(new Date())?.slice(0, 16) ?? ''],
     ['Downloaded by', about.generatedFor],
     ...(about.filters?.length ? ([['Filters', about.filters.join('; ')]] as [string, string][]) : []),
-    ['Confidential', 'Contains personal and business information about exhibitors. Keep it within Media10 and delete it when you no longer need it.'],
+    ['Confidential', 'Contains personal and business information about exhibitors. Keep it within your organisation and delete it when you no longer need it.'],
   ];
   for (const [k, v] of lines) info.addRow([cleanText(k), cleanText(v)]).getCell(1).font = { bold: true };
   return Buffer.from(await wb.xlsx.writeBuffer());

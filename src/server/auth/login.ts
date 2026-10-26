@@ -22,8 +22,7 @@ export const MAX_PASSWORD_FAILURES = 10;
 export const PASSWORD_LOCK_MS = 15 * 60 * 1000;
 
 const GENERIC_CODE_ERROR = 'That code is wrong or has expired. Request a new one and try again.';
-const GENERIC_PASSWORD_ERROR =
-  'That email and password do not match. After several wrong tries password sign-in pauses for 15 minutes, but you can always sign in with an emailed code.';
+const GENERIC_PASSWORD_ERROR = 'That email and password do not match. After several wrong tries, password sign-in pauses for 15 minutes.';
 
 export type RequestContext = { ip?: string | null; userAgent?: string | null };
 
@@ -90,7 +89,7 @@ export async function issueEmailCode(email: string, opts: { userId?: string | nu
         ? 'If you did not ask to sign in, you can ignore this email. Nobody can sign in without the code.'
         : 'Enter it on the invitation page to finish setting up your account.',
     ],
-    footer: 'BluePrint, the Media10 exhibitor manual.',
+    footer: 'BluePrint, the online exhibitor manual.',
   });
   await sendEmail({
     to: email,
@@ -244,8 +243,8 @@ function assertRecentSignIn(session: { createdAt: Date } | null | undefined) {
 async function sendSecurityNotice(actor: Actor, heading: string, what: string) {
   const { html, text } = renderSimpleEmail({
     heading,
-    paragraphs: [what, 'If this was not you, sign in with an emailed code straight away and contact the Media10 show team.'],
-    footer: 'BluePrint, the Media10 exhibitor manual.',
+    paragraphs: [what, 'If this was not you, sign in with an emailed code straight away and contact your show team.'],
+    footer: 'BluePrint, the online exhibitor manual.',
   });
   await sendEmail({ to: actor.email, toUserId: actor.userId, templateKey: 'security_notice', category: 'security', subject: heading, html, text });
 }

@@ -4,7 +4,8 @@ import { getDb } from '../db/client';
 import { cronRuns, emailOutbox, emailSuppressions, stripeEvents } from '../db/schema';
 import { assertSuperAdmin } from '../authz';
 import { audit } from '../audit';
-import { emailMode, env, storageMode } from '../env';
+import { emailMode, env, storageMode, twoFactorOn } from '../env';
+import { getPlatformSettings } from './settings';
 import { deliverOutboxEmail } from '../email/send';
 import type { Actor } from '../auth/actor';
 
@@ -32,6 +33,7 @@ export async function systemStatus(actor: Actor) {
     .orderBy(desc(stripeEvents.receivedAt))
     .limit(30);
   const e = env();
+  const invoicing = (await getPlatformSettings()).invoicing;
   const config = {
     database: e.DATABASE_URL ? 'Postgres (Neon)' : 'Local PGlite',
     email: { resend: 'Resend (key set)', outbox: 'Local outbox only', off: 'Not set up: emails are recorded but not sent' }[emailMode()],
@@ -42,6 +44,8 @@ export async function systemStatus(actor: Actor) {
     assistant: e.ANTHROPIC_API_KEY ? 'Claude (key set)' : e.NODE_ENV === 'production' ? 'Not set up (no Claude API key)' : 'Practice mode (no Claude API key)',
     cron: e.CRON_SECRET ? 'Protected' : 'Secret missing',
     encryptionKey: e.APP_ENCRYPTION_KEY ? 'Set' : 'Development key in use',
+    twoFactor: twoFactorOn() ? 'Required for staff' : 'Switched off: staff sign in without a second step (TWO_FACTOR=off)',
+    invoiceDetails: invoicing.legalName && invoicing.address ? 'Set' : 'Not set up: add your company name and address in Platform settings',
   };
   return {
     emailByStatus: Object.fromEntries(emailByStatus.map((r) => [r.status, Number(r.n)])),

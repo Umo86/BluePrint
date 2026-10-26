@@ -90,7 +90,7 @@ async function makeSupplier(name: string, opts: { stripe?: boolean } = {}) {
   return { supplier: s, user, actor: actorFor(user) };
 }
 
-/** A show with a furniture category (supplier, 15% commission, 5 chairs in stock) and Media10's own cleaning. */
+/** A show with a furniture category (supplier, 15% commission, 5 chairs in stock) and the organiser's own cleaning. */
 async function shopFixture() {
   const { edition, shell, space } = await makeEdition();
   const admin = await makeStaff(edition.id, 'show_admin');
@@ -294,12 +294,12 @@ describe('card checkout and payouts', () => {
     const rival = await makeSupplier('Rival AV');
     await expect(supplierOrders(rival.actor, furnitureCo.supplier.id)).rejects.toThrow();
 
-    // Commission report: Media10 keeps 15% of furniture and all of its own cleaning.
+    // Commission report: the organiser keeps 15% of furniture and all of its own cleaning.
     const report = await commissionReport(adminActor, edition.id);
     const furnitureRow = report.suppliers.find((r) => r.key === furnitureCo.supplier.id)!;
     expect(furnitureRow).toMatchObject({ commissionPence: 1500, payoutPence: 10_200 });
     expect(furnitureRow.transfers?.sent).toBe(10_200);
-    expect(report.suppliers.find((r) => r.key === 'media10')?.commissionPence).toBe(4000);
+    expect(report.suppliers.find((r) => r.key === 'organiser')?.commissionPence).toBe(4000);
     const csv = await exportOrdersCsv(adminActor, edition.id);
     expect(csv.split('\r\n')).toHaveLength(3);
     expect(csv).toContain('PO-77');

@@ -3,6 +3,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { editionStaff, sessions, users } from '../db/schema';
 import { randomToken, sha256Hex } from '../security/crypto';
+import { twoFactorOn } from '../env';
 
 /** Staff sign in again after 12 idle hours (7 days at most); everyone else stays signed in for 30 days. */
 export const STAFF_IDLE_SECONDS = 12 * 3600;
@@ -15,13 +16,23 @@ const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 export type SessionUser = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 
-/** Staff (super admins and anyone on a show team) must use two-factor sign-in. */
+/** Staff (super admins and anyone on a show team) must use two-factor sign-in, unless it is switched off. */
 export async function isStaffUser(userId: string): Promise<boolean> {
   const db = await getDb();
   const [u] = await db.select({ isSuperAdmin: users.isSuperAdmin }).from(users).where(eq(users.id, userId)).limit(1);
   if (u?.isSuperAdmin) return true;
   const [s] = await db.select({ userId: editionStaff.userId }).from(editionStaff).where(eq(editionStaff.userId, userId)).limit(1);
   return Boolean(s);
+}
+
+/**
+ * What a signed-in person still has to do before their session unlocks anything: set up two-factor
+ * (staff without it) or pass the check (anyone who has it). Nothing while TWO_FACTOR=off, even for
+ * people who already have an authenticator set up.
+ */
+export function twoFactorSteps(p: { isStaff: boolean; totpEnabledAt: Date | null; twoFactorVerified: boolean }) {
+  if (!twoFactorOn()) return { needsTwoFactorSetup: false, needsSecondFactor: false };
+  return { needsTwoFactorSetup: p.isStaff && !p.totpEnabledAt, needsSecondFactor: Boolean(p.totpEnabledAt) && !p.twoFactorVerified };
 }
 
 export async function createSession(
@@ -47,8 +58,9 @@ export async function createSession(
       userId,
       expiresAt,
       idleTimeoutSeconds: staff ? STAFF_IDLE_SECONDS : MEMBER_IDLE_SECONDS,
-      // Staff, and anyone who has turned two-factor on, must pass the check before the session unlocks anything.
-      twoFactorVerified: opts.twoFactorVerified ?? (!staff && !owner?.totpEnabledAt),
+      // Staff, and anyone who has turned two-factor on, must pass the check before the session unlocks
+      // anything, unless two-factor is switched off for everyone (TWO_FACTOR=off).
+      twoFactorVerified: opts.twoFactorVerified ?? (!twoFactorOn() || (!staff && !owner?.totpEnabledAt)),
       ip: opts.ip ?? null,
       userAgent: opts.userAgent?.slice(0, 300) ?? null,
       ...(opts.signedInAt ? { createdAt: opts.signedInAt } : {}),

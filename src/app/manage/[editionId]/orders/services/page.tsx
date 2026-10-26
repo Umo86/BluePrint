@@ -22,10 +22,10 @@ export default async function ServicesByStand({ params, searchParams }: PageProp
   const { lines } = await servicesForEdition(actor, edition.id);
   const categories = await shopCategoriesForFilters(actor, edition.id);
   const notOrdered = await Promise.all(categories.map(async (c) => ({ ...c, stands: (await standsWithoutOrderFrom(edition.id, c.id)).size })));
-  const supplierNames = [...new Set(lines.map((l) => l.supplierName ?? 'Media10'))].sort((a, b) => a.localeCompare(b, 'en-GB'));
+  const supplierNames = [...new Set(lines.map((l) => l.supplierName ?? 'Organiser'))].sort((a, b) => a.localeCompare(b, 'en-GB'));
   const shown = lines.filter(
     (l) =>
-      (supplier === 'all' || (l.supplierName ?? 'Media10') === supplier) &&
+      (supplier === 'all' || (l.supplierName ?? 'Organiser') === supplier) &&
       (!q || [l.standNumber, l.companyName ?? '', l.line.description, l.hallName ?? ''].some((v) => v.toLowerCase().includes(q))),
   );
   const products = totalsByProduct(shown);
@@ -127,7 +127,7 @@ export default async function ServicesByStand({ params, searchParams }: PageProp
                       <Text fz="sm">{l.line.quantity}</Text>
                     </TableTd>
                     <TableTd>
-                      <Text fz="sm">{l.supplierName ?? 'Media10'}</Text>
+                      <Text fz="sm">{l.supplierName ?? 'Organiser'}</Text>
                     </TableTd>
                     <TableTd>
                       <Badge variant="light" color={FULFILMENT_COLORS[l.line.fulfilmentStatus]}>

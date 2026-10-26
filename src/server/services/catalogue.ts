@@ -26,7 +26,7 @@ import { assertRateLimit } from '../security/rate-limit';
 import type { Actor } from '../auth/actor';
 
 /**
- * The services shop catalogue: categories (each fulfilled by one supplier, or by Media10 itself)
+ * The services shop catalogue: categories (each fulfilled by one supplier, or by the organiser itself)
  * and their products. Show teams with "manage orders" run it; suppliers add their own products,
  * which only go on sale once the show team approves them.
  */

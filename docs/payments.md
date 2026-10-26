@@ -4,12 +4,12 @@ How money moves through BluePrint's services shop, and how to connect Stripe. **
 
 ## The money model
 
-- **Media10 is the seller of record.** The exhibitor pays Media10 and gets one VAT invoice from Media10 for the whole order, whichever suppliers fulfil it. Numbers are gap-free sequences: orders `ORD-000001`, invoices `INV-000001`, credit notes `CRN-000001`.
-- **Suppliers are paid their share.** For each order line: the net price, minus Media10's commission, plus VAT on that share when the supplier is VAT registered (their own supply to Media10). Suppliers who are not VAT registered (switch in Super admin → Suppliers) are paid their share only.
+- **The organiser is the seller of record.** The exhibitor pays the organiser and gets one VAT invoice from the organiser for the whole order, whichever suppliers fulfil it. Numbers are gap-free sequences: orders `ORD-000001`, invoices `INV-000001`, credit notes `CRN-000001`.
+- **Suppliers are paid their share.** For each order line: the net price, minus the organiser's commission, plus VAT on that share when the supplier is VAT registered (their own supply to the organiser). Suppliers who are not VAT registered (switch in Super admin → Suppliers) are paid their share only.
 - **Commission** is the first of these that is set: product, category, supplier, edition, platform default. Percentages are in basis points (1000 = 10%); a fixed amount is per order line. Only show admins and super admins can change commission.
-- **Lines Media10 provides itself** (categories with no supplier, such as stand cleaning) are 100% Media10's.
+- **Lines the organiser provides itself** (categories with no supplier, such as stand cleaning) are 100% the organiser's.
 - **Card fee** (Platform settings, overridable per edition):
-  - *Exhibitor pays it on top*: a "Card processing fee" line is added so that, after Stripe's percentage and fixed fee, Media10 still receives the order total. Shown as a separate line with no VAT. **Check the VAT treatment with your accountant.** UK law bans surcharges on consumer cards; exhibitors are businesses, but confirm before switching this on.
+  - *Exhibitor pays it on top*: a "Card processing fee" line is added so that, after Stripe's percentage and fixed fee, the organiser still receives the order total. Shown as a separate line with no VAT. **Check the VAT treatment with your accountant.** UK law bans surcharges on consumer cards; exhibitors are businesses, but confirm before switching this on.
   - *Taken from the supplier's share*: no extra charge; Stripe's fee is split across the order's lines in proportion to their value and each supplier receives that much less.
 - **Prices** are entered before VAT. Products can have an early-bird price (until N days before build-up) and a late price (from N days before build-up). The price on the order is the one that applied when it was placed; later product edits never change placed orders.
 
@@ -25,7 +25,7 @@ Stock limits are checked with the products locked, so two exhibitors cannot buy 
 
 ## Supplier payouts (Stripe Connect)
 
-Separate charges and transfers: Media10 takes the payment into its own Stripe account, then transfers each supplier's share to the supplier's Stripe Express account, tied to the original charge (`source_transaction`), so a transfer never pays out money that has not arrived.
+Separate charges and transfers: the organiser takes the payment into its own Stripe account, then transfers each supplier's share to the supplier's Stripe Express account, tied to the original charge (`source_transaction`), so a transfer never pays out money that has not arrived.
 
 - Suppliers connect from **Supplier portal → Payouts → Set up payouts with Stripe**. Stripe collects their identity and bank details; BluePrint stores only the account id (`acct_…`) and whether payouts are switched on.
 - Until a supplier finishes set-up, their payouts wait. They are sent automatically when Stripe reports the account ready (webhook), when the supplier presses "Check status", or when someone retries from the order page or **Super admin → Payments**.

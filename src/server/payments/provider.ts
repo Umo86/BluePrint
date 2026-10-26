@@ -4,7 +4,7 @@ import { env, localProductionAllowed } from '../env';
 
 /**
  * Card payments and supplier payouts. In production this is Stripe Connect with separate charges
- * and transfers: Media10 takes the payment, then transfers each supplier's share to their own
+ * and transfers: the organiser takes the payment, then transfers each supplier's share to their own
  * Stripe account. Locally (no Stripe key) a simulator stands in so everything can be tried safely.
  */
 

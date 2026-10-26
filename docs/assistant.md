@@ -35,11 +35,11 @@ It also **reminds**: when a task reaches a reminder step (14, 7 and 1 days befor
 - Links in replies are only clickable when they point into BluePrint or to an https website, and links to other websites always show their real address next to the link. Replies cannot contain HTML.
 - Limits: 30 questions per person per hour and 150 a day, and a daily ceiling per show (Super admin → Platform settings). If Claude is unavailable, the exhibitor gets a friendly message and nothing is saved.
 - Conversations are kept for 12 months by default (Platform settings → Data retention), then deleted by the nightly tidy-up. Only people with the help desk permission can read conversations, and each time they do it is recorded in the audit log. The portal tells exhibitors that the show team can read their conversations.
-- Requests go to Anthropic's Claude API. Under Anthropic's [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), Anthropic may not train models on customer content sent through the API, and the data is handled under Anthropic's Data Processing Addendum. Add Anthropic as a sub-processor in Media10's privacy notice and records of processing.
+- Requests go to Anthropic's Claude API. Under Anthropic's [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), Anthropic may not train models on customer content sent through the API, and the data is handled under Anthropic's Data Processing Addendum. Add Anthropic as a sub-processor in your privacy notice and records of processing.
 
 ### Setting it up
 
-1. Create an API key in the Claude Console (platform.claude.com) for a Media10 workspace, ideally with a monthly spend limit.
+1. Create an API key in the Claude Console (platform.claude.com) for your organisation's workspace, ideally with a monthly spend limit.
 2. Set `ANTHROPIC_API_KEY` in the production environment.
 3. Super admin → **Platform settings → Assistant and notices**: switch it on, choose the model and effort, and set the daily ceiling per show.
    - **Claude Sonnet 5.5** (default) gives the best balance of quality, speed and cost.

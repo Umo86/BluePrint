@@ -88,8 +88,8 @@ export function SettingsForms({ settings }: { settings: PlatformSettings }) {
       </Section>
 
       <Section
-        title="Media10 commission"
-        description="The default share Media10 keeps from each supplier order. Editions, suppliers, categories and products can override it."
+        title="Commission"
+        description="The default share you keep from each supplier order. Editions, suppliers, categories and products can override it."
         pending={busy('commission')}
         onSave={() => run('commission', { defaultCommissionType: s.defaultCommissionType, defaultCommissionValue: s.defaultCommissionValue })}
       >
@@ -114,7 +114,7 @@ export function SettingsForms({ settings }: { settings: PlatformSettings }) {
 
       <Section
         title="Invoices"
-        description="Media10 is the seller on every order, so these details are printed on every VAT invoice and credit note."
+        description="You are the seller on every order, so these details are printed on every VAT invoice and credit note."
         pending={busy('invoicing')}
         onSave={() => run('invoicing', { invoicing: s.invoicing })}
       >
@@ -181,7 +181,7 @@ export function SettingsForms({ settings }: { settings: PlatformSettings }) {
           <TextInput label="Sender name" value={s.emailDefaults.senderName} onChange={(e) => setS({ ...s, emailDefaults: { ...s.emailDefaults, senderName: e.currentTarget.value } })} />
           <TextInput
             label="Sender address"
-            placeholder="noreply@blueprint.media10.co.uk"
+            placeholder="noreply@mail.yourshow.com"
             value={s.emailDefaults.senderAddress}
             onChange={(e) => setS({ ...s, emailDefaults: { ...s.emailDefaults, senderAddress: e.currentTarget.value } })}
           />

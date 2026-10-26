@@ -36,7 +36,7 @@ export function SiteFooter() {
       <div className={`${styles.container} ${styles.footerInner}`}>
         <div className={styles.footerBrand}>
           <BrandMark size="md" tone="white" />
-          <p style={{ margin: 0 }}>The exhibitor manual and service-ordering platform for Media10 shows.</p>
+          <p style={{ margin: 0 }}>The exhibitor manual and service-ordering platform for exhibition organisers.</p>
         </div>
         <nav aria-label="Footer">
           <ul className={styles.footerLinks}>
@@ -52,7 +52,7 @@ export function SiteFooter() {
           </ul>
         </nav>
       </div>
-      <div className={`${styles.container} ${styles.footerSmall}`}>BluePrint is made and run by Media10.</div>
+      <div className={`${styles.container} ${styles.footerSmall}`}>© {new Date().getFullYear()} BluePrint</div>
     </footer>
   );
 }

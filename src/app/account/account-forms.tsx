@@ -10,6 +10,8 @@ type Props = {
   profile: { name: string; email: string; phone: string; jobTitle: string };
   hasPassword: boolean;
   twoFactorEnabled: boolean;
+  /** False while two-factor sign-in is switched off for everyone (then the section is hidden). */
+  twoFactorAvailable: boolean;
   isStaff: boolean;
   recoveryCodesLeft: number;
   currentSessionId: string;
@@ -102,32 +104,34 @@ export function AccountForms(props: Props) {
         </Stack>
       </Paper>
 
-      <Paper withBorder p="lg">
-        <Stack>
-          <Group justify="space-between">
-            <Title order={2} fz="lg">
-              Two-factor sign-in
-            </Title>
-            {props.twoFactorEnabled ? <Badge color="green">On</Badge> : <Badge color="gray">Off</Badge>}
-          </Group>
-          {props.twoFactorEnabled ? (
-            <Text fz="sm">
-              Your authenticator app is set up. You have {props.recoveryCodesLeft} recovery code{props.recoveryCodesLeft === 1 ? '' : 's'} left.
-            </Text>
-          ) : props.isStaff ? (
-            <Alert color="orange">Staff accounts must use two-factor sign-in.</Alert>
-          ) : (
-            <Text fz="sm">Add a second step at sign-in using an authenticator app.</Text>
-          )}
-          {!props.twoFactorEnabled ? (
-            <Group>
-              <Button component={Link} href="/two-factor-setup" variant="light">
-                Set up two-factor sign-in
-              </Button>
+      {props.twoFactorAvailable ? (
+        <Paper withBorder p="lg">
+          <Stack>
+            <Group justify="space-between">
+              <Title order={2} fz="lg">
+                Two-factor sign-in
+              </Title>
+              {props.twoFactorEnabled ? <Badge color="green">On</Badge> : <Badge color="gray">Off</Badge>}
             </Group>
-          ) : null}
-        </Stack>
-      </Paper>
+            {props.twoFactorEnabled ? (
+              <Text fz="sm">
+                Your authenticator app is set up. You have {props.recoveryCodesLeft} recovery code{props.recoveryCodesLeft === 1 ? '' : 's'} left.
+              </Text>
+            ) : props.isStaff ? (
+              <Alert color="orange">Staff accounts must use two-factor sign-in.</Alert>
+            ) : (
+              <Text fz="sm">Add a second step at sign-in using an authenticator app.</Text>
+            )}
+            {!props.twoFactorEnabled ? (
+              <Group>
+                <Button component={Link} href="/two-factor-setup" variant="light">
+                  Set up two-factor sign-in
+                </Button>
+              </Group>
+            ) : null}
+          </Stack>
+        </Paper>
+      ) : null}
 
       <Paper withBorder p="lg">
         <Stack>

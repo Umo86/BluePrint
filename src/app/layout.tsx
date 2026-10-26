@@ -17,7 +17,7 @@ import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: { default: 'BluePrint', template: '%s · BluePrint' },
-  description: 'The Media10 exhibitor manual and service ordering platform.',
+  description: 'The exhibitor manual and service-ordering platform for exhibition organisers.',
   robots: { index: false, follow: false },
 };
 

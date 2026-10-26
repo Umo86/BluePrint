@@ -7,18 +7,18 @@ import { getCurrentAuth } from '@/server/auth/current';
 
 export const metadata: Metadata = {
   title: 'About',
-  description: 'Why Media10 built BluePrint, and how it is made.',
+  description: 'Why BluePrint exists, and how it is made.',
 };
 
 // Set out like the title block in the corner of a drawing.
 const TITLE_BLOCK: { label: string; value: string; wide?: boolean }[] = [
   { label: 'Project', value: 'BluePrint', wide: true },
-  { label: 'Made by', value: 'Media10' },
+  { label: 'Scale', value: 'One show or many' },
   { label: 'Hosted in', value: 'London' },
-  { label: 'For', value: 'Exhibitors, stand contractors, suppliers and show teams', wide: true },
-  { label: 'Shows', value: 'UK Construction Week, Futurebuild, Stone & Surface', wide: true },
+  { label: 'For', value: 'Exhibition organisers and their teams', wide: true },
+  { label: 'Used by', value: 'Exhibitors, stand contractors and suppliers', wide: true },
   { label: 'Accessibility', value: 'Tested to WCAG 2.2 AA', wide: true },
-  { label: 'Sign-in', value: 'Emailed codes, with two-factor for staff', wide: true },
+  { label: 'Sign-in', value: 'Email and password, or an emailed code', wide: true },
 ];
 
 const PRINCIPLES = [
@@ -36,7 +36,7 @@ const PRINCIPLES = [
   {
     icon: IconShieldCheck,
     title: 'Careful with data',
-    text: 'Two-factor sign-in for staff, private files, a full audit log, and tools for handling data protection requests.',
+    text: 'Careful sign-in, private files, a full audit log, and tools for handling data protection requests.',
   },
 ];
 
@@ -52,11 +52,11 @@ export default async function AboutPage() {
             About BluePrint.
           </p>
           <h1 id="about-title" className={styles.display}>
-            Made for Media10 shows <span className={styles.displaySans}>and the people who build them</span>
+            Made for organisers <span className={styles.displaySans}>and the people who build their shows</span>
           </h1>
           <p className={styles.lede}>
-            BluePrint is Media10’s own exhibitor manual and service-ordering platform. Every stand has one record that the exhibitor, their contractor, the
-            suppliers and the show team all work from.
+            BluePrint is an exhibitor manual and service-ordering platform for exhibition organisers. Every stand has one record that the exhibitor, their
+            contractor, the suppliers and the organiser’s team all work from.
           </p>
           <dl className={styles.titleBlock}>
             {TITLE_BLOCK.map((c) => (
@@ -83,12 +83,12 @@ export default async function AboutPage() {
               stand, having the design and the safety documents approved before anyone can build.
             </p>
             <p className={styles.body}>
-              When all of that is spread across a PDF manual, separate order forms and long email threads, things get missed, and the show team spends the
-              last weeks before build-up chasing.
+              When all of that is spread across a PDF manual, separate order forms and long email threads, things get missed, and the organiser’s team
+              spends the last weeks before build-up chasing.
             </p>
             <p className={styles.body}>
               BluePrint keeps it on one record for each stand. Exhibitors see only what applies to them, with every deadline in one checklist. Contractors and
-              suppliers see the stands they work on. The show team can see at a glance who is on track and who needs a reminder.
+              suppliers see the stands they work on. The organiser can see at a glance who is on track and who needs a reminder.
             </p>
           </div>
         </div>

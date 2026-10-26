@@ -55,6 +55,13 @@ const schema = z.object({
   // First super admin, created by `npm run bootstrap`
   BOOTSTRAP_SUPER_ADMIN_EMAIL: z.string().email().optional(),
 
+  // Two-factor sign-in for staff: "on" (the default) or "off". While it is off, nobody is asked to set up
+  // or use an authenticator app, including people who already have one. Turn it back on before launch.
+  TWO_FACTOR: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() ? (['off', 'false', '0', 'no'].includes(v.trim().toLowerCase()) ? 'off' : 'on') : undefined),
+    z.enum(['on', 'off']).default('on'),
+  ),
+
   // A test login shown on the sign-in page while the site is being tried out. Remove both (and the
   // account) when testing is over.
   TEST_LOGIN_EMAIL: z.string().trim().email().optional(),
@@ -134,6 +141,11 @@ export function storageMode(): 'r2' | 'local' | 'off' {
   if (e.STORAGE_PROVIDER === 'r2' && e.R2_ACCOUNT_ID && e.R2_ACCESS_KEY_ID && e.R2_SECRET_ACCESS_KEY && e.R2_BUCKET) return 'r2';
   if (liveSite(e) || e.STORAGE_PROVIDER === 'r2') return 'off';
   return 'local';
+}
+
+/** Whether staff must use two-factor sign-in (TWO_FACTOR=off switches it off for everyone). */
+export function twoFactorOn() {
+  return env().TWO_FACTOR === 'on';
 }
 
 /** For tests only. */

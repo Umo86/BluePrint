@@ -10,7 +10,7 @@ import { localPath } from '@/lib/safe-redirect';
 import { memberCovers } from '../authz';
 import { AppError } from '../errors';
 import type { Actor } from './actor';
-import { createSession, isStaffUser, revokeSession, validateSessionToken, type SessionRow, type SessionUser } from './sessions';
+import { createSession, isStaffUser, revokeSession, twoFactorSteps, validateSessionToken, type SessionRow, type SessionUser } from './sessions';
 import type { RequestContext } from './login';
 
 const COOKIE_NAME_PROD = '__Host-bp_session';
@@ -110,9 +110,7 @@ export const getCurrentAuth = cache(async (): Promise<CurrentAuth | null> => {
   }
   const ctx = await requestContext();
   const isStaff = await isStaffUser(user.id);
-  const needsTwoFactorSetup = isStaff && !user.totpEnabledAt;
-  // Anyone with two-factor turned on must pass it, staff or not.
-  const needsSecondFactor = Boolean(user.totpEnabledAt) && !session.twoFactorVerified;
+  const { needsTwoFactorSetup, needsSecondFactor } = twoFactorSteps({ isStaff, totpEnabledAt: user.totpEnabledAt, twoFactorVerified: session.twoFactorVerified });
 
   const actor: Actor = viewAsUser
     ? {

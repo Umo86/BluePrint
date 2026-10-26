@@ -15,7 +15,7 @@ export default async function ShowsPage() {
     <Stack>
       <PageHeader
         title="Shows and editions"
-        description="A show (such as UK Construction Week) has an edition for each year and venue. Clone last year's edition to start the next one."
+        description="A show has an edition for each year and venue. Clone last year's edition to start the next one."
         actions={<NewShowButton />}
       />
       {shows.length === 0 ? <EmptyState title="No shows yet" description="Create your first show, then add an edition." /> : null}

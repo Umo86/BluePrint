@@ -17,7 +17,7 @@ export default async function SupplierPayoutsPage({ params, searchParams }: Page
   const s = o.supplier.stripe;
   return (
     <Stack>
-      <PageHeader title="Payouts" description="Your share of each paid order. Card orders are paid to your bank through Stripe; orders paid on invoice are paid by Media10's finance team by bank transfer." />
+      <PageHeader title="Payouts" description="Your share of each paid order. Card orders are paid to your bank through Stripe; orders paid on invoice are paid by the organiser by bank transfer." />
       {sp.stripe === 'return' && !s.payoutsEnabled ? <Alert color="yellow">Thanks. If Stripe still needs anything it will say so; press “Check status” to see the latest.</Alert> : null}
       <Paper withBorder p="md">
         <Group justify="space-between" align="flex-start">

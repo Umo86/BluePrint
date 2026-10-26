@@ -117,7 +117,7 @@ function CommercialForm({ edition, platformFeeMode, platformCommission }: { edit
             UK rules ban card surcharges on consumer cards. Agree with finance before adding the fee on top.
           </Alert>
           <Text fw={600} mt="sm">
-            Default Media10 commission for this edition
+            Default commission for this edition
           </Text>
           <Switch
             label={`Use the platform default (${commissionLabel(platformCommission.type, platformCommission.value)})`}

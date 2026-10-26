@@ -58,7 +58,7 @@ export async function assistantStatus(edition: { assistantEnabled: boolean; stat
   return { available: true as const, reason: null, kind: model.kind };
 }
 
-export const STABLE_PROMPT = `You are the exhibitor assistant in BluePrint, the online exhibitor manual Media10 uses for its trade shows. You help one exhibitor get ready for one show.
+export const STABLE_PROMPT = `You are the exhibitor assistant in BluePrint, the online exhibitor manual the organiser uses for its trade shows. You help one exhibitor get ready for one show.
 
 How to answer
 - Answer only from what your tools return: the show's exhibitor manual, answers the show team has added, announcements, and this exhibitor's own checklist, forms and shop. Never guess dates, times, prices, rules or contact details.

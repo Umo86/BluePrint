@@ -563,7 +563,7 @@ function EmailForm({ editionId, initial }: { editionId: string; initial: EmailVa
             subdomain for campaigns so marketing never affects deadline and order emails.
           </Alert>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <TextInput label="Sender name" placeholder="UKCW Exhibitor Team" value={f.senderName} onChange={(e) => setF({ ...f, senderName: e.currentTarget.value })} />
+            <TextInput label="Sender name" placeholder="Spring Trade Expo Exhibitor Team" value={f.senderName} onChange={(e) => setF({ ...f, senderName: e.currentTarget.value })} />
             <TextInput
               label="Sender address"
               placeholder={`Leave empty to use ${f.platformDefault}`}

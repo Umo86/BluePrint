@@ -1,6 +1,6 @@
 /**
  * Creates the first super admin and prints an invitation link.
- *   BOOTSTRAP_SUPER_ADMIN_EMAIL=you@media10.co.uk npm run bootstrap
+ *   BOOTSTRAP_SUPER_ADMIN_EMAIL=you@example.com npm run bootstrap
  * The invitation asks for an emailed code and then two-factor set-up.
  */
 import { eq } from 'drizzle-orm';

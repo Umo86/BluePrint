@@ -15,7 +15,7 @@ export default async function SuppliersPage() {
     <Stack>
       <PageHeader
         title="Suppliers"
-        description="Official contractors who sell services through BluePrint (furniture, electrics, AV, cleaning and so on). Each one is paid out through their own Stripe account, less Media10’s commission."
+        description="Official contractors who sell services through BluePrint (furniture, electrics, AV, cleaning and so on). Each one is paid out through their own Stripe account, less your commission."
         actions={<NewSupplierButton />}
       />
       <Paper withBorder>

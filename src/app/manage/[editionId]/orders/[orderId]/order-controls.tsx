@@ -68,7 +68,7 @@ export function RefundButton({ orderId, lines, cardFeeRefundable, viaCard }: { o
                   <Table.Td>
                     <Text fz="sm">Card processing fee</Text>
                     <Text fz="xs" c="dimmed">
-                      Up to {money(cardFeeRefundable)}. Stripe does not return its fee to Media10.
+                      Up to {money(cardFeeRefundable)}. Stripe does not return its own fee.
                     </Text>
                   </Table.Td>
                   <Table.Td>

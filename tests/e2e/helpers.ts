@@ -46,6 +46,7 @@ export async function latestCode(page: Page, email: string): Promise<string> {
 export async function signInWithCode(page: Page, email: string) {
   await page.goto('/sign-in');
   await page.locator('html[data-ready="true"]').waitFor({ state: 'attached' });
+  await page.getByRole('button', { name: 'No password? Email me a sign-in code' }).click();
   await page.getByLabel('Work email').fill(email);
   await page.getByRole('button', { name: 'Email me a code' }).click();
   await expect(page.getByText('a code is on its way')).toBeVisible();

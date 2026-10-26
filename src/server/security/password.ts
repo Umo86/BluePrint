@@ -28,7 +28,6 @@ const COMMON_PASSWORDS = new Set([
   'changeme1234',
   'blueprint123',
   'blueprint1234',
-  'media10media10',
 ]);
 
 export function passwordProblems(password: string, email?: string): string | null {

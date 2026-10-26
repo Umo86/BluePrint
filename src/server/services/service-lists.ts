@@ -60,7 +60,7 @@ export function totalsByProduct(lines: OrderLineRow[]) {
   const products = new Map<string, { key: string; item: string; supplier: string; quantity: number; delivered: number; stands: string[] }>();
   for (const r of lines) {
     const key = `${r.line.productId ?? r.line.description}|${r.line.supplierId ?? ''}`;
-    const p = products.get(key) ?? { key, item: r.line.description, supplier: r.supplierName ?? 'Media10', quantity: 0, delivered: 0, stands: [] };
+    const p = products.get(key) ?? { key, item: r.line.description, supplier: r.supplierName ?? 'Organiser', quantity: 0, delivered: 0, stands: [] };
     p.quantity += r.line.quantity;
     if (r.line.fulfilmentStatus === 'delivered') p.delivered += r.line.quantity;
     if (!p.stands.includes(r.standNumber)) p.stands.push(r.standNumber);

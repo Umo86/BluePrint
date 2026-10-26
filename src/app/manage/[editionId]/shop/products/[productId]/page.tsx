@@ -34,7 +34,7 @@ export default async function EditProduct({ params }: PageProps<'/manage/[editio
         title={p.name}
         description={
           <>
-            {detail.supplier ? `Supplied by ${detail.supplier.name}` : 'Provided by Media10'} · {detail.sold} sold
+            {detail.supplier ? `Supplied by ${detail.supplier.name}` : 'Provided by you'} · {detail.sold} sold
           </>
         }
         actions={

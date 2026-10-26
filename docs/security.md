@@ -1,16 +1,18 @@
 # Security
 
-How BluePrint protects accounts and data, what was checked before launch, and what Media10 needs to do to keep it secure. For setting the site up, see [deployment](deployment.md).
+How BluePrint protects accounts and data, what was checked before launch, and what the organiser running it needs to do to keep it secure. For setting the site up, see [deployment](deployment.md).
 
 BluePrint holds personal and commercial information about exhibitors, contractors and suppliers: names and contact details, stand plans, risk assessments and insurance documents, orders, invoices, help desk messages and assistant conversations. Card details never reach BluePrint.
 
 ## Signing in
 
-- **Emailed codes.** People sign in with a six-digit code sent to their work email. Each code works once, for 10 minutes, and allows five tries.
+The sign-in page asks for an email address and password. People without a password can have a code emailed to them instead (the link is shown only when email sending is set up).
+
+- **Emailed codes.** People can sign in with a six-digit code sent to their work email. Each code works once, for 10 minutes, and allows five tries.
   - **Asking for codes.** An address can get five codes every 15 minutes from each network, and 30 an hour in all. One network (a venue or an office) can ask for up to 100 codes every 15 minutes, so a whole build-up crew on the venue Wi-Fi is not blocked.
   - **Guessing.** An address allows ten guesses every 15 minutes and 100 a day. Guesses only count while a code is actually waiting, so strangers can't lock someone out by typing wrong codes for them.
 - **Passwords (optional).** Passwords must be at least 12 characters and not a known common password. They are stored with Argon2id. After ten wrong passwords, password sign-in pauses for 15 minutes; codes still work. A password can only be set or removed within 15 minutes of signing in, and the person gets an email whenever it changes.
-- **Two-factor sign-in.** Every super admin and show team member must use an authenticator app (with ten single-use recovery codes). Exhibitors, contractors and suppliers can turn it on too, and from then on it is always asked for. Like a password, it can only be turned on within 15 minutes of signing in, so someone at a borrowed, open browser can't lock the owner out. Turning it on signs out the person's other devices and emails them.
+- **Two-factor sign-in.** With `TWO_FACTOR=off` it is switched off for everyone: nobody is asked to set up or use an authenticator app, and the super admin overview flags it. **Turn it back on before real exhibitor data goes in** (remove the setting and redeploy). When on, every super admin and show team member must use an authenticator app (with ten single-use recovery codes). Exhibitors, contractors and suppliers can turn it on too, and from then on it is always asked for. Like a password, it can only be turned on within 15 minutes of signing in, so someone at a borrowed, open browser can't lock the owner out. Turning it on signs out the person's other devices and emails them.
 - **No clues for attackers.** The sign-in page answers the same way, and takes the same time, whether or not an address has an account.
 - **Sessions.** Each sign-in gets a new random 256-bit token, stored only as a fingerprint (hash). The cookie can't be read by page scripts, is only sent over HTTPS, and isn't sent by other websites. Passing two-factor issues a fresh token. Staff are signed out after 12 hours of inactivity and after 7 days in all; everyone else after 30 days. People can see their devices and sign them out (Account and security). Super admins can sign anyone out everywhere or disable an account, which ends all of its sessions at once.
 
@@ -52,7 +54,7 @@ Every request is checked on the server against the person's role and the record 
 - **Storage.** Files are kept privately in Cloudflare R2 under names BluePrint generates. Browsers upload directly with a link that lasts ten minutes.
 - **Downloads.** BluePrint first checks the person may see the file, then hands out a link that lasts one minute and is served from the storage address, not BluePrint's own. Only logos, branding and product photos are public.
 - **Internal notes.** Files added to an internal help desk note can never be opened by the exhibitor.
-- **Not virus-scanned.** Staff should open exhibitors' documents with normal care. Add a scanning service if Media10's IT policy needs one.
+- **Not virus-scanned.** Staff should open exhibitors' documents with normal care. Add a scanning service if your IT policy needs one.
 
 ## Payments
 
@@ -113,7 +115,7 @@ See [assistant](assistant.md).
   - Neon and R2 encrypt everything they store.
   - Two-factor keys are encrypted again with AES-256-GCM under `APP_ENCRYPTION_KEY`.
   - Codes, tokens and recovery codes are stored only as fingerprints (hashes).
-- **Sub-processors.** Media10's privacy notice and records of processing should name:
+- **Sub-processors.** Your privacy notice and records of processing should name:
   - Vercel (hosting);
   - Neon (database, London);
   - Cloudflare (files);
@@ -159,16 +161,16 @@ See [assistant](assistant.md).
 
 ## Keeping it secure
 
-- **Before launch, and yearly after.** Have an independent penetration test done by a CREST-accredited tester. Align with Cyber Essentials if Media10 holds it.
+- **Before launch, and yearly after.** Have an independent penetration test done by a CREST-accredited tester. Align with Cyber Essentials if your organisation holds it.
 - **Accounts.** Turn on two-factor for every Vercel, Neon, Cloudflare, Stripe, Resend and Anthropic account. Give access to as few people as possible. Keep at least two super admins.
-- **Leavers.** When someone leaves Media10, disable their BluePrint account and remove them from the service accounts.
+- **Leavers.** When someone leaves your organisation, disable their BluePrint account and remove them from the service accounts.
 - **Updates.** Check dependency updates monthly (`npm audit`, or GitHub's Dependabot), and apply security updates promptly.
 - **Monitoring.** Watch Vercel's logs and BluePrint's audit log for unusual activity. Stripe and Resend both send alerts for problems.
 - **Incidents.** If you suspect a breach:
   - revoke the affected keys;
   - disable or sign out the accounts involved;
   - keep the audit log;
-  - follow Media10's breach procedure. Personal data breaches may need reporting to the ICO within 72 hours.
+  - follow your organisation's breach procedure. Personal data breaches may need reporting to the ICO within 72 hours.
 
 ## Known limits
 

@@ -1,6 +1,6 @@
 # BluePrint
 
-BluePrint is Media10's online exhibitor manual and service-ordering platform for its shows (UK Construction Week, Futurebuild, Stone & Surface and any new ones).
+BluePrint is an online exhibitor manual and service-ordering platform for exhibition organisers. One site holds all of an organiser's shows, each with its own branding, manual, suppliers and team.
 
 - **Exhibitors** see the manual and the tasks for their stand type (shell scheme or space only), fill in forms, upload documents, order services, ask the show team questions and use the assistant.
 - **Contractors** for space-only stands prepare and send the stand pack for health and safety review.
@@ -29,7 +29,7 @@ npm run seed    # demo shows, exhibitors, suppliers and staff
 npm run dev
 ```
 
-Open http://localhost:3000 (the public homepage; the about page is at `/about`), choose **Sign in** and sign in as `admin@blueprint.test`. Sign-in codes appear in the local mailbox at http://localhost:3000/dev/mailbox, and the seed prints the two-factor key to add to an authenticator app. It also prints demo exhibitor, supplier and show admin accounts.
+Open http://localhost:3000 (the public homepage; the about page is at `/about`), choose **Sign in**, then **No password? Email me a sign-in code**, and sign in as `admin@blueprint.test`. Sign-in codes appear in the local mailbox at http://localhost:3000/dev/mailbox, and the seed prints the two-factor key to add to an authenticator app. It also prints demo exhibitor, supplier and show admin accounts.
 
 On your computer BluePrint needs no accounts or keys: the database is an embedded Postgres in `.data/`, files are kept in `.data/files`, email goes to the local mailbox, a payment simulator stands in for Stripe and the assistant runs in practice mode. None of these stand-ins can run on a live site.
 

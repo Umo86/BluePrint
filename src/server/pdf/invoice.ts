@@ -85,7 +85,7 @@ function tableHeader(c: Ctx) {
   c.y -= 22;
 }
 
-/** Renders a VAT invoice or credit note as an A4 PDF. Media10 is the seller on every document. */
+/** Renders a VAT invoice or credit note as an A4 PDF. The organiser is the seller on every document. */
 export async function renderInvoice(doc: InvoiceDocument): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const title = doc.kind === 'invoice' ? 'Invoice' : 'Credit note';

@@ -26,7 +26,7 @@ export default async function Reports({ params }: PageProps<'/manage/[editionId]
     <Stack>
       <PageHeader
         title="Reports"
-        description="Download up-to-date Excel files for this show. Each download is recorded. The files contain personal information about exhibitors, so keep them within Media10 and delete them when you no longer need them."
+        description="Download up-to-date Excel files for this show. Each download is recorded. The files contain personal information about exhibitors, so keep them within your organisation and delete them when you no longer need them."
       />
       {GROUPS.map((g) => {
         const inGroup = reports.filter((r) => r.group === g);

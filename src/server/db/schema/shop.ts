@@ -61,7 +61,7 @@ export const serviceCategories = pgTable(
       .references(() => editions.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
-    /** Null means Media10 fulfils the category itself. */
+    /** Null means the organiser fulfils the category itself. */
     supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'set null' }),
     commissionType: text('commission_type', { enum: COMMISSION_TYPES }),
     commissionValue: integer('commission_value'),

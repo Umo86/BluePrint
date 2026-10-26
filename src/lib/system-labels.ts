@@ -9,4 +9,6 @@ export const CONFIG_LABELS: Record<string, string> = {
   assistant: 'Assistant',
   cron: 'Scheduled jobs',
   encryptionKey: 'Encryption key',
+  twoFactor: 'Two-factor sign-in',
+  invoiceDetails: 'Invoice details',
 };

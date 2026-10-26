@@ -15,7 +15,7 @@ Every email is recorded (Emails → Sent, and on each exhibitor's record) with i
 
 ## 1. Set up the sending domain in Resend (once per show brand)
 
-Use a **subdomain** for each show so its reputation is separate from Media10's own mail, for example `mail.ukconstructionweek.com`. Use a second subdomain for updates if you send many, for example `news.ukconstructionweek.com`.
+Use a **subdomain** for each show so its reputation is separate from your company's own mail, for example `mail.yourshow.com`. Use a second subdomain for updates if you send many, for example `news.yourshow.com`.
 
 1. In Resend → **Domains**, add the subdomain and choose the EU region.
 2. Add the DNS records Resend shows at your DNS provider:
@@ -24,7 +24,7 @@ Use a **subdomain** for each show so its reputation is separate from Media10's o
    - **MX** for bounce handling (on the `send` subdomain).
 3. Wait until Resend shows the domain as **Verified**.
 4. Add a **DMARC** record for the parent domain (TXT `_dmarc.ukconstructionweek.com`). Start with monitoring, then tighten:
-   - Week 1–2: `v=DMARC1; p=none; rua=mailto:dmarc@media10.co.uk; adkim=s; aspf=s`
+   - Week 1–2: `v=DMARC1; p=none; rua=mailto:dmarc@yourcompany.com; adkim=s; aspf=s`
    - Once reports show only legitimate mail: `p=quarantine`, then `p=reject`.
    DMARC tells inbox providers to trust mail that passes SPF/DKIM for your domain and to reject imitations; Gmail and Yahoo require it for bulk senders.
 5. Optional but recommended: set up **BIMI** later for the logo in Gmail.
@@ -36,7 +36,7 @@ Environment variables:
 - `EMAIL_PROVIDER=resend`
 - `RESEND_API_KEY`: a **sending-only** API key.
 - `RESEND_WEBHOOK_SECRET`: from the webhook below.
-- `EMAIL_DEFAULT_FROM`: fallback sender, for example `BluePrint <no-reply@mail.media10.co.uk>`.
+- `EMAIL_DEFAULT_FROM`: fallback sender, for example `BluePrint <no-reply@mail.yourcompany.com>`.
 
 Then in BluePrint:
 

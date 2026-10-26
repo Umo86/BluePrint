@@ -9,7 +9,7 @@ import { dateTime } from '@/lib/format';
 import { CONFIG_LABELS } from '@/lib/system-labels';
 import { removeSuppressionAction, retryEmailsAction, runCronJobAction } from '../actions';
 
-const WARN = /missing|Not set up|Not connected|Development key|Local/;
+const WARN = /missing|Not set up|Not connected|Development key|Local|Switched off/;
 
 const JOB_LABELS = { 'send-queue': 'email sending', reminders: 'reminders', housekeeping: 'tidy-up' } as const;
 

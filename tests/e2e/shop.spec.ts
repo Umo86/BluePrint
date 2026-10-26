@@ -179,7 +179,7 @@ test('the show team approves the product and refunds part of the order', async (
   await page.getByRole('link', { name: '← Orders' }).click();
   await page.getByRole('link', { name: 'Commission and payouts' }).click();
   await expect(page.getByRole('row', { name: /Expo Furniture Hire/ })).toBeVisible();
-  await expect(page.getByRole('row', { name: /Provided by Media10/ })).toBeVisible();
+  await expect(page.getByRole('row', { name: /Provided by the organiser/ })).toBeVisible();
 
   // The super admin's payments page shows PowerOn's payout waiting for its Stripe set-up.
   await page.goto('/admin/payments');

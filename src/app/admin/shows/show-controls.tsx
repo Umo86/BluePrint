@@ -21,7 +21,7 @@ export function NewShowButton() {
       <Modal opened={open} onClose={() => setOpen(false)} title="New show">
         <form onSubmit={(e) => { e.preventDefault(); create.run({ name, description }); }}>
           <Stack>
-            <TextInput label="Show name" placeholder="UK Construction Week" required value={name} onChange={(e) => setName(e.currentTarget.value)} error={create.fieldErrors.name} data-autofocus />
+            <TextInput label="Show name" placeholder="Spring Trade Expo" required value={name} onChange={(e) => setName(e.currentTarget.value)} error={create.fieldErrors.name} data-autofocus />
             <Textarea label="Description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} autosize minRows={2} />
             <Group justify="flex-end">
               <Button type="submit" loading={create.pending}>Create show</Button>

@@ -16,11 +16,16 @@ import styles from '@/components/site/site.module.css';
 import { getCurrentAuth } from '@/server/auth/current';
 
 export const metadata: Metadata = {
-  title: { absolute: 'BluePrint for Media10 shows' },
-  description: 'The exhibitor manual and service-ordering platform for Media10 shows.',
+  title: { absolute: 'BluePrint for exhibition organisers' },
+  description: 'The exhibitor manual and service-ordering platform for exhibition organisers.',
 };
 
 const AUDIENCES = [
+  {
+    icon: IconLayoutDashboard,
+    title: 'Organisers',
+    text: 'Set up each show’s manual, deadlines and services, follow every exhibitor’s progress, send reminders, review stand packs and download reports.',
+  },
   {
     icon: IconBuildingStore,
     title: 'Exhibitors',
@@ -36,17 +41,12 @@ const AUDIENCES = [
     title: 'Suppliers',
     text: 'Keep your catalogue up to date, see each order as it comes in with its details and artwork, and set up payouts.',
   },
-  {
-    icon: IconLayoutDashboard,
-    title: 'Show teams',
-    text: 'Follow every exhibitor’s progress, send reminders, review stand packs, answer questions in the help desk and download reports.',
-  },
 ];
 
 const STEPS = [
   {
     title: 'Invitations go out',
-    text: 'The show team adds exhibitors and stands, or imports them from a spreadsheet, and BluePrint emails each company an invitation.',
+    text: 'The organiser adds exhibitors and stands, or imports them from a spreadsheet, and BluePrint emails each company an invitation.',
   },
   {
     title: 'Exhibitors get their checklist',
@@ -58,7 +58,7 @@ const STEPS = [
   },
   {
     title: 'Space-only stands are approved',
-    text: 'The stand contractor sends the stand pack. The show team and its health and safety reviewers approve it or ask for changes.',
+    text: 'The stand contractor sends the stand pack. The organiser’s team and its health and safety reviewers approve it or ask for changes.',
   },
   {
     title: 'Ready for build-up',
@@ -67,7 +67,11 @@ const STEPS = [
 ];
 
 const FACTS = [
-  { icon: IconShieldLock, title: 'Two-factor sign-in for staff', text: 'Everyone on the show team signs in with an authenticator app as well as their email.' },
+  {
+    icon: IconShieldLock,
+    title: 'Careful with sign-in',
+    text: 'Passwords are stored with Argon2id, common ones are refused, and repeated wrong tries pause sign-in. Two-factor sign-in can be required for staff.',
+  },
   { icon: IconHistory, title: 'Every change is logged', text: 'The audit log records who changed what, and when. Super admins can search it and download it.' },
   { icon: IconLock, title: 'Private files', text: 'Uploads open only for the people who need them, through links that stop working after a minute.' },
   { icon: IconMapPin, title: 'Run from London', text: 'The site and its database are hosted in London, and data protection requests are handled from the admin dashboard.' },
@@ -76,7 +80,7 @@ const FACTS = [
 const QUESTIONS = [
   {
     q: 'How do I get an account?',
-    a: 'Your show team invites you by email. Sign in with the address the invitation went to: BluePrint emails you a six-digit code, so there is no password to remember.',
+    a: 'The organiser of your show invites you by email. Follow the link in the invitation to get started, using the address it was sent to.',
   },
   {
     q: 'Can colleagues help with our stand?',
@@ -88,7 +92,11 @@ const QUESTIONS = [
   },
   {
     q: 'Who do I ask about my stand?',
-    a: 'Your show team. Their details are on your BluePrint home page, and you can send them a question from the help desk.',
+    a: 'The organiser’s team for your show. Their details are on your BluePrint home page, and you can send them a question from the help desk.',
+  },
+  {
+    q: 'Can each show have its own look?',
+    a: 'Yes. Each show has its own logo and colours on the exhibitor pages, and its emails come from the show’s own address.',
   },
 ];
 
@@ -105,8 +113,8 @@ export default async function HomePage() {
             Every stand ready <span className={styles.displaySans}>for build-up</span>
           </h1>
           <p className={styles.lede}>
-            The exhibitor manual and service-ordering platform for Media10 shows. Deadlines, orders and stand approvals in one place, for everyone working on a
-            stand.
+            The exhibitor manual and service-ordering platform for exhibition organisers. Deadlines, orders and stand approvals in one place, for everyone
+            working on a stand.
           </p>
           <div className={styles.actions}>
             <CtaLink href={primary.href}>{primary.label}</CtaLink>
@@ -119,7 +127,7 @@ export default async function HomePage() {
       </section>
 
       <p className={`${styles.container} ${styles.shows}`}>
-        Built for Media10 shows, including <strong>UK Construction Week</strong>, <strong>Futurebuild</strong> and <strong>Stone &amp; Surface</strong>.
+        Built for organisers running <strong>one show or a whole portfolio</strong>, each with its own branding, manual, suppliers and team.
       </p>
 
       <section className={styles.section} aria-labelledby="who-title" style={{ paddingTop: 48 }}>
@@ -151,7 +159,7 @@ export default async function HomePage() {
             <h2 id="how-title" className={styles.h2}>
               From the first invitation <span className={styles.h2Sans}>to the morning of build-up</span>
             </h2>
-            <p className={styles.lede}>Every step happens in BluePrint, so the show team can see where each stand is up to.</p>
+            <p className={styles.lede}>Every step happens in BluePrint, so the organiser can see where each stand is up to.</p>
           </div>
           <ol className={styles.steps}>
             {STEPS.map((s, i) => (
@@ -194,7 +202,7 @@ export default async function HomePage() {
               Questions.
             </p>
             <h2 id="questions-title" className={styles.h2}>
-              Exhibiting at a Media10 show? <span className={styles.h2Sans}>Start with your invitation</span>
+              Exhibiting at a show? <span className={styles.h2Sans}>Start with your invitation</span>
             </h2>
             <div className={styles.actions}>
               <CtaLink href={primary.href} onDark>

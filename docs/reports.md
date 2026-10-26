@@ -41,4 +41,4 @@ On a task's **Responses** tab, "Email the stands that have not done it" drafts a
 - Each person can download up to 60 reports an hour.
 - Cells are written as plain text, numbers or dates, never formulas, so nothing an exhibitor typed can run when the file is opened.
 - Times are shown in UK time.
-- The files contain personal information: keep them within Media10 and delete them when no longer needed.
+- The files contain personal information: keep them within your organisation and delete them when no longer needed.

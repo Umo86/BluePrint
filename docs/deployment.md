@@ -15,7 +15,7 @@ The other guides go deeper on each area: [email](email.md), [payments](payments.
 | Stripe | Card payments and supplier payouts | Only needed when you take card payments. See [payments](payments.md). |
 | Anthropic (Claude Console) | The exhibitor assistant | Optional. See [assistant](assistant.md). |
 
-Use one shared Media10 login (with two-factor) for each service rather than someone's personal account, and record who has access.
+Use one shared company login (with two-factor) for each service rather than someone's personal account, and record who has access.
 
 ## 2. Database (Neon)
 
@@ -33,7 +33,7 @@ Use one shared Media10 login (with two-factor) for each service rather than some
    ```json
    [
      {
-       "AllowedOrigins": ["https://blueprint.media10.co.uk"],
+       "AllowedOrigins": ["https://blueprint.yourcompany.com"],
        "AllowedMethods": ["PUT"],
        "AllowedHeaders": ["Content-Type"],
        "MaxAgeSeconds": 3600
@@ -56,7 +56,7 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `APP_URL` | Yes | The site's address, for example `https://blueprint.media10.co.uk`. Used in email links and to check that requests come from the site itself. Before you add your own domain, use the production address under **Settings → Domains** (such as `https://blue-print-xyz.vercel.app`), not a deployment's own address: Vercel puts those behind its sign-in. |
+| `APP_URL` | Yes | The site's address, for example `https://blueprint.yourcompany.com`. Used in email links and to check that requests come from the site itself. Before you add your own domain, use the production address under **Settings → Domains** (such as `https://blue-print-xyz.vercel.app`), not a deployment's own address: Vercel puts those behind its sign-in. |
 | `DATABASE_URL` | Yes | Neon's pooled connection string (step 2). |
 | `DATABASE_URL_UNPOOLED` | No | Neon's direct connection string. When set, database changes during deployment use it, as Neon recommends; otherwise they use `DATABASE_URL`. |
 | `APP_ENCRYPTION_KEY` | Yes | 32 random bytes, base64: `openssl rand -base64 32`. Encrypts two-factor keys. Keep a copy in the company password manager. |
@@ -64,17 +64,19 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 | `EMAIL_PROVIDER` | For email | `resend` |
 | `RESEND_API_KEY` | For email | Sending-only key (step 4). |
 | `RESEND_WEBHOOK_SECRET` | For email | From the Resend webhook ([email guide](email.md), section 3). |
-| `EMAIL_DEFAULT_FROM` | For email | Fallback sender on a verified domain, for example `BluePrint <no-reply@mail.media10.co.uk>`. |
+| `EMAIL_DEFAULT_FROM` | For email | Fallback sender on a verified domain, for example `BluePrint <no-reply@mail.yourcompany.com>`. |
 | `STORAGE_PROVIDER` | For files | `r2` |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | For files | From step 3. |
 | `R2_JURISDICTION` | If EU | `eu` when the bucket uses the EU jurisdiction. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | For card payments | See [payments](payments.md). Without them card payment is off, and only companies allowed to pay on invoice can order. |
 | `ANTHROPIC_API_KEY` | For the assistant | See [assistant](assistant.md). Without it the assistant is hidden. |
+| `TWO_FACTOR` | No | `off` switches two-factor sign-in off for everyone, for example while the site is being tried out. Leave it unset (on) for a live site. |
+| `TEST_LOGIN_EMAIL`, `TEST_LOGIN_PASSWORD` | No | A test account shown on the sign-in page while the site is being tried out. Remove both, and the account, when testing ends. |
 
    The site refuses to start if a required value is missing, and says which one.
 
    Email and file storage can be added later. Until `RESEND_API_KEY` is set, emails are recorded on each person's record as not sent (with sign-in codes and links taken out), so nobody receives sign-in codes: people who have set a password can still sign in with it. Until all the R2 settings are in, uploads are switched off with a message, and invoices and permission-to-build certificates are not stored. The super admin overview lists what is still to set up. Redeploy after adding them.
-4. **Deploy**, then **Settings → Domains**: add your address (for example `blueprint.media10.co.uk`) and create the DNS record Vercel shows. `APP_URL` must match it exactly.
+4. **Deploy**, then **Settings → Domains**: add your address (for example `blueprint.yourcompany.com`) and create the DNS record Vercel shows. `APP_URL` must match it exactly.
 5. Keep **Deployment Protection** on for preview deployments.
 
 ## 6. The first super admin
@@ -83,8 +85,8 @@ From a computer with the code and Node.js 22 or later:
 
 ```bash
 npm ci
-DATABASE_URL="postgres://…" APP_URL="https://blueprint.media10.co.uk" \
-BOOTSTRAP_SUPER_ADMIN_EMAIL="you@media10.co.uk" npm run bootstrap
+DATABASE_URL="postgres://…" APP_URL="https://blueprint.yourcompany.com" \
+BOOTSTRAP_SUPER_ADMIN_EMAIL="you@yourcompany.com" npm run bootstrap
 ```
 
 It prints an invitation link that works for 48 hours. Open it, enter the code emailed to you and set up two-factor with an authenticator app. Then invite a second super admin from **Super admin → Users**, so nobody is ever locked out.
@@ -103,7 +105,8 @@ It prints an invitation link that works for 48 hours. Open it, enter the code em
 - [ ] Upload a file from the exhibitor portal and open it again (checks R2 and its CORS rule).
 - [ ] On the staging site with Stripe test keys: pay for an order by card, refund part of it, and check the supplier's transfer and the credit note.
 - [ ] Finance has agreed the money model in [payments](payments.md): commission, supplier VAT status, the card fee and its VAT treatment, invoice bank details and payment terms.
-- [ ] Media10's privacy notice lists the sub-processors (Vercel, Neon, Cloudflare, Resend, Stripe, and Anthropic if the assistant is on) and the retention periods in Platform settings.
+- [ ] Your privacy notice lists the sub-processors (Vercel, Neon, Cloudflare, Resend, Stripe, and Anthropic if the assistant is on) and the retention periods in Platform settings.
+- [ ] Two-factor sign-in is on (`TWO_FACTOR` not set to `off`) and the test login settings are removed.
 - [ ] At least two super admins, both with two-factor.
 
 ## Running BluePrint
@@ -118,7 +121,7 @@ It prints an invitation link that works for 48 hours. Open it, enter the code em
 
 **Rotating secrets.** For any API key or webhook secret: create the new one in the provider, update it in Vercel, redeploy, then delete the old one. `CRON_SECRET` can be changed at any time. For `APP_ENCRYPTION_KEY`, see [security](security.md).
 
-**If something looks wrong** (an unexpected admin, odd downloads, a leaked key): revoke the key at the provider, disable the account or sign the person out everywhere from their page in **Super admin → Users**, check the audit log, and follow Media10's data-breach procedure. Personal data breaches may need reporting to the ICO within 72 hours.
+**If something looks wrong** (an unexpected admin, odd downloads, a leaked key): revoke the key at the provider, disable the account or sign the person out everywhere from their page in **Super admin → Users**, check the audit log, and follow your data-breach procedure. Personal data breaches may need reporting to the ICO within 72 hours.
 
 ## Working on the code
 

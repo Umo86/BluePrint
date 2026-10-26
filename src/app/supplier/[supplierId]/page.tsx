@@ -26,7 +26,7 @@ export default async function SupplierOverview({ params }: PageProps<'/supplier/
       {o.paymentsMode && !stripe.payoutsEnabled ? (
         <Alert color="yellow" title="Set up payouts">
           <Stack gap="xs">
-            <Text fz="sm">Exhibitors pay Media10 by card, and your share is sent to your bank account through Stripe. Until you finish setting up, your payouts wait for you.</Text>
+            <Text fz="sm">Exhibitors pay the organiser by card, and your share is sent to your bank account through Stripe. Until you finish setting up, your payouts wait for you.</Text>
             <StripeButtons supplierId={supplierId} connected={stripe.connected} ready={stripe.payoutsEnabled} editable={editable} />
           </Stack>
         </Alert>

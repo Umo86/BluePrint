@@ -6,6 +6,7 @@ import { listActiveSessions } from '@/server/auth/sessions';
 import { getWorkspaces } from '@/server/services/workspaces';
 import { AppShell } from '@/components/app-shell';
 import { AccountForms } from './account-forms';
+import { twoFactorOn } from '@/server/env';
 
 export const metadata: Metadata = { title: 'Account and security' };
 
@@ -32,6 +33,7 @@ export default async function AccountPage() {
             profile={{ name: user.name, email: user.email, phone: user.phone ?? '', jobTitle: user.jobTitle ?? '' }}
             hasPassword={Boolean(user.passwordHash)}
             twoFactorEnabled={Boolean(user.totpEnabledAt)}
+            twoFactorAvailable={twoFactorOn()}
             isStaff={auth.isStaff}
             recoveryCodesLeft={user.recoveryCodeHashes.length}
             currentSessionId={auth.session.id}

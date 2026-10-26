@@ -31,7 +31,7 @@ export default async function ShopCatalogue({ params, searchParams }: PageProps<
     <Stack>
       <PageHeader
         title="Shop catalogue"
-        description="The services exhibitors can order: furniture, electrics, AV, cleaning and more. Each category is fulfilled by a supplier (paid through Stripe) or by Media10."
+        description="The services exhibitors can order: furniture, electrics, AV, cleaning and more. Each category is fulfilled by a supplier (paid through Stripe) or by you."
         actions={
           <Group gap="xs">
             <CategoryButton editionId={edition.id} suppliers={supplierOptions} types={typeOptions} canSetCommission={cat.canSetCommission} />
@@ -76,7 +76,7 @@ export default async function ShopCatalogue({ params, searchParams }: PageProps<
                       </Text>
                     </TableTd>
                     <TableTd>
-                      <Text fz="sm">{p.supplierId ? supplierName.get(p.supplierId) : 'Media10'}</Text>
+                      <Text fz="sm">{p.supplierId ? supplierName.get(p.supplierId) : 'Provided by you'}</Text>
                     </TableTd>
                     <TableTd>
                       <Text fz="sm">
@@ -124,7 +124,7 @@ export default async function ShopCatalogue({ params, searchParams }: PageProps<
                     />
                   </Group>
                   <Text fz="xs" c="dimmed">
-                    {c.supplierName ? `Supplied by ${c.supplierName}` : 'Provided by Media10'} · Commission: {commissionLabel(c.commissionType, c.commissionValue)}
+                    {c.supplierName ? `Supplied by ${c.supplierName}` : 'Provided by you'} · Commission: {commissionLabel(c.commissionType, c.commissionValue)}
                     {orderBy ? ` · Order by ${dateLong(orderBy, cat.edition.timezone)}` : ''}
                   </Text>
                   <Group gap={4} mt={4}>

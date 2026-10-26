@@ -17,11 +17,11 @@ export default async function CommissionPage({ params }: PageProps<'/manage/[edi
       </TextLink>
       <PageHeader
         title="Commission and payouts"
-        description="What each supplier has sold, what Media10 keeps, and what has been paid out. Figures are after refunds and include paid and invoiced orders."
+        description="What each supplier has sold, what you keep, and what has been paid out. Figures are after refunds and include paid and invoiced orders."
       />
       <SimpleGrid cols={{ base: 2, md: 4 }}>
         <StatCard label="Sales (incl. VAT)" value={money(r.totals.grossPence - r.totals.refundedPence)} hint={r.totals.refundedPence ? `${money(r.totals.refundedPence)} refunded` : undefined} />
-        <StatCard label="Media10 keeps" value={money(r.totals.commissionPence)} hint="Commission and its own services, before VAT" />
+        <StatCard label="You keep" value={money(r.totals.commissionPence)} hint="Commission and your own services, before VAT" />
         <StatCard label="Owed to suppliers" value={money(r.totals.payoutPence)} hint="Their share plus VAT where registered" />
         <StatCard label="Card fees collected" value={money(r.totals.cardFeesCollectedPence)} hint="Charged to exhibitors on top" />
       </SimpleGrid>
@@ -64,7 +64,7 @@ export default async function CommissionPage({ params }: PageProps<'/manage/[edi
                   <TableTd ta="right">{money(s.netPence)}</TableTd>
                   <TableTd ta="right">{money(s.commissionPence)}</TableTd>
                   <TableTd ta="right">{s.cardFeePence ? money(s.cardFeePence) : '—'}</TableTd>
-                  <TableTd ta="right">{s.key === 'media10' ? '—' : money(s.payoutPence + s.awaitingPaymentPence)}</TableTd>
+                  <TableTd ta="right">{s.key === 'organiser' ? '—' : money(s.payoutPence + s.awaitingPaymentPence)}</TableTd>
                   <TableTd ta="right">{t ? money(t.sent + t.manualSettled) : '—'}</TableTd>
                   <TableTd ta="right">
                     {t ? (

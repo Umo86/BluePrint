@@ -29,7 +29,7 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
               {children}
             </Stack>
           </div>
-          <p className={styles.foot}>BluePrint by Media10. Your information is protected and every change is logged.</p>
+          <p className={styles.foot}>Your information is protected and every change is logged.</p>
         </div>
       </main>
     </div>

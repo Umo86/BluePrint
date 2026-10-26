@@ -122,13 +122,13 @@ async function describeInvitation(inv: typeof invitations.$inferSelect) {
       headline = `Join the ${e?.name ?? 'show'} team on BluePrint`;
       break;
     case 'exhibitor':
-      headline = `${company?.name ?? 'Your company'} is exhibiting at ${e?.name ?? 'a Media10 show'}`;
+      headline = `${company?.name ?? 'Your company'} is exhibiting at ${e?.name ?? 'the show'}`;
       break;
     case 'colleague':
-      headline = `Join your colleagues on stand ${stand?.number ?? ''} at ${e?.name ?? 'a Media10 show'}`;
+      headline = `Join your colleagues on stand ${stand?.number ?? ''} at ${e?.name ?? 'the show'}`;
       break;
     case 'contractor':
-      headline = `You have been nominated to build stand ${stand?.number ?? ''} at ${e?.name ?? 'a Media10 show'}`;
+      headline = `You have been nominated to build stand ${stand?.number ?? ''} at ${e?.name ?? 'the show'}`;
       break;
     case 'supplier':
       headline = `${supplier?.name ?? 'Your company'} is a supplier on BluePrint`;

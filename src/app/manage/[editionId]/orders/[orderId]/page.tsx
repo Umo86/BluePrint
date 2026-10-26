@@ -190,7 +190,7 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
                 </TableTd>
                 <TableTd ta="right">{money(l.grossPence)}</TableTd>
                 <TableTd>
-                  <Text fz="sm">{l.supplierName ?? 'Media10'}</Text>
+                  <Text fz="sm">{l.supplierName ?? 'Organiser'}</Text>
                 </TableTd>
                 <TableTd ta="right">{money(l.commissionPence)}</TableTd>
                 <TableTd ta="right">

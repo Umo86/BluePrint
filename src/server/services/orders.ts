@@ -101,7 +101,7 @@ export function linePayoutAfterRefunds(l: LineRow) {
 }
 
 // ---------------------------------------------------------------------------
-// Documents: VAT invoices and credit notes (Media10 is the seller of record)
+// Documents: VAT invoices and credit notes (the organiser is the seller of record)
 // ---------------------------------------------------------------------------
 
 function lineDescription(l: Pick<LineRow, 'description' | 'options'>) {
@@ -276,7 +276,7 @@ async function alertFailedRefund(orderId: string, amountPence: number, alreadySh
         : 'Refund the exhibitor another way (for example by bank transfer) and note it on the order.',
     ],
     button: { label: 'Open the order', url: appUrl(`/manage/${o.editionId}/orders/${o.id}`) },
-    footer: 'BluePrint, the Media10 exhibitor manual.',
+    footer: 'BluePrint, the online exhibitor manual.',
   });
   for (const p of team) {
     await sendEmail({ to: p.email, toUserId: p.id, editionId: o.editionId, templateKey: 'refund_failed', category: 'transactional', subject: `A card refund failed: ${o.number}`, html, text });
@@ -1121,10 +1121,10 @@ export async function commissionReport(actor: Actor, editionId: string) {
   type Row = { key: string; name: string; orders: Set<string>; grossPence: number; refundedPence: number; netPence: number; vatPence: number; commissionPence: number; cardFeePence: number; payoutPence: number; awaitingPaymentPence: number };
   const by = new Map<string, Row>();
   for (const { line, order } of rows) {
-    const key = line.supplierId ?? 'media10';
+    const key = line.supplierId ?? 'organiser';
     const r =
       by.get(key) ??
-      ({ key, name: line.supplierId ? (names.get(line.supplierId) ?? 'Unknown supplier') : 'Provided by Media10', orders: new Set(), grossPence: 0, refundedPence: 0, netPence: 0, vatPence: 0, commissionPence: 0, cardFeePence: 0, payoutPence: 0, awaitingPaymentPence: 0 } as Row);
+      ({ key, name: line.supplierId ? (names.get(line.supplierId) ?? 'Unknown supplier') : 'Provided by the organiser', orders: new Set(), grossPence: 0, refundedPence: 0, netPence: 0, vatPence: 0, commissionPence: 0, cardFeePence: 0, payoutPence: 0, awaitingPaymentPence: 0 } as Row);
     const gross = lineGross(line);
     const keep = gross > 0 ? (gross - line.refundedPence) / gross : 0;
     r.orders.add(order.id);
@@ -1156,7 +1156,7 @@ export async function commissionReport(actor: Actor, editionId: string) {
     paidOut.set(t.supplierId, p);
   }
   const suppliersOut = [...by.values()]
-    .map((r) => ({ ...r, orders: r.orders.size, transfers: r.key === 'media10' ? null : (paidOut.get(r.key) ?? { sent: 0, waiting: 0, manualOwed: 0, manualSettled: 0 }) }))
+    .map((r) => ({ ...r, orders: r.orders.size, transfers: r.key === 'organiser' ? null : (paidOut.get(r.key) ?? { sent: 0, waiting: 0, manualOwed: 0, manualSettled: 0 }) }))
     .sort((a, b) => b.grossPence - a.grossPence);
   const [fees] = await db
     .select({ cardFees: sql<number>`coalesce(sum(${orders.cardFeePence}), 0)::bigint` })
@@ -1214,7 +1214,7 @@ export async function exportOrdersCsv(actor: Actor, editionId: string) {
         p(r.line.vatPence),
         p(lineGross(r.line)),
         p(r.line.refundedPence),
-        r.supplierName ?? 'Media10',
+        r.supplierName ?? 'Organiser',
         p(r.line.commissionPence),
         p(r.line.cardFeeSharePence),
         p(r.line.supplierPayoutPence),

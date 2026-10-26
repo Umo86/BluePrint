@@ -338,7 +338,7 @@ describe('Excel reports', () => {
 
     const page = await servicesForEdition(admin, s.edition.id);
     expect(page.lines.map((l) => `${l.standNumber} ${l.line.description}`)).toEqual(['S1 Spotlight', 'S2 Spotlight']);
-    expect(page.products).toEqual([expect.objectContaining({ item: 'Spotlight', supplier: 'Media10', quantity: 5, delivered: 2, stands: ['S1', 'S2'] })]);
+    expect(page.products).toEqual([expect.objectContaining({ item: 'Spotlight', supplier: 'Organiser', quantity: 5, delivered: 2, stands: ['S1', 'S2'] })]);
     const ops = actorFor(await makeStaff(s.edition.id, 'show_team', ['manage_exhibitors']));
     await expect(servicesForEdition(ops, s.edition.id)).rejects.toThrow();
 

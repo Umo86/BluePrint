@@ -21,7 +21,7 @@ export default async function AdminOverview() {
   const status = await systemStatus(actor);
   const db = await getDb();
   const recent = await db.select().from(auditLog).orderBy(desc(auditLog.at)).limit(12);
-  const warnings = Object.entries(status.config).filter(([, v]) => /missing|Not set up|Not connected|Development key/.test(v));
+  const warnings = Object.entries(status.config).filter(([, v]) => /missing|Not set up|Not connected|Development key|Switched off/.test(v));
 
   return (
     <Stack>

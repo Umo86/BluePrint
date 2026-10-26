@@ -12,7 +12,8 @@ import {
   verifySecondFactor,
   verifySignInCode,
 } from '@/server/auth/login';
-import { createSession, revokeAllSessions, validateSessionToken, STAFF_IDLE_SECONDS } from '@/server/auth/sessions';
+import { createSession, revokeAllSessions, twoFactorSteps, validateSessionToken, STAFF_IDLE_SECONDS } from '@/server/auth/sessions';
+import { resetEnvCache } from '@/server/env';
 import { acceptInvitation, createInvitation, findInvitation, sendInvitationCode } from '@/server/auth/invitations';
 import { totpCode } from '@/server/security/totp';
 import { decryptSecret } from '@/server/security/crypto';
@@ -132,6 +133,25 @@ describe('sessions', () => {
     const { session } = await createSession(staff.id, ctx);
     expect(session.twoFactorVerified).toBe(false);
     expect(session.idleTimeoutSeconds).toBe(STAFF_IDLE_SECONDS);
+  });
+
+  it('asks nobody for a second step while two-factor is switched off', async () => {
+    const { edition } = await makeEdition();
+    const staff = await makeStaff(edition.id, 'show_admin');
+    const enrolled = { isStaff: true, totpEnabledAt: new Date(), twoFactorVerified: false };
+    expect(twoFactorSteps({ isStaff: true, totpEnabledAt: null, twoFactorVerified: false })).toEqual({ needsTwoFactorSetup: true, needsSecondFactor: false });
+    expect(twoFactorSteps(enrolled)).toEqual({ needsTwoFactorSetup: false, needsSecondFactor: true });
+    process.env.TWO_FACTOR = 'off';
+    resetEnvCache();
+    try {
+      const { session } = await createSession(staff.id, ctx);
+      expect(session.twoFactorVerified).toBe(true);
+      expect(twoFactorSteps({ isStaff: true, totpEnabledAt: null, twoFactorVerified: false })).toEqual({ needsTwoFactorSetup: false, needsSecondFactor: false });
+      expect(twoFactorSteps(enrolled)).toEqual({ needsTwoFactorSetup: false, needsSecondFactor: false });
+    } finally {
+      delete process.env.TWO_FACTOR;
+      resetEnvCache();
+    }
   });
 
   it('rejects revoked, expired, idle and disabled sessions', async () => {

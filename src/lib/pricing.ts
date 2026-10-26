@@ -3,9 +3,9 @@
  * on screen, on invoices and in Stripe always agree.
  *
  * The model (agree it with finance before going live):
- * - Media10 sells to the exhibitor and issues the VAT invoice for the whole order.
- * - Each supplier is paid their share: the line's net price minus Media10's commission, plus VAT
- *   on that share when the supplier is VAT registered (their own supply to Media10).
+ * - The organiser sells to the exhibitor and issues the VAT invoice for the whole order.
+ * - Each supplier is paid their share: the line's net price minus the organiser's commission, plus VAT
+ *   on that share when the supplier is VAT registered (their own supply to the organiser).
  * - The card processing fee is either added on top for the exhibitor ("exhibitor_pays") or taken
  *   from the suppliers' shares in proportion to their lines ("deduct_from_supplier").
  */
@@ -75,9 +75,9 @@ export type LineInput = {
   unitPence: number;
   quantity: number;
   vatRateBps: number;
-  /** Null when Media10 provides the service itself. */
+  /** Null when the organiser provides the service itself. */
   supplierId: string | null;
-  /** Whether the supplier charges Media10 VAT on their share (true unless they are not VAT registered). */
+  /** Whether the supplier charges the organiser VAT on their share (true unless they are not VAT registered). */
   supplierChargesVat?: boolean;
   commission: CommissionRule;
 };
@@ -95,7 +95,7 @@ export type CardFee = { percentBps: number; fixedPence: number };
 
 /**
  * The card fee to add on top so that, after Stripe takes its percentage and fixed fee from the
- * whole charge, Media10 is left with the order total.
+ * whole charge, the organiser is left with the order total.
  */
 export function grossUpCardFee(totalPence: number, fee: CardFee) {
   if (totalPence <= 0) return 0;
@@ -140,7 +140,7 @@ export function priceOrder(lines: LineInput[], opts: { method: 'card' | 'invoice
     if (opts.feeMode === 'exhibitor_pays') {
       cardFeePence = grossUpCardFee(goodsPence, opts.cardFee);
     } else {
-      // Deducted from suppliers' shares; lines Media10 provides itself carry their own share.
+      // Deducted from suppliers' shares; lines the organiser provides itself carry their own share.
       const fee = stripeFeeOn(goodsPence, opts.cardFee);
       const shares = allocate(fee, priced.map((l) => l.grossPence));
       priced.forEach((l, i) => (l.cardFeeSharePence = shares[i]));
