@@ -68,6 +68,27 @@ describe('secret encryption', () => {
     expect(() => decryptSecret(parts.join('.'))).toThrow();
   });
 
+  it('accepts the key as base64 or as 64 hex characters, and nothing shorter', () => {
+    const saved = process.env.APP_ENCRYPTION_KEY;
+    const bytes = Buffer.alloc(32, 9);
+    try {
+      process.env.APP_ENCRYPTION_KEY = bytes.toString('hex');
+      resetEnvCache();
+      const underHex = encryptSecret('JBSWY3DPEHPK3PXP');
+      // The same 32 bytes written as base64 open it too.
+      process.env.APP_ENCRYPTION_KEY = bytes.toString('base64');
+      resetEnvCache();
+      expect(decryptSecret(underHex)).toBe('JBSWY3DPEHPK3PXP');
+      process.env.APP_ENCRYPTION_KEY = 'too-short';
+      resetEnvCache();
+      expect(() => encryptSecret('x')).toThrow(/32 random bytes/);
+    } finally {
+      if (saved === undefined) delete process.env.APP_ENCRYPTION_KEY;
+      else process.env.APP_ENCRYPTION_KEY = saved;
+      resetEnvCache();
+    }
+  });
+
   it('rotates to a new key: old secrets still open, and can be re-encrypted under the new key', () => {
     const oldKey = process.env.APP_ENCRYPTION_KEY!;
     const newKey = Buffer.alloc(32, 7).toString('base64');

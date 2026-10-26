@@ -31,9 +31,11 @@ export function numericCode(digits = 6): string {
 
 const DEV_KEY = createHash('sha256').update('blueprint-local-development-key').digest();
 
+/** 32 random bytes, written as base64 (`openssl rand -base64 32`) or as 64 hex characters (`openssl rand -hex 32`). */
 function keyFrom(raw: string, name: string): Buffer {
-  const key = Buffer.from(raw, 'base64');
-  if (key.length !== 32) throw new Error(`${name} must be 32 bytes, base64 encoded`);
+  const value = raw.trim();
+  const key = /^[0-9a-f]{64}$/i.test(value) ? Buffer.from(value, 'hex') : Buffer.from(value, 'base64');
+  if (key.length !== 32) throw new Error(`${name} must be 32 random bytes, as base64 or 64 hex characters`);
   return key;
 }
 
