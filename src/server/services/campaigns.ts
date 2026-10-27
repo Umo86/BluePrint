@@ -227,7 +227,14 @@ async function renderForRecipients(edition: EditionRow, c: { subject: string; bl
       hall: r.hallName ?? '',
       unsubscribe_url: unsubscribeUrl(r.email, edition.id),
     };
-    const fill = (s: string, esc: boolean) => s.replace(/⁣([a-z_]+)⁣/g, (_, k: string) => (esc ? escapeHtml(values[k] ?? '') : (values[k] ?? '')));
+    // The plain-text copy writes headings in capitals, markers included, so those are filled in capitals too.
+    const fill = (s: string, esc: boolean) =>
+      s.replace(/⁣([a-zA-Z_]+)⁣/g, (_, k: string) => {
+        const shout = k !== k.toLowerCase() && k.toLowerCase() !== 'unsubscribe_url';
+        const value = values[k.toLowerCase()] ?? '';
+        const out = shout ? value.toUpperCase() : value;
+        return esc ? escapeHtml(out) : out;
+      });
     // Names can contain line breaks; a subject never may.
     return { subject: fill(rendered.subject, false).replace(/[\r\n]+/g, ' ').slice(0, 250), html: fill(rendered.html, true), text: fill(rendered.text, false), unsubscribe: values.unsubscribe_url };
   };

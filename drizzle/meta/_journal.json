@@ -71,6 +71,13 @@
       "when": 1793113651633,
       "tag": "0009_assistant_section",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793119113019,
+      "tag": "0010_demo_data",
+      "breakpoints": true
     }
   ]
 }

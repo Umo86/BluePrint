@@ -54,10 +54,11 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
   return (
     <MantineAppShell header={{ height: 60 }} navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="lg">
       <MantineAppShell.Header bg={branded ? brand!.color! : undefined} c={branded ? 'white' : undefined}>
-        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap" gap="sm">
+          {/* Shrinks (the title truncates) so the account menu always stays on screen. */}
+          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Open navigation" />
-            <Link href="/start" aria-label="BluePrint home" style={{ textDecoration: 'none' }}>
+            <Link href="/start" aria-label="BluePrint home" style={{ textDecoration: 'none', flexShrink: 0 }}>
               {brand?.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={brand.logoUrl} alt="Show logo" style={{ height: 36, maxWidth: 160, objectFit: 'contain', background: 'white', borderRadius: 4, padding: 2 }} />
@@ -77,7 +78,7 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
               ) : null}
             </div>
           </Group>
-          <Group gap="xs" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
             {headerExtra}
             {workspaces.length > 1 ? (
               <Menu position="bottom-end" width={280}>

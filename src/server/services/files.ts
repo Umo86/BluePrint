@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
+import { qualified } from '../db/qualified';
 import { files, orderLines, orders, standContractors, stands, type EditionPermission, type FILE_PURPOSES } from '../db/schema';
 import {
   assertWritable,
@@ -20,7 +21,8 @@ import {
 import { AppError, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { assertRateLimit } from '../security/rate-limit';
-import { STORAGE_OFF_MESSAGE, storage } from '../storage';
+import { PRACTICE_KEY_PREFIX, PRACTICE_MAX_BYTES, PRACTICE_TOTAL_BYTES, STORAGE_OFF_MESSAGE, practiceStorage, storage, storageForKey } from '../storage';
+import { isDemoScope } from '../demo/flags';
 import type { Actor } from '../auth/actor';
 import { DRAWING_TYPES, UPLOAD_RULES, typeFromName } from '@/lib/upload-rules';
 
@@ -120,7 +122,6 @@ async function authorizeUpload(actor: Actor, input: z.infer<typeof beginUploadSc
  */
 export async function beginUpload(actor: Actor, raw: z.input<typeof beginUploadSchema>) {
   const input = beginUploadSchema.parse(raw);
-  if (storage().kind === 'off') throw new AppError(STORAGE_OFF_MESSAGE, 'unavailable');
   const rules = UPLOAD_RULES[input.purpose];
   if (input.size > rules.maxBytes) throw invalid(`That file is too big. Allowed: ${rules.label}.`);
   const acceptsDrawings = rules.types.includes('image/vnd.dwg');
@@ -132,10 +133,26 @@ export async function beginUpload(actor: Actor, raw: z.input<typeof beginUploadS
   if (!rules.types.includes(declared)) throw invalid(`That type of file isn’t accepted here. Allowed: ${rules.label}.`);
   await assertRateLimit(`upload:${actor.realUserId}`, 200, 3600);
   const scope = await authorizeUpload(actor, input);
+  // Without file storage, only the demo shows can upload: their files are kept in the database.
+  const practice = storage().kind === 'off' && (await isDemoScope(scope));
+  if (storage().kind === 'off' && !practice) throw new AppError(STORAGE_OFF_MESSAGE, 'unavailable');
+  if (practice) {
+    if (input.size > PRACTICE_MAX_BYTES) throw invalid('That file is too big for the demo shows: up to 4 MB each while file storage is not connected.');
+    // The test logins are public, so the database never fills up with demo files.
+    const db = await getDb();
+    const [{ used }] = await db
+      .select({ used: sql<number>`coalesce(sum(${files.sizeBytes}), 0)::bigint` })
+      .from(files)
+      .where(and(sql`${files.storageKey} like ${PRACTICE_KEY_PREFIX + '%'}`, isNull(files.deletedAt)));
+    if (Number(used) + input.size > PRACTICE_TOTAL_BYTES) {
+      throw new AppError('The demo shows have no room for more files. A super admin can start the demo again to clear them.', 'unavailable');
+    }
+    await assertRateLimit(`practice-upload:${actor.realUserId}`, 40, 3600);
+  }
 
   const db = await getDb();
   const id = randomUUID();
-  const key = `${input.purpose}/${new Date().toISOString().slice(0, 7)}/${id}`;
+  const key = `${practice ? PRACTICE_KEY_PREFIX : ''}${input.purpose}/${new Date().toISOString().slice(0, 7)}/${id}`;
   const [row] = await db
     .insert(files)
     .values({
@@ -152,22 +169,28 @@ export async function beginUpload(actor: Actor, raw: z.input<typeof beginUploadS
     })
     .returning();
 
-  const s = storage();
+  const s = storageForKey(key);
   const uploadUrl = s.presignPut ? await s.presignPut(key, declared, 600) : `/api/files/upload/${row.id}`;
   return { fileId: row.id, uploadUrl, contentType: declared };
 }
 
-/** Local development only: receives the bytes for a pending upload. */
+/**
+ * Receives the bytes for a pending upload that does not go straight to R2: local development, and
+ * demo-show files kept in the database. Anything else is "not found".
+ */
 export async function receiveLocalUpload(actor: Actor, fileId: string, body: Uint8Array) {
   const db = await getDb();
   const [row] = await db.select().from(files).where(eq(files.id, fileId)).limit(1);
   if (!row || row.verifiedAt || row.deletedAt || row.uploadedBy !== actor.realUserId) throw notFound();
+  const s = storageForKey(row.storageKey);
+  if (s.kind !== 'local' && s.kind !== 'database') throw notFound();
   if (body.byteLength > UPLOAD_RULES[row.purpose].maxBytes) throw invalid('That file is too big.');
-  await storage().put(row.storageKey, body, row.mimeType);
+  if (s.kind === 'database' && body.byteLength > PRACTICE_MAX_BYTES) throw invalid('That file is too big for the demo shows: up to 4 MB each.');
+  await s.put(row.storageKey, body, row.mimeType);
 }
 
 async function sniffType(key: string): Promise<string | null> {
-  const head = await storage().readStart(key, 512 * 1024);
+  const head = await storageForKey(key).readStart(key, 512 * 1024);
   if (head.byteLength >= 6 && /^AC10\d\d$/.test(Buffer.from(head.subarray(0, 6)).toString('latin1'))) return 'image/vnd.dwg';
   const { fileTypeFromBuffer } = await import('file-type');
   const t = await fileTypeFromBuffer(head);
@@ -175,7 +198,7 @@ async function sniffType(key: string): Promise<string | null> {
 }
 
 async function hashObject(key: string): Promise<string> {
-  const stream = await storage().stream(key);
+  const stream = await storageForKey(key).stream(key);
   if (!stream) throw notFound();
   const hash = createHash('sha256');
   const reader = stream.getReader();
@@ -197,7 +220,7 @@ export async function completeUpload(actor: Actor, fileId: string): Promise<File
   if (!row || row.deletedAt || row.uploadedBy !== actor.realUserId) throw notFound();
   if (row.verifiedAt) return row;
   const rules = UPLOAD_RULES[row.purpose];
-  const s = storage();
+  const s = storageForKey(row.storageKey);
   const size = await s.size(row.storageKey);
   const reject = async (message: string) => {
     await s.delete(row.storageKey).catch(() => undefined);
@@ -241,8 +264,10 @@ export async function storeGeneratedFile(input: {
   supplierId?: string | null;
 }) {
   const id = randomUUID();
-  const key = `${input.purpose}/${new Date().toISOString().slice(0, 7)}/${id}`;
-  await storage().put(key, input.body, input.contentType);
+  // Without file storage, the demo shows keep their certificates in the database like their uploads.
+  const practice = storage().kind === 'off' && (await isDemoScope({ editionId: input.editionId, supplierId: input.supplierId, companyId: input.companyId }));
+  const key = `${practice ? PRACTICE_KEY_PREFIX : ''}${input.purpose}/${new Date().toISOString().slice(0, 7)}/${id}`;
+  await (practice ? practiceStorage() : storage()).put(key, input.body, input.contentType);
   const db = await getDb();
   const [row] = await db
     .insert(files)
@@ -410,7 +435,7 @@ export async function deleteFile(actor: Actor, fileId: string) {
   if (!row || row.deletedAt) return;
   const db = await getDb();
   await db.update(files).set({ deletedAt: new Date() }).where(eq(files.id, fileId));
-  await storage().delete(row.storageKey).catch(() => undefined);
+  await storageForKey(row.storageKey).delete(row.storageKey).catch(() => undefined);
   await audit(actor, 'file.deleted', { entityType: 'file', entityId: fileId, editionId: row.editionId, companyId: row.companyId });
 }
 
@@ -423,7 +448,7 @@ export async function purgeAbandonedUploads() {
     .where(and(isNull(files.verifiedAt), lt(files.createdAt, new Date(Date.now() - 24 * 3600 * 1000))))
     .limit(500);
   for (const f of stale) {
-    await storage().delete(f.storageKey).catch(() => undefined);
+    await storageForKey(f.storageKey).delete(f.storageKey).catch(() => undefined);
     await db.delete(files).where(eq(files.id, f.id));
   }
   return { removed: stale.length };
@@ -443,13 +468,13 @@ export async function purgeUnusedOrderFiles(now = new Date()) {
         eq(files.purpose, 'order'),
         isNull(files.deletedAt),
         lt(files.createdAt, new Date(now.getTime() - 30 * 24 * 3600 * 1000)),
-        sql`not exists (select 1 from cart_items c cross join lateral jsonb_each(c.details) d where d.value ->> 'file' = cast(${files.id} as text))`,
-        sql`not exists (select 1 from order_lines l cross join lateral jsonb_each(l.details) d where d.value ->> 'file' = cast(${files.id} as text))`,
+        sql`not exists (select 1 from cart_items c cross join lateral jsonb_each(c.details) d where d.value ->> 'file' = cast(${qualified(files.id)} as text))`,
+        sql`not exists (select 1 from order_lines l cross join lateral jsonb_each(l.details) d where d.value ->> 'file' = cast(${qualified(files.id)} as text))`,
       ),
     )
     .limit(500);
   for (const f of unused) {
-    await storage().delete(f.storageKey).catch(() => undefined);
+    await storageForKey(f.storageKey).delete(f.storageKey).catch(() => undefined);
     await db.update(files).set({ deletedAt: now }).where(eq(files.id, f.id));
   }
   return { removed: unused.length };

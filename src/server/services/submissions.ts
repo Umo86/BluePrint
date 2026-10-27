@@ -22,6 +22,8 @@ import { sendEmail } from '../email/send';
 import { renderSimpleEmail } from '../email/simple';
 import { appUrl } from '../auth/login';
 import { validateAnswers, answerToText } from '@/lib/forms';
+import { spreadsheetDateTime } from '@/lib/format';
+import { TASK_STATE_LABELS } from '@/lib/task-labels';
 import { resolveDeadline } from './editions';
 import { assertEditionOpen } from './portal';
 import { staffMayReadFile } from './files';
@@ -50,8 +52,10 @@ export function taskState(task: TaskRow, sub: SubmissionRow | null, edition: Edi
   const reopened = Boolean(sub?.reopenedUntil && sub.reopenedUntil > now);
   const pastDeadline = Boolean(deadline && now > deadline);
   const status = sub?.status ?? null;
+  // A draft with nothing in it (for example "read" undone) has not been started.
+  const started = status === 'draft' && Object.keys(sub?.data ?? {}).length > 0;
   let state: TaskState;
-  if (!status || status === 'draft') state = pastDeadline ? 'overdue' : status === 'draft' ? 'draft' : 'to_do';
+  if (!status || status === 'draft') state = pastDeadline ? 'overdue' : started ? 'draft' : 'to_do';
   else state = status as TaskState;
 
   let lockedReason: string | null = null;
@@ -208,7 +212,10 @@ export async function markTask(actor: Actor, standId: string, taskId: string, ma
     status = 'draft';
   }
   const db = await getDb();
-  if (t.submission) {
+  if (t.submission && mark === 'undo') {
+    // Back to where it was: nothing marked, nothing sent.
+    await db.update(submissions).set({ status, submittedBy: null, submittedAt: null }).where(eq(submissions.id, t.submission.id));
+  } else if (t.submission) {
     await db.update(submissions).set({ status, submittedBy: actor.realUserId, submittedAt: new Date() }).where(eq(submissions.id, t.submission.id));
   } else {
     await db.insert(submissions).values({ taskId, standId, status, submittedBy: actor.realUserId, submittedAt: new Date() });
@@ -372,8 +379,8 @@ export async function exportResponses(actor: Actor, taskId: string) {
   const body = rows.map((r) => [
     r.stand.number,
     r.company?.name ?? '',
-    r.state,
-    r.submission?.submittedAt ? r.submission.submittedAt.toISOString() : '',
+    TASK_STATE_LABELS[r.state]?.label ?? r.state,
+    spreadsheetDateTime(r.submission?.submittedAt),
     r.late ? 'Yes' : '',
     ...questions.map((q) => answerToText(q, r.submission?.data?.[q.id], names)),
   ]);

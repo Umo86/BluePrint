@@ -59,6 +59,7 @@ export function TaskEditor(props: {
   initial: Values;
   types: { id: string; name: string; isSpaceOnly: boolean; standCount: number }[];
   pages: { value: string; label: string }[];
+  categories: { value: string; label: string }[];
   buildUpStartsAt: string | null;
   responses: ResponseRow[];
 }) {
@@ -143,6 +144,23 @@ export function TaskEditor(props: {
                   allowDeselect={false}
                   disabled={ro}
                 />
+                {v.kind === 'order' ? (
+                  <Select
+                    label="Shop category"
+                    required
+                    description={
+                      props.categories.length
+                        ? 'The task is done once the stand has ordered something from this category.'
+                        : 'Add a category to the shop first, then choose it here.'
+                    }
+                    placeholder="Choose a category"
+                    data={props.categories}
+                    value={v.linkedCategoryId}
+                    onChange={(c) => setV({ ...v, linkedCategoryId: c })}
+                    error={save.fieldErrors.linkedCategoryId}
+                    disabled={ro}
+                  />
+                ) : null}
                 <RichTextEditor label="Instructions" value={v.descriptionHtml} onChange={(html) => setV((x) => ({ ...x, descriptionHtml: html }))} minHeight={180} />
                 <Select
                   label="Related manual page"

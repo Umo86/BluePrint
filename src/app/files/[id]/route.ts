@@ -1,6 +1,6 @@
 import { getActorForApi } from '@/server/auth/current';
 import { canReadFile, getFile } from '@/server/services/files';
-import { contentDisposition, storage } from '@/server/storage';
+import { contentDisposition, storageForKey } from '@/server/storage';
 
 const INLINE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
@@ -17,7 +17,7 @@ export async function GET(req: Request, ctx: RouteContext<'/files/[id]'>) {
   if (!(await canReadFile(actor, file))) return new Response('Not found', { status: 404 });
 
   const wantsInline = new URL(req.url).searchParams.get('download') !== '1';
-  const s = storage();
+  const s = storageForKey(file.storageKey);
   if (s.presignGet) {
     // Served from the storage domain, so even inline PDFs never run on BluePrint's own origin.
     const inline = wantsInline && (INLINE_TYPES.has(file.mimeType) || file.mimeType === 'application/pdf');

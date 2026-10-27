@@ -6,7 +6,7 @@ import { requireSupplierMember } from '../authz';
 import { conflict, notFound } from '../errors';
 import { audit } from '../audit';
 import { appUrl } from '../auth/login';
-import { payments, SimulatedPayments } from '../payments/provider';
+import { paymentsForSupplier, SimulatedPayments } from '../payments/provider';
 import { processTransfers } from './orders';
 import { supplierCategories } from './catalogue';
 import type { Actor } from '../auth/actor';
@@ -48,14 +48,14 @@ export async function supplierOverview(actor: Actor, supplierId: string) {
     counts: { newLines: Number(lines.newLines), confirmed: Number(lines.confirmed), delivered: Number(lines.delivered) },
     money: { paidOutPence: Number(money.paidOut), waitingPence: Number(money.waiting), manualOwedPence: Number(money.manualOwed) },
     categories,
-    paymentsMode: payments()?.kind ?? null,
+    paymentsMode: (await paymentsForSupplier(supplierId))?.kind ?? null,
   };
 }
 
 /** Starts (or continues) the supplier's Stripe set-up and returns the Stripe page to send them to. */
 export async function startStripeOnboarding(actor: Actor, supplierId: string) {
   await requireSupplierMember(actor, supplierId, { write: true });
-  const p = payments();
+  const p = await paymentsForSupplier(supplierId);
   if (!p) throw conflict('Card payments are not switched on yet, so there is nothing to set up. The show team will pay you directly.');
   const db = await getDb();
   const [s] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId)).limit(1);
@@ -79,7 +79,7 @@ export async function refreshStripeStatus(actor: Actor, supplierId: string) {
   const db = await getDb();
   const [s] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId)).limit(1);
   if (!s) throw notFound();
-  const p = payments();
+  const p = await paymentsForSupplier(supplierId);
   if (!s.stripeAccountId || !p) return { payoutsEnabled: s.stripePayoutsEnabled };
   // The simulator keeps its state in the database (set by the test set-up page).
   if (p.kind === 'stripe') {
@@ -100,18 +100,17 @@ export async function stripeDashboardLink(actor: Actor, supplierId: string) {
   await requireSupplierMember(actor, supplierId, { write: true });
   const db = await getDb();
   const [s] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId)).limit(1);
-  const p = payments();
+  const p = await paymentsForSupplier(supplierId);
   if (!s?.stripeAccountId || !p) return null;
   return p.dashboardLink(s.stripeAccountId);
 }
 
-/** Local test payments only: stands in for finishing Stripe's set-up pages. */
+/** Test and practice payments only (a local machine, or a demo supplier): stands in for finishing Stripe's set-up pages. */
 export async function completeSimulatedOnboarding(actor: Actor, accountId: string) {
-  const p = payments();
-  if (!(p instanceof SimulatedPayments)) throw notFound();
   const db = await getDb();
   const [s] = await db.select().from(suppliers).where(eq(suppliers.stripeAccountId, accountId)).limit(1);
   if (!s) throw notFound();
+  if (!((await paymentsForSupplier(s.id)) instanceof SimulatedPayments)) throw notFound();
   await requireSupplierMember(actor, s.id, { write: true });
   await db.update(suppliers).set({ stripeChargesEnabled: true, stripePayoutsEnabled: true, stripeDetailsSubmitted: true }).where(eq(suppliers.id, s.id));
   await audit(actor, 'supplier.stripe_onboarded', { entityType: 'supplier', entityId: s.id, details: { simulated: true } });
@@ -123,7 +122,7 @@ export async function completeSimulatedOnboarding(actor: Actor, accountId: strin
 export async function adminRefreshSupplierStripe(supplierId: string) {
   const db = await getDb();
   const [s] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId)).limit(1);
-  const p = payments();
+  const p = await paymentsForSupplier(supplierId);
   if (!s?.stripeAccountId || !p || p.kind !== 'stripe') return;
   const status = await p.accountStatus(s.stripeAccountId);
   await db

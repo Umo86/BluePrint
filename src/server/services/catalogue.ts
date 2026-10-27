@@ -581,17 +581,28 @@ export async function submitSupplierProduct(actor: Actor, supplierId: string, pr
   await notifyApprovers(p);
 }
 
-/** Supplier: takes their own product off sale. Products never ordered are deleted outright. */
+/**
+ * Supplier: takes their own product off sale. It goes back to their drafts, so they can change it
+ * and send it for approval again. Orders already placed keep their own copy of it.
+ */
 export async function withdrawSupplierProduct(actor: Actor, supplierId: string, productId: string) {
   await requireSupplierMember(actor, supplierId, { write: true });
   const db = await getDb();
   const p = await supplierProductOrThrow(db, supplierId, productId);
-  if (await productHasOrders(db, productId)) {
-    await db.update(products).set({ status: 'archived' }).where(eq(products.id, productId));
-  } else {
-    await db.delete(products).where(eq(products.id, productId));
-  }
+  if (p.status !== 'approved' && p.status !== 'pending_approval') throw conflict('This product is not on sale or waiting for approval.');
+  await db.update(products).set({ status: 'draft' }).where(eq(products.id, productId));
   await audit(actor, 'shop.supplier_product_withdrawn', { entityType: 'product', entityId: productId, editionId: p.editionId, details: { supplierId, name: p.name } });
+}
+
+/** Supplier: deletes one of their drafts that has never been ordered. */
+export async function deleteSupplierProduct(actor: Actor, supplierId: string, productId: string) {
+  await requireSupplierMember(actor, supplierId, { write: true });
+  const db = await getDb();
+  const p = await supplierProductOrThrow(db, supplierId, productId);
+  if (p.status !== 'draft' && p.status !== 'rejected') throw conflict('Withdraw the product first.');
+  if (await productHasOrders(db, productId)) throw conflict('This product has been ordered, so it is kept for the record. It stays off sale.');
+  await db.delete(products).where(eq(products.id, productId));
+  await audit(actor, 'shop.supplier_product_deleted', { entityType: 'product', entityId: productId, editionId: p.editionId, details: { supplierId, name: p.name } });
 }
 
 async function notifyApprovers(p: Pick<ProductRow, 'editionId' | 'name' | 'supplierId' | 'id'>) {

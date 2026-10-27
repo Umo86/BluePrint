@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ButtonLink, TextLink } from '@/components/links';
 import { catalogueForStaff } from '@/server/services/catalogue';
-import { payments } from '@/server/payments/provider';
+import { paymentsForEdition } from '@/server/payments/provider';
 import { commissionLabel, dateLong, money, percentFromBps } from '@/lib/format';
 import { loadEdition } from '../load';
 import { ApprovalButtons, CategoryButton, CategoryRowActions, ProductRowActions } from './catalogue-controls';
@@ -25,7 +25,7 @@ export default async function ShopCatalogue({ params, searchParams }: PageProps<
   const typeName = new Map(cat.types.map((t) => [t.id, t.name]));
   const supplierName = new Map(cat.suppliers.map((s) => [s.id, s.name]));
   const pending = cat.products.filter((p) => p.status === 'pending_approval');
-  const cardsOn = Boolean(payments());
+  const cardsOn = Boolean(await paymentsForEdition(edition.id));
 
   return (
     <Stack>

@@ -127,6 +127,16 @@ describe('space-only approvals', () => {
     expect(await canReadFile(actorFor(stranger), cert)).toBe(false);
     const [approvedSub] = await db.select().from(submissions).where(and(eq(submissions.taskId, t.id), eq(submissions.standId, ex.stand.id)));
     expect(approvedSub.status).toBe('approved');
+    // If the team changes its decision, the old permission to build stops working.
+    await reviewPack(actorFor(ops), ex.stand.id, { decision: 'changes_needed', comment: 'The rigging plan is missing after all.' });
+    const [retired] = await db.select().from(files).where(eq(files.id, cert.id));
+    expect(retired.deletedAt).toBeTruthy();
+    expect(await canReadFile(me, retired)).toBe(false);
+    // The exhibitor sees what to change; the team's own "review started" markers stay with the team.
+    await reviewPack(actorFor(ops), ex.stand.id, { decision: 'under_review' });
+    const seen = await packView(me, ex.stand.id);
+    expect(seen.reviews.some((r) => r.comment === 'Review started.')).toBe(false);
+    expect(seen.reviews.some((r) => r.comment === 'The rigging plan is missing after all.')).toBe(true);
   });
 
   it('keeps space-only packs private to the stand, its contractor and the show team', async () => {

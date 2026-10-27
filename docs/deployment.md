@@ -73,7 +73,7 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 | `TWO_FACTOR` | No | `off` switches two-factor sign-in off for everyone, for example while the site is being tried out. Leave it unset (on) for a live site. |
 | `TEST_LOGIN_EMAIL`, `TEST_LOGIN_PASSWORD` | No | A test account shown on the sign-in page (as the super admin) while the site is being tried out. |
 | `TEST_LOGINS` | No | More test accounts for the sign-in page, one per kind of account, as JSON: `[{"role":"Show admin","email":"olivia@buildexpo.test","password":"…"}]`. Each one signs straight in. |
-| `DEMO_DATA` | No | `load` adds the demo data during the build (`npm run demo`): an invented organiser's two shows with a show team, exhibitors, a contractor, suppliers, orders and questions, and gives the `TEST_LOGINS` accounts their passwords. It adds the shows once; later builds only refresh the passwords. |
+| `DEMO_DATA` | No | `load` adds the demo data during the build (`npm run demo`) and gives the `TEST_LOGINS` accounts their passwords. See [Demo data](#demo-data) below. |
 
    The site refuses to start if a required value is missing, and says which one.
 
@@ -108,8 +108,32 @@ It prints an invitation link that works for 48 hours. Open it, enter the code em
 - [ ] On the staging site with Stripe test keys: pay for an order by card, refund part of it, and check the supplier's transfer and the credit note.
 - [ ] Finance has agreed the money model in [payments](payments.md): commission, supplier VAT status, the card fee and its VAT treatment, invoice bank details and payment terms.
 - [ ] Your privacy notice lists the sub-processors (Vercel, Neon, Cloudflare, Resend, Stripe, and Anthropic if the assistant is on) and the retention periods in Platform settings.
-- [ ] Two-factor sign-in is on (`TWO_FACTOR` not set to `off`), the test login settings (`TEST_LOGIN_*`, `TEST_LOGINS`) and `DEMO_DATA` are removed, and the demo shows (BuildExpo, Green Homes Live) are deleted in **Super admin → Shows** and their accounts disabled in **Super admin → Users**.
+- [ ] The demo data is removed (**Super admin → Demo data → Remove the demo data**), two-factor sign-in is on (`TWO_FACTOR` not set to `off`), and the test login settings (`TEST_LOGIN_*`, `TEST_LOGINS`) and `DEMO_DATA` are deleted from the environment variables.
 - [ ] At least two super admins, both with two-factor.
+
+## Demo data
+
+With `DEMO_DATA=load`, the build adds an invented organiser for trying BluePrint out as every kind of account. **BuildExpo London** is live and about five weeks from build-up (dates are counted from the day the data is added), with 36 exhibitors at every stage:
+- forms waiting for approval, approved or sent back;
+- orders paid by card, on invoice, overdue, part and fully refunded, and cancelled;
+- space-only stand packs in every review state, with their documents;
+- help desk questions, AI assistant conversations, announcements and emails.
+
+**Green Homes Live** is still being set up. Every name is made up and every address ends in `.test`.
+
+Each test login has an account in the demo shows (`TEST_LOGINS`, plus `TEST_LOGIN_EMAIL` for the super admin). The sign-in page shows only the test logins whose accounts exist.
+
+The demo shows are kept apart from real ones:
+- **No real money.** Their card payments are practice payments and the demo suppliers' payouts are practice payouts, even once Stripe is connected.
+- **Separate numbering.** Their orders, invoices, credit notes and help desk questions are numbered separately (`DEMO-ORD-000001`), so real numbering starts at 000001.
+- **No emails sent.** The demo shows never send email, and nothing is sent to an address ending in `.test`, because the test logins are public. Each email is still kept in the show's sent emails. A copy to a `.test` address keeps its invitation link, so testers can accept invitations from there.
+- **Files in the database.** While R2 is not connected, uploads in the demo shows are kept in the database (up to 4 MB each), so every feature can be tried. Real shows still need R2.
+
+**Super admin → Demo data** lists everything the demo data includes, and has two buttons:
+- **Start the demo again** adds a fresh copy with today's dates.
+- **Remove the demo data** deletes the demo shows with everything in them. This includes the invented companies, suppliers and people, anyone who was only ever in the demo shows, and their audit log entries.
+
+  It never touches super admins, real shows, or anything a real show uses. Once removed, the build does not add the demo data again, even if `DEMO_DATA` is still set. A newer version of the demo data replaces an older one at the next deployment.
 
 ## Running BluePrint
 

@@ -6,7 +6,7 @@ import { ActionButton } from '@/components/action-button';
 import { requireSuperAdmin } from '@/server/auth/current';
 import { systemStatus } from '@/server/services/system';
 import { dateTime } from '@/lib/format';
-import { CONFIG_LABELS } from '@/lib/system-labels';
+import { CONFIG_LABELS, jobResultText } from '@/lib/system-labels';
 import { removeSuppressionAction, retryEmailsAction, runCronJobAction } from '../actions';
 
 const WARN = /missing|Not set up|Not connected|Development key|Local|Switched off/;
@@ -53,7 +53,19 @@ export default async function SystemPage() {
         <StatCard label="Waiting" value={by.queued ?? 0} />
         <StatCard label="Failed" value={by.failed ?? 0} color={by.failed ? 'red' : undefined} />
         <StatCard label="Bounced" value={by.bounced ?? 0} color={by.bounced ? 'orange' : undefined} />
-        <StatCard label="Not sent (blocked)" value={by.suppressed ?? 0} hint="Unsubscribed or bounced before" />
+        <StatCard
+          label="Not sent"
+          value={by.suppressed ?? 0}
+          hint={
+            [
+              s.notSent.blocked ? `${s.notSent.blocked} to blocked or unsubscribed addresses` : '',
+              s.notSent.emailOff ? `${s.notSent.emailOff} while email sending was not set up` : '',
+              s.notSent.demo ? `${s.notSent.demo} in the demo shows, which never send` : '',
+            ]
+              .filter(Boolean)
+              .join('; ') || 'Unsubscribed or bounced addresses are not emailed'
+          }
+        />
       </SimpleGrid>
 
       <Paper withBorder p="md">
@@ -184,6 +196,9 @@ export default async function SystemPage() {
                     <TableTd>{dateTime(j.startedAt)}</TableTd>
                     <TableTd>
                       <StatusBadge status={j.status} />
+                      <Text fz="xs" c={j.status === 'error' ? 'red' : 'dimmed'} mt={2}>
+                        {jobResultText(j.status, j.details)}
+                      </Text>
                     </TableTd>
                   </TableTr>
                 ))}

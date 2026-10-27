@@ -50,6 +50,14 @@ export async function cancelMyCheckoutAction(slug: string, orderId: string): Pro
   }, 'Payment cancelled. Your basket is as you left it.');
 }
 
+/** Back from the payment page without paying: closes that checkout quietly (the page already says so). */
+export async function closeCancelledCheckoutAction(slug: string, orderId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await cancelMyCheckout(await requireActor(), id(orderId));
+    revalidatePath(`/portal/${slugOf(slug)}`, 'layout');
+  });
+}
+
 /** Local payment simulator only (the service refuses when real Stripe is configured). */
 export async function simulateCheckoutAction(orderId: string, outcome: 'pay' | 'cancel'): Promise<ActionResult> {
   return runAction(async () => {

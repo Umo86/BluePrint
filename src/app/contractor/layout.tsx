@@ -1,14 +1,12 @@
-import { notFound } from 'next/navigation';
 import { IconCrane } from '@tabler/icons-react';
 import { AppShell } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
 import { getCurrentAuth, requireActor } from '@/server/auth/current';
 import { getWorkspaces } from '@/server/services/workspaces';
-import { contractorStandIds } from '@/server/authz';
 
+/** The contractor area. Someone with no stands (for example after an exhibitor changed contractor) sees an empty list. */
 export default async function ContractorLayout({ children }: LayoutProps<'/contractor'>) {
   const actor = await requireActor();
-  if (!(await contractorStandIds(actor)).length) notFound();
   const auth = (await getCurrentAuth())!;
   const workspaces = await getWorkspaces(actor);
   return (

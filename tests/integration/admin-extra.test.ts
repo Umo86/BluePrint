@@ -9,6 +9,9 @@ import { createInvitation } from '@/server/auth/invitations';
 import { listLibrary, createLibraryItem, updateLibraryItem } from '@/server/services/library';
 import { updatePlatformSettings, getPlatformSettings } from '@/server/services/settings';
 import { toCsv } from '@/lib/csv';
+import { systemStatus } from '@/server/services/system';
+import { DEMO_ADDRESS_REASON, DEMO_SHOW_REASON } from '@/server/email/send';
+import { EMAIL_OFF_REASON } from '@/server/email/provider';
 import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
 
 let root: Awaited<ReturnType<typeof makeUser>>;
@@ -123,5 +126,27 @@ describe('CSV downloads', () => {
       ['=HYPERLINK("http://evil")', '+1', '-2', '@cmd', 'normal, with comma', 'line\nbreak', null, 42],
     ]);
     expect(csv).toBe(`"'=HYPERLINK(""http://evil"")",'+1,'-2,'@cmd,"normal, with comma","line\nbreak",,42\r\n`);
+  });
+});
+
+describe('system page', () => {
+  it('says why emails were not sent', async () => {
+    const db = await getDb();
+    const held = (error: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        toEmail: `held-${i}@example.com`,
+        templateKey: 'campaign',
+        category: 'campaign' as const,
+        fromAddress: 'noreply@example.com',
+        subject: 'Update',
+        html: '<p>Hi</p>',
+        text: 'Hi',
+        status: 'suppressed' as const,
+        error,
+      }));
+    await db.insert(emailOutbox).values([...held(DEMO_SHOW_REASON, 3), ...held(DEMO_ADDRESS_REASON, 1), ...held(EMAIL_OFF_REASON, 2), ...held('Unsubscribed from campaigns', 1)]);
+    const s = await systemStatus(actorFor(root));
+    expect(s.notSent).toEqual({ demo: 4, emailOff: 2, blocked: 1 });
+    expect(s.emailByStatus.suppressed).toBe(7);
   });
 });

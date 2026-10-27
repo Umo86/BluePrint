@@ -21,6 +21,7 @@ import { IconFile, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { FileUpload } from './file-upload';
 import { isVisible, type Declaration, type FormField } from '@/lib/forms';
 import { formatBytes } from '@/lib/upload-rules';
+import { dateTime } from '@/lib/format';
 
 type Values = Record<string, unknown>;
 /** Names and sizes of uploaded files; `canOpen: false` shows the name without a link. */
@@ -98,7 +99,7 @@ function FieldInput({ field, value, set, error, readOnly, standId, files, onFile
             <TextInput label="Your full name" value={d.name} onChange={(e) => set({ ...d, name: e.currentTarget.value })} readOnly={readOnly} maxLength={120} w={320} />
             {d.signedAt ? (
               <Text fz="xs" c="dimmed">
-                Signed {new Date(d.signedAt).toLocaleString('en-GB', { timeZone: 'Europe/London' })}
+                Signed {dateTime(d.signedAt)}
               </Text>
             ) : null}
             {error ? (

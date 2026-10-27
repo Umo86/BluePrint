@@ -1,6 +1,7 @@
 import { IconBuildingWarehouse, IconCash, IconLayoutDashboard, IconPackage, IconReceipt } from '@tabler/icons-react';
 import { AppShell } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
+import { DemoFrame } from '@/components/demo-frame';
 import { getCurrentAuth } from '@/server/auth/current';
 import { getWorkspaces } from '@/server/services/workspaces';
 import { loadSupplier } from './load';
@@ -27,7 +28,7 @@ export default async function SupplierLayout({ children, params }: LayoutProps<'
       viewAs={auth.viewAsUser ? { name: auth.viewAsUser.name, email: auth.viewAsUser.email } : null}
     >
       <PlatformNotice />
-      {children}
+      <DemoFrame supplierId={supplier.id}>{children}</DemoFrame>
     </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
+import { qualified } from '../db/qualified';
 import {
   companies,
   companyMembers,
@@ -45,16 +46,16 @@ export async function listUsers(actor: Actor, opts: { q?: string; filter?: UserF
       conditions.push(eq(users.status, 'disabled'));
       break;
     case 'staff':
-      conditions.push(sql`exists (select 1 from ${editionStaff} where ${editionStaff.userId} = ${users.id})`);
+      conditions.push(sql`exists (select 1 from ${editionStaff} where ${editionStaff.userId} = ${qualified(users.id)})`);
       break;
     case 'exhibitors':
-      conditions.push(sql`exists (select 1 from ${companyMembers} where ${companyMembers.userId} = ${users.id})`);
+      conditions.push(sql`exists (select 1 from ${companyMembers} where ${companyMembers.userId} = ${qualified(users.id)})`);
       break;
     case 'suppliers':
-      conditions.push(sql`exists (select 1 from ${supplierUsers} where ${supplierUsers.userId} = ${users.id})`);
+      conditions.push(sql`exists (select 1 from ${supplierUsers} where ${supplierUsers.userId} = ${qualified(users.id)})`);
       break;
     case 'contractors':
-      conditions.push(sql`exists (select 1 from ${standContractors} where ${standContractors.userId} = ${users.id})`);
+      conditions.push(sql`exists (select 1 from ${standContractors} where ${standContractors.userId} = ${qualified(users.id)})`);
       break;
   }
   const where = and(...conditions);
@@ -69,9 +70,9 @@ export async function listUsers(actor: Actor, opts: { q?: string; filter?: UserF
       totpEnabledAt: users.totpEnabledAt,
       lastLoginAt: users.lastLoginAt,
       createdAt: users.createdAt,
-      staffCount: sql<number>`(select count(*)::int from ${editionStaff} where ${editionStaff.userId} = ${users.id})`,
-      companyCount: sql<number>`(select count(*)::int from ${companyMembers} where ${companyMembers.userId} = ${users.id})`,
-      supplierCount: sql<number>`(select count(*)::int from ${supplierUsers} where ${supplierUsers.userId} = ${users.id})`,
+      staffCount: sql<number>`(select count(*)::int from ${editionStaff} where ${editionStaff.userId} = ${qualified(users.id)})`,
+      companyCount: sql<number>`(select count(*)::int from ${companyMembers} where ${companyMembers.userId} = ${qualified(users.id)})`,
+      supplierCount: sql<number>`(select count(*)::int from ${supplierUsers} where ${supplierUsers.userId} = ${qualified(users.id)})`,
     })
     .from(users)
     .where(where)

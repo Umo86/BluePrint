@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { AuthCard } from '@/components/auth-card';
 import { getCurrentAuth, safeNextPath } from '@/server/auth/current';
 import { emailMode } from '@/server/env';
-import { testLogins } from '@/server/test-logins';
+import { availableTestLogins } from '@/server/test-logins';
 import { SignInForm } from './sign-in-form';
 
 export const metadata: Metadata = { title: 'Sign in' };
@@ -16,7 +16,7 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
   return (
     <AuthCard title="Sign in to BluePrint">
       {/* Emailed codes are offered only when email can actually be sent. */}
-      <SignInForm next={next} signedOut={params.signedOut === '1'} testLogins={testLogins()} codes={emailMode() !== 'off'} />
+      <SignInForm next={next} signedOut={params.signedOut === '1'} testLogins={await availableTestLogins()} codes={emailMode() !== 'off'} />
     </AuthCard>
   );
 }

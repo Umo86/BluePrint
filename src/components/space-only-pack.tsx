@@ -26,6 +26,7 @@ import { DateInput } from '@mantine/dates';
 import { IconCertificate, IconCheck, IconCircleDashed, IconFile, IconX } from '@tabler/icons-react';
 import { FileUpload } from './file-upload';
 import { useAction } from '@/lib/use-action';
+import { dateTime } from '@/lib/format';
 import { checkPack, PACK_STATUS_LABELS, SPACE_ONLY_DOCS, SPACE_ONLY_DOC_LABELS, type Declared, type SpaceOnlyRulesLike } from '@/lib/space-only';
 import { formatBytes } from '@/lib/upload-rules';
 import { nominateContractorAction, removeContractorAction, savePackDraftAction, submitPackAction } from '@/app/space-only-actions';
@@ -137,6 +138,7 @@ export function SpaceOnlyPack(p: PackProps) {
   const save = useAction(savePackDraftAction, { onSuccess: () => setDirty(false) });
   const submit = useAction(submitPackAction);
   const status = PACK_STATUS_LABELS[p.status] ?? { label: p.status, color: 'gray' };
+  const feedback = ['changes_needed', 'rejected'].includes(p.status) ? p.reviews.filter((r) => r.version === p.currentVersion && r.comment).reverse() : [];
   const update = (d: Partial<Declared>) => {
     setDeclared((x) => ({ ...x, ...d }));
     setDirty(true);
@@ -240,6 +242,23 @@ export function SpaceOnlyPack(p: PackProps) {
         {p.conditions ? (
           <Alert color="lime" mt="sm" title="Conditions">
             {p.conditions}
+          </Alert>
+        ) : null}
+        {feedback.length ? (
+          // What the team said about the version they sent back, at the top where it is seen first.
+          <Alert color={p.status === 'rejected' ? 'red' : 'orange'} mt="sm" title={p.status === 'rejected' ? 'Why it was not approved' : 'What needs to change'}>
+            <Stack gap={6}>
+              {feedback.map((r) => (
+                <Text key={r.id} fz="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                  {r.docType ? (
+                    <Text span fz="sm" fw={600}>
+                      {SPACE_ONLY_DOC_LABELS[r.docType] ?? r.docType}:{' '}
+                    </Text>
+                  ) : null}
+                  {r.comment}
+                </Text>
+              ))}
+            </Stack>
           </Alert>
         ) : null}
       </Paper>
@@ -358,7 +377,7 @@ export function SpaceOnlyPack(p: PackProps) {
                       </Text>
                     ) : null}
                     <Text fz="xs" c="dimmed">
-                      version {r.version} · {new Date(r.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' })}
+                      version {r.version} · {dateTime(r.at)}
                     </Text>
                   </Group>
                   <Text fz="sm" style={{ whiteSpace: 'pre-wrap' }}>

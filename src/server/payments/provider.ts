@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { env, localProductionAllowed } from '../env';
+import { isDemoEdition, isDemoSupplier } from '../demo/flags';
 
 /**
  * Card payments and supplier payouts. In production this is Stripe Connect with separate charges
@@ -239,6 +240,7 @@ export class SimulatedPayments implements PaymentsProvider {
 
 let instance: PaymentsProvider | null = null;
 let override: PaymentsProvider | null = null;
+let practice: SimulatedPayments | null = null;
 
 /**
  * Real Stripe when a key is set. Without one, the simulator runs only on a developer's machine:
@@ -252,6 +254,28 @@ export function payments(): PaymentsProvider | null {
   if (e.STRIPE_SECRET_KEY) instance = new StripeProvider();
   else if (e.NODE_ENV !== 'production' || localProductionAllowed()) instance = new SimulatedPayments();
   return instance;
+}
+
+/** The simulator used for the demo shows, on any site: it never moves money. */
+export function practicePayments(): SimulatedPayments {
+  practice ??= new SimulatedPayments();
+  return practice;
+}
+
+/**
+ * Payments for one show. The demo shows are invented, so they never take real money, even once
+ * Stripe is connected: their checkouts, refunds and payouts always go through the simulator
+ * ("practice payments"). Every other show uses the platform's provider.
+ */
+export async function paymentsForEdition(editionId: string): Promise<PaymentsProvider | null> {
+  if (await isDemoEdition(editionId)) return practicePayments();
+  return payments();
+}
+
+/** Payouts set-up for one supplier: practice for the demo suppliers, otherwise the platform's. */
+export async function paymentsForSupplier(supplierId: string): Promise<PaymentsProvider | null> {
+  if (await isDemoSupplier(supplierId)) return practicePayments();
+  return payments();
 }
 
 export { isLocalAddress } from '@/lib/local-address';

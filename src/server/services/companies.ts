@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
+import { qualified } from '../db/qualified';
 import { companies, companyMembers, editions, exhibitorTypes, stands, users } from '../db/schema';
 import { assertSuperAdmin, assertWritable, getEditionAccess } from '../authz';
 import { conflict, forbidden, notFound } from '../errors';
@@ -63,8 +64,8 @@ export async function listCompanies(actor: Actor, opts: { q?: string; page?: num
   const rows = await db
     .select({
       company: companies,
-      memberCount: sql<number>`(select count(*)::int from ${companyMembers} where ${companyMembers.companyId} = ${companies.id})`,
-      standCount: sql<number>`(select count(*)::int from ${stands} where ${stands.companyId} = ${companies.id} and ${stands.status} = 'active')`,
+      memberCount: sql<number>`(select count(*)::int from ${companyMembers} where ${companyMembers.companyId} = ${qualified(companies.id)})`,
+      standCount: sql<number>`(select count(*)::int from ${stands} where ${stands.companyId} = ${qualified(companies.id)} and ${stands.status} = 'active')`,
     })
     .from(companies)
     .where(where)

@@ -38,6 +38,14 @@ import { checkPack, SPACE_ONLY_DOCS, type Declared } from '@/lib/space-only';
 import type { Actor } from '../auth/actor';
 
 const DOC_KEYS = new Set(SPACE_ONLY_DOCS.map((d) => d.key));
+const REVIEW_STARTED = 'Review started.';
+
+/** A permission-to-build certificate stops working once a new version is sent or the decision changes. */
+async function withdrawCertificate(fileId: string | null) {
+  if (!fileId) return;
+  const db = await getDb();
+  await db.update(files).set({ deletedAt: new Date() }).where(and(eq(files.id, fileId), isNull(files.deletedAt)));
+}
 const EDITABLE: string[] = ['not_started', 'changes_needed', 'rejected'];
 const OPEN_EDITION = ['live', 'onsite'];
 
@@ -180,7 +188,10 @@ export async function packView(actor: Actor, standId: string) {
     draft,
     check,
     current: current ?? null,
-    reviews: reviews.map((r) => ({ id: r.id, version: r.version, by: r.reviewerRole === 'hs' ? 'Health and safety' : 'Show team', outcome: r.outcome, docType: r.docType, comment: r.comment, at: r.createdAt })),
+    // The team's own "review started" markers are for the team, not the exhibitor.
+    reviews: reviews
+      .filter((r) => !(r.outcome === 'comment' && r.comment === REVIEW_STARTED))
+      .map((r) => ({ id: r.id, version: r.version, by: r.reviewerRole === 'hs' ? 'Health and safety' : 'Show team', outcome: r.outcome, docType: r.docType, comment: r.comment, at: r.createdAt })),
     files: await fileInfo(allIds),
     editable: editableNow,
     canNominate: (a.role === 'main_contact' || a.role === 'exhibitor') && OPEN_EDITION.includes(a.edition.status) && !actor.readOnly,
@@ -342,6 +353,7 @@ export async function submitPack(actor: Actor, standId: string) {
   if (!check.complete) throw invalid(`Your pack is not complete yet. Still needed: ${check.missing.join('; ')}.`);
   const version = pack.currentVersion + 1;
   const now = new Date();
+  await withdrawCertificate(pack.certificateFileId);
   await db.transaction(async (tx) => {
     await tx.insert(spaceOnlyVersions).values({
       packId: pack.id,
@@ -544,12 +556,13 @@ export async function reviewPack(
     reviewerRole: role,
     outcome: input.decision === 'under_review' ? 'comment' : input.decision,
     docType: input.docType ?? null,
-    comment: input.decision === 'under_review' ? comment ?? 'Review started.' : input.decision === 'approved_with_conditions' ? [conditions, comment].filter(Boolean).join('\n\n') : comment,
+    comment: input.decision === 'under_review' ? comment ?? REVIEW_STARTED : input.decision === 'approved_with_conditions' ? [conditions, comment].filter(Boolean).join('\n\n') : comment,
   });
 
   if (input.decision === 'under_review') {
     await db.update(spaceOnlyPacks).set({ status: 'under_review' }).where(eq(spaceOnlyPacks.id, pack.id));
   } else if (input.decision !== 'comment') {
+    await withdrawCertificate(pack.certificateFileId);
     let certificateFileId: string | null = null;
     if (input.decision === 'approved' || input.decision === 'approved_with_conditions') {
       const [contractor] = await db.select().from(standContractors).where(eq(standContractors.standId, standId)).limit(1);

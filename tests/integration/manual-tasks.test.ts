@@ -19,6 +19,7 @@ import { resolvePortal } from '@/server/services/portal';
 import { beginUpload, completeUpload, receiveLocalUpload } from '@/server/services/files';
 import { MemoryStorage, setStorageForTests } from '@/server/storage';
 import { validateAnswers, isVisible, type FormField } from '@/lib/forms';
+import { TASK_STATE_LABELS } from '@/lib/task-labels';
 import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
 
 beforeAll(async () => {
@@ -118,6 +119,10 @@ describe('tasks and the exhibitor checklist', () => {
     await markTask(actorFor(spaceEx.user), spaceEx.stand.id, t.id, 'not_needed');
     await expect(markTask(actorFor(shellEx.user), shellEx.stand.id, t.id, 'not_needed')).rejects.toThrow(/required/);
     await markTask(actorFor(spaceEx.user), spaceEx.stand.id, t.id, 'undo');
+    // Undoing goes back to "to do", not "started".
+    const undone = await taskForStand(actorFor(spaceEx.user), spaceEx.stand.id, t.id);
+    expect(undone.state).toBe('to_do');
+    expect(undone.submission?.submittedAt ?? null).toBeNull();
   });
 
   it('runs the whole draft, submit, review and resubmit cycle with emails', async () => {
@@ -157,6 +162,9 @@ describe('tasks and the exhibitor checklist', () => {
     const exported = await exportResponses(actorFor(editor), t.id);
     expect(exported.header.slice(0, 5)).toEqual(['Stand', 'Company', 'Status', 'Submitted', 'Late']);
     expect(exported.body[0]).toContain('Ann');
+    // Statuses are written as the team sees them, and times are London times a spreadsheet can read.
+    expect(Object.values(TASK_STATE_LABELS).map((s) => s.label)).toContain(exported.body[0][2]);
+    expect(exported.body[0][3]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 
   it('locks answers after the deadline unless the stand gets more time', async () => {

@@ -85,3 +85,20 @@ export function PageNav({ total, page, pageSize }: { total: number; page: number
     </Group>
   );
 }
+
+/** One choice that lives in the page address (for example which show), without a search box. */
+export function ParamSelect({ param, label, options, width = 260 }: { param: string; label: string; options: { value: string; label: string }[]; width?: number }) {
+  const params = useSearchParams();
+  const update = useParamUpdater();
+  return (
+    <Select
+      label={label}
+      data={options}
+      value={params.get(param) ?? options[0]?.value ?? null}
+      onChange={(v) => update({ [param]: v && v !== options[0]?.value ? v : null, page: null })}
+      allowDeselect={false}
+      w={width}
+      maw="100%"
+    />
+  );
+}

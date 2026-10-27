@@ -4,6 +4,10 @@ import { getDb } from '../db/client';
 import { editions, emailOutbox, emailSuppressions, unsubscribes } from '../db/schema';
 import { EMAIL_OFF_REASON, emailProvider } from './provider';
 import { senderFor } from './templates';
+import { isDemoEdition } from '../demo/flags';
+
+export const DEMO_ADDRESS_REASON = 'Not sent: a demo address (ending .test)';
+export const DEMO_SHOW_REASON = 'Not sent: the demo shows never send email';
 
 export type EmailCategory = 'transactional' | 'reminder' | 'campaign' | 'security';
 
@@ -84,9 +88,19 @@ export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
   }
   // A live site without email sending yet records the email as not sent. The copy is only a record,
   // so codes and personal links come out of it, as they do once an email has really gone.
-  const off = emailProvider().name === 'off';
+  const provider = emailProvider().name;
+  const off = provider === 'off';
   if (off) suppressedReason = EMAIL_OFF_REASON;
-  const keep = (value: string) => (off ? hideSecrets(value, input.category) : value);
+  // Nothing is ever sent to a demo address (ending .test), and the demo shows never send email at all:
+  // their test logins are public, so they must not be a way to email real people. The copy of an email
+  // to a demo address in a demo show keeps its invitation link, so testers can accept invitations from
+  // the show's sent emails. Sign-in codes are always hidden.
+  const testAddress = /\.test$/.test(to);
+  const demoShow = await isDemoEdition(input.editionId);
+  const demoMail = provider !== 'outbox' && (testAddress || demoShow);
+  if (demoMail && !off) suppressedReason = testAddress ? DEMO_ADDRESS_REASON : DEMO_SHOW_REASON;
+  const keepLinks = demoMail && testAddress && demoShow && input.category !== 'security';
+  const keep = (value: string) => ((off || demoMail) && !keepLinks ? hideSecrets(value, input.category) : value);
 
   const [row] = await db
     .insert(emailOutbox)

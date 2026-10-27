@@ -8,7 +8,8 @@ import { conflict, forbidden, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { assertRateLimit } from '../security/rate-limit';
 import { appUrl } from '../auth/login';
-import { payments, SimulatedPayments } from '../payments/provider';
+import { paymentsForEdition, SimulatedPayments } from '../payments/provider';
+import { isDemoEdition } from '../demo/flags';
 import { getPlatformSettings, type PlatformSettings } from './settings';
 import { assertEditionOpen } from './portal';
 import { soldQuantities } from './catalogue';
@@ -304,10 +305,10 @@ async function priceBasket(db: DbLike, standId: string, method: 'card' | 'invoic
 
 /** The basket as the exhibitor sees it, priced for the chosen way of paying. */
 export async function basketForStand(actor: Actor, standId: string, method: 'card' | 'invoice' = 'card') {
-  const { membership } = await requireStandAccess(actor, standId);
+  const { membership, stand } = await requireStandAccess(actor, standId);
   const db = await getDb();
   const b = await priceBasket(db, standId, method, await getPlatformSettings());
-  const p = payments();
+  const p = await paymentsForEdition(stand.editionId);
   const canPay = membership.role === 'main_contact' || membership.canPay;
   return {
     items: b.items.map((i) => {
@@ -334,6 +335,8 @@ export async function basketForStand(actor: Actor, standId: string, method: 'car
     }),
     totals: { netPence: b.priced.netPence, vatPence: b.priced.vatPence, cardFeePence: b.priced.cardFeePence, totalPence: b.priced.totalPence },
     methods: { card: Boolean(p), invoice: b.company.invoiceAllowed },
+    /** A demo show: card payments go to the practice payment page. */
+    practice: await isDemoEdition(stand.editionId),
     method,
     feeMode: b.feeMode,
     canPay,
@@ -378,7 +381,8 @@ export async function checkout(actor: Actor, standId: string, raw: z.input<typeo
     }
   }
 
-  const provider = payments();
+  const provider = await paymentsForEdition(stand.editionId);
+  const demo = await isDemoEdition(stand.editionId);
   const created = await db.transaction(async (tx) => {
     const ids = (await tx.select({ productId: cartItems.productId }).from(cartItems).where(eq(cartItems.standId, standId))).map((r) => r.productId);
     if (!ids.length) throw invalid('Your basket is empty.');
@@ -395,7 +399,7 @@ export async function checkout(actor: Actor, standId: string, raw: z.input<typeo
     if (b.priced.totalPence !== input.expectedTotalPence) throw conflict('Prices have changed since you opened your basket. Please check the new total.');
     if (input.method === 'card' && b.priced.totalPence > 0 && !provider) throw conflict('Card payments are not available at the moment. Please contact the show team.');
     const free = b.priced.totalPence === 0;
-    const number = await nextNumber(tx, 'order');
+    const number = await nextNumber(tx, 'order', { demo });
     const now = new Date();
     const [order] = await tx
       .insert(orders)
@@ -462,7 +466,7 @@ export async function checkout(actor: Actor, standId: string, raw: z.input<typeo
         ].filter((l) => l.amountPence > 0),
         customerEmail: actor.email,
         successUrl: appUrl(`/portal/${standEdition.slug}/orders/${created.id}?checkout=done`),
-        cancelUrl: appUrl(`/portal/${standEdition.slug}/shop/basket?checkout=cancelled`),
+        cancelUrl: appUrl(`/portal/${standEdition.slug}/shop/basket?checkout=cancelled&order=${created.id}`),
       });
       await db.update(orders).set({ stripeCheckoutSessionId: session.id }).where(eq(orders.id, created.id));
       return { orderId: created.id, number: created.number, redirectUrl: session.url };
@@ -492,7 +496,7 @@ export async function confirmCheckoutReturn(actor: Actor, orderId: string) {
   if (!o) throw notFound();
   await requireStandAccess(actor, o.standId);
   if (o.status !== 'pending_payment' || !o.stripeCheckoutSessionId) return o.status;
-  const p = payments();
+  const p = await paymentsForEdition(o.editionId);
   if (!p) return o.status;
   try {
     const s = await p.checkoutStatus(o.stripeCheckoutSessionId);
@@ -518,15 +522,21 @@ export async function cancelMyCheckout(actor: Actor, orderId: string) {
   await audit(actor, 'shop.checkout_cancelled', { entityType: 'order', entityId: o.id, editionId: o.editionId, details: { number: o.number } });
 }
 
-/** Local test payments only: pays or abandons a checkout in the payment simulator. */
+/** Test and practice payments only (a local machine, or a demo show): pays or abandons a checkout in the payment simulator. */
 export async function simulateCheckout(actor: Actor, orderId: string, outcome: 'pay' | 'cancel') {
-  const p = payments();
-  if (!(p instanceof SimulatedPayments)) throw notFound();
   const db = await getDb();
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!o || !o.stripeCheckoutSessionId) throw notFound();
+  const p = await paymentsForEdition(o.editionId);
+  if (!(p instanceof SimulatedPayments)) throw notFound();
   await requireStandAccess(actor, o.standId, { pay: true });
-  if (outcome === 'cancel') return o;
+  if (outcome === 'cancel') {
+    // Leaving the payment page cancels the checkout, so no "awaiting payment" order is left behind.
+    if (o.status === 'pending_payment' && (await closeCheckout(o))) {
+      await audit(actor, 'shop.checkout_cancelled', { entityType: 'order', entityId: o.id, editionId: o.editionId, details: { number: o.number } });
+    }
+    return o;
+  }
   if (o.status !== 'pending_payment') throw conflict('This order is not waiting for payment.');
   const intent = `sim_pi_${o.id.replace(/-/g, '')}`;
   p.paidSessions.set(o.stripeCheckoutSessionId, intent);
@@ -536,12 +546,12 @@ export async function simulateCheckout(actor: Actor, orderId: string, outcome: '
 
 /** For the simulator page: the order being paid, if this person may pay it. */
 export async function simulatorOrder(actor: Actor, orderId: string) {
-  const p = payments();
-  if (!(p instanceof SimulatedPayments)) throw notFound();
   const db = await getDb();
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!o) throw notFound();
+  const p = await paymentsForEdition(o.editionId);
+  if (!(p instanceof SimulatedPayments)) throw notFound();
   await requireStandAccess(actor, o.standId);
   const [e] = await db.select({ slug: editions.slug, name: editions.name }).from(editions).where(eq(editions.id, o.editionId)).limit(1);
-  return { order: o, edition: e };
+  return { order: o, edition: e, practice: await isDemoEdition(o.editionId) };
 }

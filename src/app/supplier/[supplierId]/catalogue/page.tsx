@@ -1,4 +1,4 @@
-import { Alert, Image, Paper, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
+import { Alert, Image, Paper, Stack, Table, TableScrollContainer, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -38,57 +38,59 @@ export default async function SupplierCataloguePage({ params }: PageProps<'/supp
                 </Text>
               </Stack>
               {items.length ? (
-                <Table verticalSpacing="xs">
-                  <TableThead>
-                    <TableTr>
-                      <TableTh w={64} />
-                      <TableTh>Product</TableTh>
-                      <TableTh>Price (before VAT)</TableTh>
-                      <TableTh>Sold</TableTh>
-                      <TableTh>Status</TableTh>
-                      <TableTh />
-                    </TableTr>
-                  </TableThead>
-                  <TableTbody>
-                    {items.map((p) => (
-                      <TableTr key={p.id}>
-                        <TableTd>{p.imageFileId ? <Image src={`/files/${p.imageFileId}`} alt="" w={48} h={36} fit="contain" radius="sm" /> : null}</TableTd>
-                        <TableTd>
-                          {p.status === 'archived' ? (
-                            <Text fz="sm" fw={600}>
-                              {p.name}
-                            </Text>
-                          ) : (
-                            <TextLink href={`${base}/${p.id}`} fw={600} fz="sm">
-                              {p.name}
-                            </TextLink>
-                          )}
-                          {p.code ? (
-                            <Text fz="xs" c="dimmed">
-                              Code {p.code}
-                            </Text>
-                          ) : null}
-                          {p.status === 'rejected' && p.rejectionReason ? (
-                            <Text fz="xs" c="orange" lineClamp={2}>
-                              {p.rejectionReason}
-                            </Text>
-                          ) : null}
-                        </TableTd>
-                        <TableTd>
-                          <Text fz="sm">{money(p.pricePence)}</Text>
-                          <Text fz="xs" c="dimmed">
-                            VAT {percentFromBps(p.vatRateBps)}
-                          </Text>
-                        </TableTd>
-                        <TableTd>{p.stockLimit !== null ? `${p.sold} of ${p.stockLimit}` : p.sold}</TableTd>
-                        <TableTd>
-                          <StatusBadge status={p.status} label={STATUS_LABELS[p.status]} />
-                        </TableTd>
-                        <TableTd>{editable ? <SupplierProductActions supplierId={supplierId} productId={p.id} name={p.name} status={p.status} /> : null}</TableTd>
+                <TableScrollContainer minWidth={640}>
+                  <Table verticalSpacing="xs">
+                    <TableThead>
+                      <TableTr>
+                        <TableTh w={64} />
+                        <TableTh>Product</TableTh>
+                        <TableTh>Price (before VAT)</TableTh>
+                        <TableTh>Sold</TableTh>
+                        <TableTh>Status</TableTh>
+                        <TableTh />
                       </TableTr>
-                    ))}
-                  </TableTbody>
-                </Table>
+                    </TableThead>
+                    <TableTbody>
+                      {items.map((p) => (
+                        <TableTr key={p.id}>
+                          <TableTd>{p.imageFileId ? <Image src={`/files/${p.imageFileId}`} alt="" w={48} h={36} fit="contain" radius="sm" /> : null}</TableTd>
+                          <TableTd>
+                            {p.status === 'archived' ? (
+                              <Text fz="sm" fw={600}>
+                                {p.name}
+                              </Text>
+                            ) : (
+                              <TextLink href={`${base}/${p.id}`} fw={600} fz="sm">
+                                {p.name}
+                              </TextLink>
+                            )}
+                            {p.code ? (
+                              <Text fz="xs" c="dimmed">
+                                Code {p.code}
+                              </Text>
+                            ) : null}
+                            {p.status === 'rejected' && p.rejectionReason ? (
+                              <Text fz="xs" c="orange" lineClamp={2}>
+                                {p.rejectionReason}
+                              </Text>
+                            ) : null}
+                          </TableTd>
+                          <TableTd>
+                            <Text fz="sm">{money(p.pricePence)}</Text>
+                            <Text fz="xs" c="dimmed">
+                              VAT {percentFromBps(p.vatRateBps)}
+                            </Text>
+                          </TableTd>
+                          <TableTd>{p.stockLimit !== null ? `${p.sold} of ${p.stockLimit}` : p.sold}</TableTd>
+                          <TableTd>
+                            <StatusBadge status={p.status} label={STATUS_LABELS[p.status]} />
+                          </TableTd>
+                          <TableTd>{editable ? <SupplierProductActions supplierId={supplierId} productId={p.id} name={p.name} status={p.status} sold={p.sold} /> : null}</TableTd>
+                        </TableTr>
+                      ))}
+                    </TableTbody>
+                  </Table>
+                </TableScrollContainer>
               ) : (
                 <Text px="md" pb="md" fz="sm" c="dimmed">
                   No products yet.

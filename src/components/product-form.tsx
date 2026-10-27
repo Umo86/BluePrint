@@ -144,7 +144,7 @@ export function ProductForm({
               <TextInput label="Name" value={v.name} onChange={(e) => set('name', e.currentTarget.value)} maxLength={200} error={errors.name} required miw={240} />
               <TextInput
                 label="Product code"
-                description="The supplier’s own code, if they use one."
+                description={mode.kind === 'supplier' ? 'Your own code, if you use one.' : 'The supplier’s own code, if they use one.'}
                 value={v.code}
                 onChange={(e) => set('code', e.currentTarget.value)}
                 maxLength={40}

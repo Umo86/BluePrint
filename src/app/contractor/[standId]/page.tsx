@@ -9,6 +9,7 @@ import { AppError } from '@/server/errors';
 import { dateTime, standSize } from '@/lib/format';
 import { toPackProps } from '@/app/space-only-props';
 import { ShowContacts } from '@/components/show-contacts';
+import { DemoFrame } from '@/components/demo-frame';
 
 export default async function ContractorStand({ params }: PageProps<'/contractor/[standId]'>) {
   const { standId } = await params;
@@ -23,48 +24,50 @@ export default async function ContractorStand({ params }: PageProps<'/contractor
   }
   const pages = await pagesForType(view.edition.id, view.stand.exhibitorTypeId);
   return (
-    <Stack maw={960}>
-      <TextLink href="/contractor" fz="sm">
-        ← Your stands
-      </TextLink>
-      <div>
-        <Title order={1} fz={30}>
-          Stand {view.stand.number} · {view.company.name}
-        </Title>
-        <Text c="dimmed">
-          {view.edition.name}
-          {view.hall ? ` · hall ${view.hall.name}` : ''}
-          {standSize(view.stand) ? ` · ${standSize(view.stand)}` : ''}
-        </Text>
-      </div>
-      <SimpleGrid cols={{ base: 1, md: 2 }}>
-        <Paper withBorder p="md">
-          <Text fz="sm" fw={500} c="dimmed">
-            Build-up and breakdown
+    <DemoFrame editionId={view.edition.id}>
+      <Stack maw={960}>
+        <TextLink href="/contractor" fz="sm">
+          ← Your stands
+        </TextLink>
+        <div>
+          <Title order={1} fz={30}>
+            Stand {view.stand.number} · {view.company.name}
+          </Title>
+          <Text c="dimmed">
+            {view.edition.name}
+            {view.hall ? ` · hall ${view.hall.name}` : ''}
+            {standSize(view.stand) ? ` · ${standSize(view.stand)}` : ''}
           </Text>
-          <Text fz="sm">Build-up starts {view.edition.buildUpStartsAt ? dateTime(view.edition.buildUpStartsAt) : 'to be confirmed'}</Text>
-          <Text fz="sm">Breakdown ends {view.edition.breakdownEndsAt ? dateTime(view.edition.breakdownEndsAt) : 'to be confirmed'}</Text>
-        </Paper>
-        <Paper withBorder p="md">
-          <Text fz="sm" fw={500} c="dimmed">
-            Rules for building
-          </Text>
-          <Group gap="sm" mt={4}>
-            {pages.filter((p) => !p.parentId).map((p) => (
-              <TextLink key={p.id} href={`/contractor/${standId}/manual/${p.slug}`} fz="sm">
-                {p.title}
-              </TextLink>
-            ))}
-            {!pages.length ? (
-              <Text fz="sm" c="dimmed">
-                The show team has not published build rules yet.
-              </Text>
-            ) : null}
-          </Group>
-        </Paper>
-      </SimpleGrid>
-      <ShowContacts contacts={view.edition.contacts} title="Show contacts" />
-      <SpaceOnlyPack {...toPackProps(view)} />
-    </Stack>
+        </div>
+        <SimpleGrid cols={{ base: 1, md: 2 }}>
+          <Paper withBorder p="md">
+            <Text fz="sm" fw={500} c="dimmed">
+              Build-up and breakdown
+            </Text>
+            <Text fz="sm">Build-up starts {view.edition.buildUpStartsAt ? dateTime(view.edition.buildUpStartsAt) : 'to be confirmed'}</Text>
+            <Text fz="sm">Breakdown ends {view.edition.breakdownEndsAt ? dateTime(view.edition.breakdownEndsAt) : 'to be confirmed'}</Text>
+          </Paper>
+          <Paper withBorder p="md">
+            <Text fz="sm" fw={500} c="dimmed">
+              Rules for building
+            </Text>
+            <Group gap="sm" mt={4}>
+              {pages.filter((p) => !p.parentId).map((p) => (
+                <TextLink key={p.id} href={`/contractor/${standId}/manual/${p.slug}`} fz="sm">
+                  {p.title}
+                </TextLink>
+              ))}
+              {!pages.length ? (
+                <Text fz="sm" c="dimmed">
+                  The show team has not published build rules yet.
+                </Text>
+              ) : null}
+            </Group>
+          </Paper>
+        </SimpleGrid>
+        <ShowContacts contacts={view.edition.contacts} title="Show contacts" />
+        <SpaceOnlyPack {...toPackProps(view)} />
+      </Stack>
+    </DemoFrame>
   );
 }

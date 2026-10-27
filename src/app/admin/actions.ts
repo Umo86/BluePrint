@@ -40,6 +40,9 @@ import { updatePlatformSettings, type PlatformSettings } from '@/server/services
 import { checkAssistantConnection, type ConnectionCheck } from '@/server/assistant/admin';
 import { removeSuppression, retryFailedEmails } from '@/server/services/system';
 import { anonymisePerson, eraseEmailAddress, findPersonRecords } from '@/server/services/gdpr';
+import { removeDemoData } from '@/server/demo/remove';
+import { resetDemoData } from '@/server/demo/data';
+import { testLogins } from '@/server/test-logins';
 import { audit } from '@/server/audit';
 import { assertSuperAdmin } from '@/server/authz';
 import type { z } from 'zod';
@@ -420,4 +423,21 @@ export async function eraseAddressAction(email: string): Promise<ActionResult> {
   return runAction(async () => {
     await eraseEmailAddress(await superAdmin(), String(email ?? ''));
   }, 'Address erased.');
+}
+
+// Demo data ---------------------------------------------------------------------
+
+export async function removeDemoDataAction(confirmation: string): Promise<ActionResult<Record<string, number>>> {
+  return runAction(async () => {
+    const counts = await removeDemoData(await superAdmin(), typeof confirmation === 'string' ? confirmation : '');
+    revalidatePath('/', 'layout');
+    return counts;
+  }, 'The demo data has been removed.');
+}
+
+export async function resetDemoDataAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await resetDemoData(await superAdmin(), testLogins());
+    revalidatePath('/', 'layout');
+  }, 'Fresh demo data has been added.');
 }

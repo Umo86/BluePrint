@@ -12,7 +12,7 @@ export function StandSwitcher({ slug, current, stands }: { slug: string; current
     <Select
       aria-label="Choose your stand"
       size="xs"
-      w={240}
+      w={{ base: 140, sm: 240 }}
       data={stands.map((s) => ({ value: s.id, label: s.label }))}
       value={current}
       onChange={(v) => v && v !== current && choose.run(slug, v)}

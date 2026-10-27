@@ -1,6 +1,7 @@
 import { IconBook2, IconBuildingStore, IconChecklist, IconCrane, IconHelpCircle, IconHome, IconReceipt, IconShoppingCart } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
+import { DemoFrame } from '@/components/demo-frame';
 import { getCurrentAuth } from '@/server/auth/current';
 import { getWorkspaces } from '@/server/services/workspaces';
 import { checklistForStand } from '@/server/services/submissions';
@@ -49,7 +50,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
       }
     >
       <PlatformNotice />
-      {children}
+      <DemoFrame editionId={ctx.edition.id}>{children}</DemoFrame>
       {assistant.available ? <AssistantLauncher slug={ctx.edition.slug} standId={ctx.stand.id} name={assistantConfig.customName ? assistantConfig.name : null} /> : null}
     </AppShell>
   );

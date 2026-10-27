@@ -20,6 +20,12 @@ export function dateTime(d: Date | string | null | undefined, timeZone = 'Europe
   return new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone });
 }
 
+/** London time as 2027-03-01 14:30, which spreadsheets sort and read as a date. Empty when there is no date. */
+export function spreadsheetDateTime(d: Date | string | null | undefined, timeZone = 'Europe/London'): string {
+  if (!d) return '';
+  return new Date(d).toLocaleString('sv-SE', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 export function percentFromBps(bps: number | null | undefined): string {
   if (bps === null || bps === undefined) return '—';
   return `${(bps / 100).toLocaleString('en-GB', { maximumFractionDigits: 2 })}%`;

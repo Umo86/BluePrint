@@ -183,26 +183,28 @@ export function ExhibitorTable({
                     </TextLink>
                   </TableTd>
                   <TableTd>
-                    <Stack gap={2}>
+                    <Stack gap={6}>
                       {r.stands.map((s) => (
-                        <Group key={s.id} gap={6} wrap="nowrap">
-                          <Text fz="sm" fw={600}>
-                            {s.number}
-                          </Text>
-                          <Badge size="xs" variant="light" color={s.isSpaceOnly ? 'orange' : 'blue'}>
-                            {s.typeName}
-                          </Badge>
-                          {s.hallName ? (
-                            <Text fz="xs" c="dimmed">
-                              {s.hallName}
+                        <Stack key={s.id} gap={2} align="flex-start">
+                          <Group gap={6} style={{ rowGap: 2 }}>
+                            <Text fz="sm" fw={600}>
+                              {s.number}
                             </Text>
-                          ) : null}
+                            <Badge size="xs" variant="light" color={s.isSpaceOnly ? 'orange' : 'blue'} style={{ flexShrink: 0 }}>
+                              {s.typeName}
+                            </Badge>
+                            {s.hallName ? (
+                              <Text fz="xs" c="dimmed">
+                                {s.hallName}
+                              </Text>
+                            ) : null}
+                          </Group>
                           {s.packStatus ? (
-                            <Badge size="xs" variant="outline" color={PACK_STATUS_LABELS[s.packStatus]?.color ?? 'gray'} title="Space-only stand pack">
+                            <Badge size="xs" variant="outline" color={PACK_STATUS_LABELS[s.packStatus]?.color ?? 'gray'} title="Space-only stand pack" style={{ flexShrink: 0 }}>
                               Pack: {PACK_STATUS_LABELS[s.packStatus]?.label ?? s.packStatus}
                             </Badge>
                           ) : null}
-                        </Group>
+                        </Stack>
                       ))}
                     </Stack>
                   </TableTd>

@@ -31,7 +31,7 @@ npm run dev
 
 Open http://localhost:3000 (the public homepage; the about page is at `/about`), choose **Sign in**, then **No password? Email me a sign-in code**, and sign in as `admin@blueprint.test`. Sign-in codes appear in the local mailbox at http://localhost:3000/dev/mailbox, and the seed prints the two-factor key to add to an authenticator app. It also prints demo exhibitor, supplier and show admin accounts.
 
-For the live demo (an invented organiser with a password for each kind of account) there is also `DEMO_DATA=load TEST_LOGINS='[…]' npm run demo`; see [deployment](docs/deployment.md).
+For the live demo (an invented organiser with a password for each kind of account) there is also `DEMO_DATA=load TEST_LOGINS='[…]' npm run demo`. A super admin can start it again or remove it all from **Super admin → Demo data**; see [deployment](docs/deployment.md#demo-data).
 
 On your computer BluePrint needs no accounts or keys: the database is an embedded Postgres in `.data/`, files are kept in `.data/files`, email goes to the local mailbox, a payment simulator stands in for Stripe and the assistant runs in practice mode. None of these stand-ins can run on a live site.
 

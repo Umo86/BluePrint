@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
+import { qualified } from '../db/qualified';
 import { editionStaff, editions, invitations, serviceCategories, supplierUsers, suppliers, users } from '../db/schema';
 import { assertSuperAdmin, assertWritable, isViewingAs, requireSupplierMember } from '../authz';
 import { forbidden, notFound } from '../errors';
@@ -12,7 +13,14 @@ export const supplierSchema = z.object({
   name: z.string().trim().min(1, 'Enter the supplier name.').max(200),
   email: z.string().trim().email('Enter a valid email.').max(254),
   phone: z.string().trim().max(40).optional().nullable(),
-  website: z.string().trim().max(300).optional().nullable(),
+  website: z
+    .string()
+    .trim()
+    .max(300)
+    .optional()
+    .nullable()
+    .transform((v) => (v ? (/^https?:\/\//i.test(v) ? v : `https://${v}`) : null))
+    .refine((v) => v === null || /^https?:\/\/[^\s]+\.[^\s]+$/i.test(v), 'Enter a valid website.'),
 });
 
 export const supplierCommissionSchema = z.object({
@@ -41,8 +49,8 @@ export async function listSuppliers(actor: Actor) {
   return db
     .select({
       supplier: suppliers,
-      userCount: sql<number>`(select count(*)::int from ${supplierUsers} where ${supplierUsers.supplierId} = ${suppliers.id})`,
-      categoryCount: sql<number>`(select count(*)::int from ${serviceCategories} where ${serviceCategories.supplierId} = ${suppliers.id})`,
+      userCount: sql<number>`(select count(*)::int from ${supplierUsers} where ${supplierUsers.supplierId} = ${qualified(suppliers.id)})`,
+      categoryCount: sql<number>`(select count(*)::int from ${serviceCategories} where ${serviceCategories.supplierId} = ${qualified(suppliers.id)})`,
     })
     .from(suppliers)
     .orderBy(asc(suppliers.name));

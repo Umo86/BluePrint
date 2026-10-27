@@ -23,6 +23,7 @@ import { sanitizeRichText } from '../security/sanitize';
 import { formSchemaSchema } from '@/lib/forms';
 import { parseLocalDateTime } from '@/lib/dates';
 import { resolveDeadline } from './editions';
+import { syncOrderTaskForAllStands } from './orders';
 import type { Actor } from '../auth/actor';
 
 export const REQUIREMENT_CHOICES = ['required', 'if_applicable', 'optional', 'hidden'] as const;
@@ -177,6 +178,7 @@ export async function createTask(actor: Actor, editionId: string, input: TaskInp
     await writeRequirements(tx, t.id, data.requirements);
     return t;
   });
+  if (row.kind === 'order') await syncOrderTaskForAllStands(row.id);
   await audit(actor, 'task.created', { entityType: 'task', entityId: row.id, editionId, details: { title: row.title, kind: row.kind } });
   return row;
 }
@@ -207,6 +209,7 @@ export async function updateTask(actor: Actor, taskId: string, input: TaskInput)
       .where(eq(tasks.id, taskId));
     await writeRequirements(tx, taskId, data.requirements);
   });
+  if (data.kind === 'order' && (task.kind !== 'order' || task.linkedCategoryId !== (data.linkedCategoryId ?? null))) await syncOrderTaskForAllStands(taskId);
   await audit(actor, 'task.updated', { entityType: 'task', entityId: taskId, editionId: task.editionId, details: { title: data.title, published: data.published } });
 }
 

@@ -38,8 +38,9 @@ export function passwordProblems(password: string, email?: string): string | nul
   if (/^(.)\1+$/.test(password)) return 'Avoid repeating a single character.';
   if (email) {
     const local = email.split('@')[0]?.toLowerCase();
-    if (lower === email.toLowerCase() || (local && local.length >= 4 && lower.includes(local))) {
-      return 'Your password should not contain your email address.';
+    if (lower === email.toLowerCase()) return 'Your password should not be your email address.';
+    if (local && local.length >= 4 && lower.includes(local)) {
+      return `Your password should not contain “${local}”, the first part of your email address.`;
     }
   }
   return null;

@@ -18,7 +18,8 @@ import { cloneEdition, createEdition, createShow, deleteEdition, updateEditionBa
 import { getPlatformSettings, updatePlatformSettings } from '@/server/services/settings';
 import { listUsers, setSuperAdmin, setUserStatus } from '@/server/services/users';
 import { anonymisePerson, exportPersonData } from '@/server/services/gdpr';
-import { canManageCompany, removeMember, setMemberAccess, updateCompany } from '@/server/services/companies';
+import { canManageCompany, listCompanies, removeMember, setMemberAccess, updateCompany } from '@/server/services/companies';
+import { createCategory } from '@/server/services/catalogue';
 import { removeStaff, updateStaffRole } from '@/server/services/staff';
 import { createSupplier, listSuppliers } from '@/server/services/suppliers';
 import { queryAuditLog } from '@/server/services/audit-log';
@@ -189,6 +190,21 @@ describe('companies and staff', () => {
     const ex = await makeExhibitor(edition.id, shell.id, 'K3');
     await expect(createSupplier(actorFor(admin), { name: 'Clean Co', email: 'clean@example.com' })).resolves.toBeTruthy();
     await expect(listSuppliers(actorFor(ex.user))).rejects.toThrow(/permission/);
+  });
+
+  it('counts each company’s stands and each supplier’s categories in the lists', async () => {
+    const { edition, shell } = await makeEdition();
+    const ex = await makeExhibitor(edition.id, shell.id, 'K4');
+    const sa = actorFor(await makeUser({ isSuperAdmin: true }));
+    const [row] = (await listCompanies(sa, { q: ex.company.name })).rows;
+    expect(row).toMatchObject({ memberCount: 1, standCount: 1 });
+
+    const admin = actorFor(await makeStaff(edition.id, 'show_admin'));
+    const supplier = await createSupplier(admin, { name: 'Count Co', email: 'count@example.com' });
+    await createCategory(admin, edition.id, { name: 'Lighting', supplierId: supplier.id });
+    await createCategory(admin, edition.id, { name: 'Power', supplierId: supplier.id });
+    const listed = (await listSuppliers(sa)).find((s) => s.supplier.id === supplier.id);
+    expect(listed?.categoryCount).toBe(2);
   });
 });
 

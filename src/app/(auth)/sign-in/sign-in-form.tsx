@@ -5,7 +5,7 @@ import { Alert, Anchor, Button, Code, Group, PasswordInput, PinInput, Stack, Tex
 import { useAction } from '@/lib/use-action';
 import { passwordSignInAction, requestCodeAction, verifyCodeAction } from '../actions';
 
-type TestLogin = { role: string; email: string; password: string };
+type TestLogin = { role: string; email: string; password: string; note?: string | null };
 
 /**
  * Test logins, one per kind of account, shown under the form while the site is being tried out
@@ -24,6 +24,11 @@ function TestLogins({ logins, onUse, busy }: { logins: TestLogin[]; onUse: (l: T
               <Text fz="sm" fw={600}>
                 {l.role}
               </Text>
+              {l.note ? (
+                <Text fz="xs" c="dimmed">
+                  {l.note}
+                </Text>
+              ) : null}
               <Text fz="xs" truncate>
                 {l.email}
               </Text>

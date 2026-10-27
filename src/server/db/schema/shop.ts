@@ -32,6 +32,8 @@ export const suppliers = pgTable(
     /** VAT-registered suppliers are paid VAT on their share; others are paid their share only. */
     vatRegistered: boolean('vat_registered').notNull().default(true),
     status: text('status', { enum: ['active', 'disabled'] }).notNull().default('active'),
+    /** An invented supplier from the demo data, removed with it. Its payouts are always practice ones. */
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

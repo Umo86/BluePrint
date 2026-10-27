@@ -18,6 +18,7 @@ import {
 } from '@tabler/icons-react';
 import { AppShell, type NavItem } from '@/components/app-shell';
 import { PlatformNotice } from '@/components/platform-notice';
+import { DemoFrame } from '@/components/demo-frame';
 import { getCurrentAuth, requireActor } from '@/server/auth/current';
 import { getEditionForStaff } from '@/server/services/editions';
 import { getWorkspaces } from '@/server/services/workspaces';
@@ -89,7 +90,7 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
       workspaces={workspaces}
     >
       <PlatformNotice />
-      {children}
+      <DemoFrame editionId={edition.id}>{children}</DemoFrame>
     </AppShell>
   );
 }

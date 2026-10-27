@@ -5,9 +5,12 @@ import { Group, Paper, Progress, Stack, Text } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { IconCloudOff, IconCloudUpload, IconFile, IconX } from '@tabler/icons-react';
-import { useUploadsOn } from './uploads-context';
+import { usePracticeUploads, useUploadsOn } from './uploads-context';
 import { beginUploadAction, completeUploadAction, type UploadedFile } from '@/app/file-actions';
 import { UPLOAD_RULES, formatBytes, type UploadPurpose } from '@/lib/upload-rules';
+
+/** Matches PRACTICE_MAX_BYTES on the server. */
+const PRACTICE_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 type Scope = { editionId?: string; standId?: string; companyId?: string; supplierId?: string };
 
@@ -51,7 +54,11 @@ export function FileUpload({
   label?: string;
   disabled?: boolean;
 }) {
-  const rules = UPLOAD_RULES[purpose];
+  const practice = usePracticeUploads();
+  // In a demo show without file storage, files are kept in the database, so they are smaller.
+  const rules = practice
+    ? { ...UPLOAD_RULES[purpose], maxBytes: Math.min(UPLOAD_RULES[purpose].maxBytes, PRACTICE_UPLOAD_BYTES), label: UPLOAD_RULES[purpose].label.replace(/up to \d+ MB/, 'up to 4 MB in the demo shows') }
+    : UPLOAD_RULES[purpose];
   const [progress, setProgress] = useState<{ name: string; pct: number } | null>(null);
   const uploadsOn = useUploadsOn();
 

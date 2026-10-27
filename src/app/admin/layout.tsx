@@ -5,6 +5,7 @@ import {
   IconCalendarEvent,
   IconClipboardList,
   IconCreditCard,
+  IconFlask,
   IconLayoutDashboard,
   IconMessageChatbot,
   IconServer,
@@ -34,6 +35,7 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
     { label: 'Audit log', href: '/admin/audit', icon: <IconClipboardList size={18} />, section: 'Platform' },
     { label: 'System', href: '/admin/system', icon: <IconServer size={18} />, section: 'Platform' },
     { label: 'Privacy (GDPR)', href: '/admin/gdpr', icon: <IconShieldLock size={18} />, section: 'Platform' },
+    { label: 'Demo data', href: '/admin/demo', icon: <IconFlask size={18} />, section: 'Platform' },
   ];
   return (
     <AppShell title="Super admin" subtitle="Full control of BluePrint" nav={nav} user={{ name: auth.user.name, email: auth.user.email }} workspaces={workspaces}>

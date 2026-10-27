@@ -1,7 +1,9 @@
 import 'server-only';
+import { isDemoEdition } from '../demo/flags';
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
+import { qualified } from '../db/qualified';
 import { companies, companyMembers, editions, files, savedReplies, stands, ticketMessages, tickets, users } from '../db/schema';
 import { editionStaffWith, getEditionAccess, requireEditionPermission, requireStandAccess } from '../authz';
 import { forbidden, invalid, notFound } from '../errors';
@@ -192,8 +194,9 @@ export async function openTicket(actor: Actor, standId: string, raw: z.input<typ
   await checkAttachments(actor, data.attachments, stand.id);
   const db = await getDb();
   const [user] = await db.select().from(users).where(eq(users.id, actor.userId)).limit(1);
+  const demo = await isDemoEdition(stand.editionId);
   const t = await db.transaction(async (tx) => {
-    const number = await nextNumber(tx, 'ticket');
+    const number = await nextNumber(tx, 'ticket', { demo });
     const now = new Date();
     const [row] = await tx
       .insert(tickets)
@@ -268,7 +271,7 @@ export async function helpdeskQueue(actor: Actor, editionId: string, opts: { sta
     const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
     conds.push(or(ilike(tickets.subject, like), ilike(tickets.number, like), ilike(companies.name, like), ilike(stands.number, like), ilike(tickets.contactEmail, like))!);
   }
-  const assignee = sql<string | null>`(select name from users where users.id = ${tickets.assignedTo})`;
+  const assignee = sql<string | null>`(select name from users where users.id = ${qualified(tickets.assignedTo)})`;
   const rows = await db
     .select({ ticket: tickets, companyName: companies.name, standNumber: stands.number, assigneeName: assignee })
     .from(tickets)

@@ -6,7 +6,7 @@ import { Button, Group } from '@mantine/core';
 import { useAction } from '@/lib/use-action';
 import { simulateCheckoutAction } from '@/app/portal/shop-actions';
 
-export function SimulatorButtons({ orderId, slug, amount }: { orderId: string; slug: string; amount: string }) {
+export function SimulatorButtons({ orderId, slug, amount, practice = false }: { orderId: string; slug: string; amount: string; practice?: boolean }) {
   const router = useRouter();
   const [outcome, setOutcome] = useState<'pay' | 'cancel' | null>(null);
   const act = useAction(simulateCheckoutAction);
@@ -21,7 +21,7 @@ export function SimulatorButtons({ orderId, slug, amount }: { orderId: string; s
         Cancel
       </Button>
       <Button color="green" loading={act.pending && outcome === 'pay'} onClick={() => go('pay')}>
-        Pay {amount} (test)
+        Pay {amount} ({practice ? 'practice' : 'test'})
       </Button>
     </Group>
   );

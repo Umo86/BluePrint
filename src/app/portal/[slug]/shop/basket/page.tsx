@@ -5,6 +5,7 @@ import { ButtonLink, TextLink } from '@/components/links';
 import { basketForStand } from '@/server/services/shop';
 import { loadPortal } from '../../load';
 import { BasketClient } from './basket-client';
+import { CloseCancelledCheckout } from './close-cancelled-checkout';
 
 export default async function BasketPage({ params, searchParams }: PageProps<'/portal/[slug]/shop/basket'>) {
   const { slug } = await params;
@@ -20,6 +21,7 @@ export default async function BasketPage({ params, searchParams }: PageProps<'/p
       </TextLink>
       <PageHeader title="Your basket" description={`Stand ${ctx.stand.number}. Everyone in your company working on this stand shares this basket.`} />
       {sp.checkout === 'cancelled' ? <Alert color="yellow">Payment cancelled. Nothing was charged and your basket is as you left it.</Alert> : null}
+      {sp.checkout === 'cancelled' && typeof sp.order === 'string' && /^[0-9a-f-]{36}$/i.test(sp.order) ? <CloseCancelledCheckout slug={ctx.edition.slug} orderId={sp.order} /> : null}
       {ctx.closedReason ? <Alert color="gray">{ctx.closedReason}</Alert> : null}
       {card.items.length ? (
         <BasketClient
@@ -32,6 +34,7 @@ export default async function BasketPage({ params, searchParams }: PageProps<'/p
           editable={ctx.editable}
           terms={card.terms}
           feeMode={card.feeMode}
+          practice={card.practice}
         />
       ) : (
         <EmptyState

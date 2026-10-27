@@ -3,6 +3,7 @@ import { Stack } from '@mantine/core';
 import { PageHeader } from '@/components/ui/page-header';
 import { getTask } from '@/server/services/tasks';
 import { listPages } from '@/server/services/manual';
+import { shopCategoriesForFilters } from '@/server/services/catalogue';
 import { listExhibitorTypes } from '@/server/services/show-setup';
 import { responsesForTask } from '@/server/services/submissions';
 import { AppError } from '@/server/errors';
@@ -27,9 +28,10 @@ export default async function TaskPage({ params, searchParams }: PageProps<'/man
     }
     if (loaded.task.editionId !== edition.id) notFound();
   }
-  const [types, pages, responses] = await Promise.all([
+  const [types, pages, categories, responses] = await Promise.all([
     listExhibitorTypes(actor, edition.id),
     listPages(actor, edition.id),
+    shopCategoriesForFilters(actor, edition.id),
     loaded ? responsesForTask(actor, loaded.task.id) : Promise.resolve(null),
   ]);
   const t = loaded?.task;
@@ -72,6 +74,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<'/man
         }}
         types={types.map((ty) => ({ id: ty.id, name: ty.name, isSpaceOnly: ty.isSpaceOnly, standCount: ty.standCount }))}
         pages={pages.map((p) => ({ value: p.id, label: p.title }))}
+        categories={categories.map((c) => ({ value: c.id, label: c.name }))}
         buildUpStartsAt={edition.buildUpStartsAt?.toISOString() ?? null}
         responses={
           responses

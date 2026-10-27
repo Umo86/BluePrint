@@ -53,6 +53,7 @@ import {
   type REVIEW_OUTCOMES,
 } from '@/server/services/submissions';
 import { parseLocalDateTime } from '@/lib/dates';
+import { plural } from '@/lib/format';
 
 const refresh = (editionId: string) => revalidatePath(`/manage/${editionId}`, 'layout');
 const id = (v: unknown) => String(v ?? '');
@@ -266,7 +267,14 @@ export async function runImportAction(editionId: string, form: FormData): Promis
     });
     refresh(editionId);
     return {
-      summary: `Imported ${r.created} new and ${r.updated} updated stands, ${r.newCompanies} new companies, and ${r.invitations} invitations ${r.invitationsSent ? 'sent' : 'saved to send later'}.${r.skipped.length ? ` ${r.skipped.length} rows with problems were skipped.` : ''}${r.notInvited ? ` ${r.notInvited} contacts could not be invited (for example your own address).` : ''}`,
+      summary: [
+        `Imported ${plural(r.created, 'new stand')} and ${plural(r.updated, 'updated stand')}, with ${plural(r.newCompanies, 'new company', 'new companies')}.`,
+        r.invitations ? `${plural(r.invitations, 'invitation')} ${r.invitationsSent ? 'sent' : 'saved to send later'}.` : '',
+        r.skipped.length ? `${plural(r.skipped.length, 'row')} with problems ${r.skipped.length === 1 ? 'was' : 'were'} skipped.` : '',
+        r.notInvited ? `${plural(r.notInvited, 'contact')} could not be invited (for example your own address).` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
     };
   });
 }

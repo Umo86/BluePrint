@@ -6,7 +6,8 @@ import { assertSuperAdmin } from '../authz';
 import { audit } from '../audit';
 import { emailMode, env, storageMode, twoFactorOn } from '../env';
 import { getPlatformSettings } from './settings';
-import { deliverOutboxEmail } from '../email/send';
+import { DEMO_ADDRESS_REASON, DEMO_SHOW_REASON, deliverOutboxEmail } from '../email/send';
+import { EMAIL_OFF_REASON } from '../email/provider';
 import type { Actor } from '../auth/actor';
 
 export async function systemStatus(actor: Actor) {
@@ -18,6 +19,20 @@ export async function systemStatus(actor: Actor) {
     .from(emailOutbox)
     .where(gte(emailOutbox.createdAt, since))
     .groupBy(emailOutbox.status);
+  // Emails held back, by why: the demo shows never send, nothing is sent while email is not set up,
+  // and the rest went to blocked or unsubscribed addresses.
+  const held = await db
+    .select({ reason: emailOutbox.error, n: count() })
+    .from(emailOutbox)
+    .where(and(gte(emailOutbox.createdAt, since), eq(emailOutbox.status, 'suppressed')))
+    .groupBy(emailOutbox.error);
+  const notSent = { demo: 0, emailOff: 0, blocked: 0 };
+  for (const h of held) {
+    const n = Number(h.n);
+    if (h.reason === DEMO_ADDRESS_REASON || h.reason === DEMO_SHOW_REASON) notSent.demo += n;
+    else if (h.reason === EMAIL_OFF_REASON) notSent.emailOff += n;
+    else notSent.blocked += n;
+  }
   const failed = await db
     .select()
     .from(emailOutbox)
@@ -49,6 +64,7 @@ export async function systemStatus(actor: Actor) {
   };
   return {
     emailByStatus: Object.fromEntries(emailByStatus.map((r) => [r.status, Number(r.n)])),
+    notSent,
     failed,
     suppressions,
     jobs,

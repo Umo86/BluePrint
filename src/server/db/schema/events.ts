@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -23,6 +24,12 @@ export const shows = pgTable(
     slug: text('slug').notNull(),
     description: text('description'),
     archivedAt: timestamp('archived_at', tz),
+    /**
+     * Part of the demo data (an invented organiser for trying BluePrint out). Only the demo loader sets
+     * it. Everything in a demo show goes when the demo data is removed, its card payments are always
+     * practice payments, and its uploads are kept in the database while file storage is not connected.
+     */
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -262,6 +269,23 @@ export const files = pgTable(
   },
   (t) => [uniqueIndex('files_key_unique').on(t.storageKey), index('files_stand_idx').on(t.standId)],
 );
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => 'bytea',
+  fromDriver: (v) => (v instanceof Uint8Array ? v : new Uint8Array(v as ArrayBufferLike)),
+  toDriver: (v) => (Buffer.isBuffer(v) ? v : Buffer.from(v.buffer, v.byteOffset, v.byteLength)),
+});
+
+/**
+ * The bytes of files in the demo shows (keys starting `demo/`) while file storage (R2) is not
+ * connected, so every part of BluePrint can be tried on a new site. Small files only; removed with
+ * the demo data. Real shows never keep files here.
+ */
+export const fileBlobs = pgTable('file_blobs', {
+  storageKey: text('storage_key').primaryKey(),
+  body: bytea('body').notNull(),
+  createdAt: createdAt(),
+});
 
 /** Internal notes on an exhibitor, visible to the show team only. */
 export const exhibitorNotes = pgTable(

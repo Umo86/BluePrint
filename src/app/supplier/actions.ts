@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { runAction, type ActionResult } from '@/server/actions';
 import { requireActor } from '@/server/auth/current';
-import { createSupplierProduct, submitSupplierProduct, updateSupplierProduct, withdrawSupplierProduct, type SupplierProductInput } from '@/server/services/catalogue';
+import { createSupplierProduct, deleteSupplierProduct, submitSupplierProduct, updateSupplierProduct, withdrawSupplierProduct, type SupplierProductInput } from '@/server/services/catalogue';
 import { completeSimulatedOnboarding, refreshStripeStatus, startStripeOnboarding, stripeDashboardLink } from '@/server/services/supplier-portal';
 import { updateSupplier, type supplierSchema } from '@/server/services/suppliers';
 import type { z } from 'zod';
@@ -38,7 +38,14 @@ export async function withdrawSupplierProductAction(supplierId: string, productI
   return runAction(async () => {
     await withdrawSupplierProduct(await requireActor(), id(supplierId), id(productId));
     refresh();
-  }, 'Product withdrawn.');
+  }, 'Product withdrawn. It is back in your drafts.');
+}
+
+export async function deleteSupplierProductAction(supplierId: string, productId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await deleteSupplierProduct(await requireActor(), id(supplierId), id(productId));
+    refresh();
+  }, 'Product deleted.');
 }
 
 /** Returns the Stripe page to continue set-up on (or the local simulator page). */

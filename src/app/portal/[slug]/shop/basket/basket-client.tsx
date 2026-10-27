@@ -39,6 +39,7 @@ export function BasketClient({
   editable,
   terms,
   feeMode,
+  practice = false,
 }: {
   slug: string;
   standId: string;
@@ -49,6 +50,7 @@ export function BasketClient({
   editable: boolean;
   terms: string;
   feeMode: string;
+  practice?: boolean;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<'card' | 'invoice'>(card ? 'card' : 'invoice');
@@ -254,7 +256,7 @@ export function BasketClient({
           </Button>
           {method === 'card' && !free ? (
             <Text fz="xs" c="dimmed" ta="center">
-              You will pay on Stripe’s secure page. BluePrint never sees your card details.
+              {practice ? 'This is a demo show: you go to a practice payment page, and no card is charged.' : 'You will pay on Stripe’s secure page. BluePrint never sees your card details.'}
             </Text>
           ) : null}
         </Stack>

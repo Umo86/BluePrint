@@ -30,14 +30,15 @@ import { sendEmail } from '../email/send';
 import { renderSimpleEmail } from '../email/simple';
 import { renderTemplate } from '../email/templates';
 import { appUrl } from '../auth/login';
-import { payments, type WebhookEvent } from '../payments/provider';
+import { payments, paymentsForEdition, type WebhookEvent } from '../payments/provider';
+import { isDemoEdition } from '../demo/flags';
 import { renderInvoice, type InvoiceDocument, type InvoiceLine } from '../pdf/invoice';
 import { getPlatformSettings } from './settings';
 import { canReadOrderDocuments, storeGeneratedFile } from './files';
 import { storage } from '../storage';
 import { notifySupplier } from './catalogue';
 import { reversalFor, vatWithin } from '@/lib/pricing';
-import { money } from '@/lib/format';
+import { money, spreadsheetDateTime } from '@/lib/format';
 import { csvCell } from '@/lib/csv';
 import { answerText } from '@/lib/order-details';
 
@@ -68,14 +69,21 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 const PREFIX = { order: 'ORD', invoice: 'INV', credit_note: 'CRN', ticket: 'HD' } as const;
 
-/** Next number in a gap-free sequence (orders, invoices and credit notes each have their own). */
-export async function nextNumber(db: DbLike, key: keyof typeof PREFIX) {
+const WAITING_FOR_SUPPLIER = 'Waiting for the supplier to finish setting up Stripe payouts.';
+
+/**
+ * Next number in a gap-free sequence (orders, invoices and credit notes each have their own). The
+ * demo shows have sequences of their own (DEMO-ORD-000001 and so on), so removing the demo data
+ * never leaves gaps in the real ones.
+ */
+export async function nextNumber(db: DbLike, key: keyof typeof PREFIX, opts: { demo?: boolean } = {}) {
+  const counter = opts.demo ? `demo_${key}` : key;
   const [r] = await db
     .insert(counters)
-    .values({ key, value: 1 })
+    .values({ key: counter, value: 1 })
     .onConflictDoUpdate({ target: counters.key, set: { value: sql`${counters.value} + 1` } })
     .returning({ value: counters.value });
-  return `${PREFIX[key]}-${String(r.value).padStart(6, '0')}`;
+  return `${opts.demo ? 'DEMO-' : ''}${PREFIX[key]}-${String(r.value).padStart(6, '0')}`;
 }
 
 async function orderContext(db: DbLike, orderId: string) {
@@ -165,16 +173,21 @@ async function storeDocument(ctx: OrderContext, number: string, body: Uint8Array
  */
 export async function ensureInvoice(orderId: string) {
   const db = await getDb();
+  const [head] = await db.select({ editionId: orders.editionId }).from(orders).where(eq(orders.id, orderId)).limit(1);
+  const demo = await isDemoEdition(head?.editionId);
   const reserved = await db.transaction(async (tx) => {
     const [o] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1).for('update');
     if (!o) throw notFound();
     const [existing] = await tx.select().from(invoices).where(and(eq(invoices.orderId, orderId), eq(invoices.kind, 'invoice'))).limit(1);
     if (existing) return existing;
-    const number = await nextNumber(tx, 'invoice');
+    const number = await nextNumber(tx, 'invoice', { demo });
     const [row] = await tx.insert(invoices).values({ number, orderId, kind: 'invoice', totalPence: o.totalPence }).returning();
     return row;
   });
   if (reserved.fileId) return reserved;
+  // Without file storage the invoice is drawn from the order each time it is downloaded (the demo
+  // shows keep theirs in the database instead).
+  if (storage().kind === 'off' && !demo) return reserved;
   const ctx = await orderContext(db, orderId);
   const pdf = await renderInvoice(await invoiceDocument(db, ctx, reserved));
   const file = await storeDocument(ctx, reserved.number, pdf);
@@ -267,15 +280,18 @@ export async function orderDocumentPdf(actor: Actor, documentId: string): Promis
 async function ensureCreditNote(refund: RefundRow) {
   const db = await getDb();
   const orderId = refund.orderId;
+  const [head] = await db.select({ editionId: orders.editionId }).from(orders).where(eq(orders.id, orderId)).limit(1);
+  const demo = await isDemoEdition(head?.editionId);
   const row = await db.transaction(async (tx) => {
     await tx.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId)).limit(1).for('update');
     const [existing] = await tx.select().from(invoices).where(eq(invoices.refundId, refund.id)).limit(1);
     if (existing) return existing;
-    const number = await nextNumber(tx, 'credit_note');
+    const number = await nextNumber(tx, 'credit_note', { demo });
     const [created] = await tx.insert(invoices).values({ number, orderId, kind: 'credit_note', refundId: refund.id, totalPence: refund.amountPence }).returning();
     return created;
   });
   if (row.fileId) return row;
+  if (storage().kind === 'off' && !demo) return row;
   const ctx = await orderContext(db, orderId);
   const pdf = await renderInvoice(await creditNoteDocument(db, ctx, row, refund));
   const file = await storeDocument(ctx, row.number, pdf);
@@ -366,7 +382,8 @@ async function notifyOrderPlaced(orderId: string) {
       order_number: o.number,
       order_total: money(o.totalPence),
       order_link: appUrl(`/portal/${ctx.edition.slug}/orders/${o.id}`),
-      order_lines: linesSummary(ctx.lines).join('\n'),
+      // The card fee is part of the total, so it is listed with the lines and they add up.
+      order_lines: [...linesSummary(ctx.lines), ...(o.cardFeePence ? [`Card processing fee: ${money(o.cardFeePence)}`] : [])].join('\n'),
       payment_note: paid
         ? `We have received your payment of ${money(o.totalPence)} for stand ${ctx.stand.number}. Your VAT invoice is on the order page.`
         : `Your order for stand ${ctx.stand.number} is confirmed. A VAT invoice for ${money(o.totalPence)} is on the order page${o.dueAt ? `, with payment due by ${o.dueAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ctx.edition.timezone })}` : ''}.`,
@@ -455,7 +472,7 @@ async function completePaidOrder(orderId: string, opts: { notify: boolean }) {
   };
   await step('charge', async () => {
     const [o] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-    const p = payments();
+    const p = o ? await paymentsForEdition(o.editionId) : null;
     if (o?.stripePaymentIntentId && !o.stripeChargeId && p) {
       const { chargeId } = await p.paymentDetails(o.stripePaymentIntentId);
       if (chargeId) await db.update(orders).set({ stripeChargeId: chargeId }).where(eq(orders.id, orderId));
@@ -507,7 +524,6 @@ export async function createSupplierTransfers(orderId: string) {
  */
 export async function processTransfers(filter: { orderId?: string; supplierId?: string; transferId?: string; includeFailed?: boolean }) {
   const db = await getDb();
-  const p = payments();
   const statuses: ('pending' | 'failed')[] = filter.includeFailed ? ['pending', 'failed'] : ['pending'];
   const conds = [inArray(supplierTransfers.status, statuses), eq(orders.paymentMethod, 'card')];
   if (filter.orderId) conds.push(eq(supplierTransfers.orderId, filter.orderId));
@@ -522,6 +538,8 @@ export async function processTransfers(filter: { orderId?: string; supplierId?: 
     .limit(200);
   let sent = 0;
   for (const { t, s, o } of rows) {
+    // The demo shows pay their invented suppliers with practice payouts.
+    const p = await paymentsForEdition(o.editionId);
     if (t.amountPence <= 0) {
       await db.update(supplierTransfers).set({ status: 'reversed', error: null }).where(eq(supplierTransfers.id, t.id));
       continue;
@@ -531,7 +549,7 @@ export async function processTransfers(filter: { orderId?: string; supplierId?: 
       continue;
     }
     if (!s.stripeAccountId || !s.stripePayoutsEnabled) {
-      await db.update(supplierTransfers).set({ status: 'pending', error: 'Waiting for the supplier to finish setting up Stripe payouts.' }).where(eq(supplierTransfers.id, t.id));
+      await db.update(supplierTransfers).set({ status: 'pending', error: WAITING_FOR_SUPPLIER }).where(eq(supplierTransfers.id, t.id));
       continue;
     }
     try {
@@ -608,6 +626,40 @@ export async function syncOrderTasks(standId: string) {
 }
 
 /**
+ * Brings one order task up to date for every stand in its show: used when the task is created or
+ * its category changes, so stands that have already ordered from that category are not asked again.
+ */
+export async function syncOrderTaskForAllStands(taskId: string) {
+  const db = await getDb();
+  const [t] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+  if (!t || t.kind !== 'order') return;
+  const covered = t.linkedCategoryId
+    ? await db
+        .selectDistinct({ standId: orders.standId })
+        .from(orderLines)
+        .innerJoin(orders, eq(orders.id, orderLines.orderId))
+        .where(
+          and(
+            eq(orders.editionId, t.editionId),
+            eq(orderLines.categoryId, t.linkedCategoryId),
+            inArray(orders.status, LIVE_ORDER_STATUSES),
+            ne(orderLines.fulfilmentStatus, 'cancelled'),
+          ),
+        )
+    : [];
+  const done = new Set(covered.map((c) => c.standId));
+  const existing = await db.select({ id: submissions.id, standId: submissions.standId, status: submissions.status }).from(submissions).where(eq(submissions.taskId, taskId));
+  const have = new Set(existing.map((s) => s.standId));
+  const now = new Date();
+  const add = [...done].filter((standId) => !have.has(standId)).map((standId) => ({ taskId, standId, status: 'completed' as const, submittedAt: now }));
+  const complete = existing.filter((s) => done.has(s.standId) && s.status !== 'completed').map((s) => s.id);
+  const reopen = existing.filter((s) => !done.has(s.standId) && s.status === 'completed').map((s) => s.id);
+  if (add.length) await db.insert(submissions).values(add).onConflictDoNothing();
+  if (complete.length) await db.update(submissions).set({ status: 'completed', submittedAt: now }).where(inArray(submissions.id, complete));
+  if (reopen.length) await db.update(submissions).set({ status: 'draft', submittedAt: null }).where(inArray(submissions.id, reopen));
+}
+
+/**
  * Releases card checkouts that were never paid, so their stock is free again. Asks Stripe first:
  * a checkout that was paid after all is marked paid instead.
  */
@@ -630,7 +682,7 @@ export async function expireStaleOrders(filter: { standId?: string } = {}) {
  */
 export async function closeCheckout(o: OrderRow) {
   const db = await getDb();
-  const p = payments();
+  const p = await paymentsForEdition(o.editionId);
   if (o.stripeCheckoutSessionId && p) {
     try {
       const status = await p.checkoutStatus(o.stripeCheckoutSessionId);
@@ -714,7 +766,7 @@ export async function refundOrder(actor: Actor, orderId: string, raw: z.input<ty
 
   let refund = prepared.refund;
   if (prepared.viaStripe) {
-    const p = payments();
+    const p = await paymentsForEdition(prepared.order.editionId);
     if (!p) {
       await db.update(refunds).set({ status: 'failed', error: 'Card payments are not set up.' }).where(eq(refunds.id, refund.id));
       throw conflict('Card payments are not set up, so this refund cannot be made here.');
@@ -825,7 +877,8 @@ async function applySupplierReversals(orderId: string, refundId: string) {
   const owed = new Map<string, number>();
   for (const l of lines) if (l.supplierId) owed.set(l.supplierId, (owed.get(l.supplierId) ?? 0) + linePayoutAfterRefunds(l));
   const transfers = await db.select().from(supplierTransfers).where(eq(supplierTransfers.orderId, orderId));
-  const p = payments();
+  const [order] = await db.select({ editionId: orders.editionId }).from(orders).where(eq(orders.id, orderId)).limit(1);
+  const p = order ? await paymentsForEdition(order.editionId) : null;
   for (const t of transfers) {
     const target = Math.max(0, owed.get(t.supplierId) ?? 0);
     if (t.status === 'pending' || t.status === 'failed') {
@@ -1138,7 +1191,7 @@ export async function orderForStaff(actor: Actor, orderId: string) {
     documents: await documentsFor(db, [orderId]),
     cardFeeRefundable: o.cardFeePence - cardFeeRefunded(o, ctx.lines),
     canManage: access.permissions.has('manage_orders') && !actor.readOnly,
-    paymentsMode: payments()?.kind ?? null,
+    paymentsMode: (await paymentsForEdition(o.editionId))?.kind ?? null,
   };
 }
 
@@ -1197,10 +1250,18 @@ export async function commissionReport(actor: Actor, editionId: string) {
   const suppliersOut = [...by.values()]
     .map((r) => ({ ...r, orders: r.orders.size, transfers: r.key === 'organiser' ? null : (paidOut.get(r.key) ?? { sent: 0, waiting: 0, manualOwed: 0, manualSettled: 0 }) }))
     .sort((a, b) => b.grossPence - a.grossPence);
-  const [fees] = await db
-    .select({ cardFees: sql<number>`coalesce(sum(${orders.cardFeePence}), 0)::bigint` })
-    .from(orders)
-    .where(and(eq(orders.editionId, editionId), inArray(orders.status, ['paid', 'partially_refunded', 'refunded'])));
+  // Card fees charged on paid orders, less any card fee given back in a refund.
+  const byOrder = new Map<string, { order: OrderRow; lines: LineRow[] }>();
+  for (const { line, order } of rows) {
+    const entry = byOrder.get(order.id) ?? { order, lines: [] };
+    entry.lines.push(line);
+    byOrder.set(order.id, entry);
+  }
+  let cardFeesCollectedPence = 0;
+  for (const { order, lines } of byOrder.values()) {
+    if (order.status === 'invoiced') continue;
+    cardFeesCollectedPence += Math.max(0, order.cardFeePence - cardFeeRefunded(order, lines));
+  }
   const totals = suppliersOut.reduce(
     (a, r) => ({
       grossPence: a.grossPence + r.grossPence,
@@ -1210,7 +1271,7 @@ export async function commissionReport(actor: Actor, editionId: string) {
     }),
     { grossPence: 0, refundedPence: 0, commissionPence: 0, payoutPence: 0 },
   );
-  return { suppliers: suppliersOut, totals: { ...totals, cardFeesCollectedPence: Number(fees.cardFees) } };
+  return { suppliers: suppliersOut, totals: { ...totals, cardFeesCollectedPence } };
 }
 
 /** Every order line in an edition as CSV, for finance. Values are made safe for spreadsheets. */
@@ -1235,7 +1296,7 @@ export async function exportOrdersCsv(actor: Actor, editionId: string) {
     lines.push(
       [
         r.order.number,
-        r.order.createdAt.toISOString().slice(0, 16).replace('T', ' '),
+        spreadsheetDateTime(r.order.createdAt),
         ORDER_STATUS_LABELS[r.order.status],
         r.order.paymentMethod,
         r.companyName ?? '',
@@ -1327,6 +1388,19 @@ export async function supplierOrders(actor: Actor, supplierId: string, opts: { e
   };
 }
 
+/** The shows a supplier has orders in, newest first, for choosing one. */
+export async function supplierOrderShows(actor: Actor, supplierId: string) {
+  await assertSupplier(actor, supplierId);
+  const db = await getDb();
+  return db
+    .selectDistinct({ id: editions.id, name: editions.name, buildUpStartsAt: editions.buildUpStartsAt })
+    .from(orderLines)
+    .innerJoin(orders, eq(orders.id, orderLines.orderId))
+    .innerJoin(editions, eq(editions.id, orders.editionId))
+    .where(and(eq(orderLines.supplierId, supplierId), inArray(orders.status, SUPPLIER_VISIBLE)))
+    .orderBy(desc(editions.buildUpStartsAt));
+}
+
 export async function supplierOrdersCsv(actor: Actor, supplierId: string, editionId: string | null) {
   const { lines } = await supplierOrders(actor, supplierId, { editionId });
   const header = ['Order', 'Placed', 'Show', 'Company', 'Stand', 'Hall', 'Contact', 'Email', 'Phone', 'Item', 'Code', 'Options', 'Details', 'Quantity', 'Your payout', 'Status'];
@@ -1335,7 +1409,7 @@ export async function supplierOrdersCsv(actor: Actor, supplierId: string, editio
     out.push(
       [
         l.order.number,
-        l.order.createdAt.toISOString().slice(0, 16).replace('T', ' '),
+        spreadsheetDateTime(l.order.createdAt),
         l.edition.name,
         l.companyName ?? '',
         l.stand.number,
@@ -1383,7 +1457,8 @@ export async function supplierPayouts(actor: Actor, supplierId: string) {
     status: r.t.status,
     settledAt: r.t.settledAt,
     createdAt: r.t.createdAt,
-    waitingReason: r.t.status === 'pending' ? r.t.error : null,
+    // Said to the supplier themselves.
+    waitingReason: r.t.status === 'pending' ? (r.t.error === WAITING_FOR_SUPPLIER ? 'Waiting for you to finish setting up payouts.' : r.t.error) : null,
   }));
 }
 

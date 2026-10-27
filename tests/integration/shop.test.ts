@@ -32,6 +32,8 @@ import {
   submitSupplierProduct,
   updateProduct,
   updateSupplierProduct,
+  withdrawSupplierProduct,
+  deleteSupplierProduct,
 } from '@/server/services/catalogue';
 import { addToBasket, basketForStand, checkout, confirmCheckoutReturn, shopForStand, simulateCheckout, updateBasketItem } from '@/server/services/shop';
 import {
@@ -161,6 +163,21 @@ describe('catalogue', () => {
     await expect(updateSupplierProduct(rival.actor, furnitureCo.supplier.id, sofa.id, { categoryId: furniture.id, name: 'Mine now', pricePence: 1, vatRateBps: 0 })).rejects.toThrow();
     const cleaningCat = (await catalogueForStaff(adminActor, edition.id)).categories.find((c) => c.name === 'Stand cleaning')!;
     await expect(createSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, { categoryId: cleaningCat.id, name: 'Sneaky', pricePence: 1, vatRateBps: 0 })).rejects.toThrow();
+  });
+
+  it('lets a supplier withdraw a product back to their drafts, and delete drafts nobody has ordered', async () => {
+    const { adminActor, furnitureCo, furniture } = await shopFixture();
+    const db = await getDb();
+    const stool = await createSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, { categoryId: furniture.id, name: 'Stool', pricePence: 2000, vatRateBps: 2000 }, { submit: true });
+    await setProductStatus(adminActor, stool.id, 'approved');
+    await withdrawSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, stool.id);
+    expect((await db.select().from(products).where(eq(products.id, stool.id)))[0].status).toBe('draft');
+    // Back in their drafts, so it can be sent again.
+    await submitSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, stool.id);
+    await expect(deleteSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, stool.id)).rejects.toThrow(/Withdraw/);
+    await withdrawSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, stool.id);
+    await deleteSupplierProduct(furnitureCo.actor, furnitureCo.supplier.id, stool.id);
+    expect(await db.select().from(products).where(eq(products.id, stool.id))).toHaveLength(0);
   });
 });
 
@@ -334,6 +351,12 @@ describe('card checkout and payouts', () => {
     let [transfer] = await db.select().from(supplierTransfers).where(eq(supplierTransfers.orderId, placed.orderId));
     expect(transfer).toMatchObject({ reversedPence: 2550, status: 'partially_reversed' });
     expect((await db.select().from(submissions).where(and(eq(submissions.taskId, task.id), eq(submissions.standId, ex.stand.id))))[0].status).toBe('completed');
+    // The card fee was not part of that refund, so it still counts as collected.
+    expect(order.cardFeePence).toBeGreaterThan(0);
+    expect((await commissionReport(adminActor, edition.id)).totals.cardFeesCollectedPence).toBe(order.cardFeePence);
+    // An order task added after the stand has ordered is done straight away.
+    const late = await createTask(adminActor, edition.id, { title: 'Furniture (added later)', kind: 'order', linkedCategoryId: furniture.id, deadline: { mode: 'none' }, published: true, requirements: { [shell.id]: 'required' } });
+    expect((await db.select().from(submissions).where(and(eq(submissions.taskId, late.id), eq(submissions.standId, ex.stand.id))))[0]?.status).toBe('completed');
 
     // The rest of the line and the card fee: the order is fully refunded and the task is open again.
     const detail = await orderForStaff(adminActor, placed.orderId);
@@ -345,6 +368,8 @@ describe('card checkout and payouts', () => {
     expect(transfer).toMatchObject({ reversedPence: 5100, status: 'reversed' });
     expect((await db.select().from(orderLines).where(eq(orderLines.id, line.id)))[0].fulfilmentStatus).toBe('cancelled');
     expect((await db.select().from(submissions).where(and(eq(submissions.taskId, task.id), eq(submissions.standId, ex.stand.id))))[0].status).toBe('draft');
+    expect((await db.select().from(submissions).where(and(eq(submissions.taskId, late.id), eq(submissions.standId, ex.stand.id))))[0].status).toBe('draft');
+    expect((await commissionReport(adminActor, edition.id)).totals.cardFeesCollectedPence).toBe(0);
     await expect(refundOrder(adminActor, placed.orderId, { lines: [{ lineId: line.id, amountPence: 1 }], reason: 'Again' })).rejects.toThrow();
     const notes = await db.select().from(invoices).where(and(eq(invoices.orderId, placed.orderId), eq(invoices.kind, 'credit_note')));
     expect(notes).toHaveLength(2);
@@ -487,6 +512,20 @@ describe('stock and abandoned checkouts', () => {
     expect((await db.select().from(orders).where(eq(orders.id, placed.orderId)))[0].status).toBe('cancelled');
     expect(sim.calls.some((c) => c.method === 'expireCheckout')).toBe(true);
     expect(again.orderId).not.toBe(placed.orderId);
+  });
+
+  it('cancels the checkout when the exhibitor leaves the payment page without paying', async () => {
+    const { edition, shell, chair } = await shopFixture();
+    const ex = await makeExhibitor(edition.id, shell.id);
+    const me = actorFor(ex.user);
+    await addToBasket(me, ex.stand.id, { productId: chair.id, quantity: 1, options: { Colour: 'White' } });
+    const total = (await basketForStand(me, ex.stand.id)).totals.totalPence;
+    const placed = await checkout(me, ex.stand.id, { method: 'card', expectedTotalPence: total });
+    await simulateCheckout(me, placed.orderId, 'cancel');
+    const db = await getDb();
+    expect((await db.select().from(orders).where(eq(orders.id, placed.orderId)))[0].status).toBe('cancelled');
+    // The basket is as they left it.
+    expect((await basketForStand(me, ex.stand.id)).items).toHaveLength(1);
   });
 });
 

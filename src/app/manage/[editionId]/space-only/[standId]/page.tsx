@@ -5,7 +5,7 @@ import { DownloadButton, TextLink } from '@/components/links';
 import { packForReview } from '@/server/services/space-only';
 import { AppError } from '@/server/errors';
 import { checkPack, PACK_STATUS_LABELS, SPACE_ONLY_DOC_LABELS } from '@/lib/space-only';
-import { dateTime, plural, standSize } from '@/lib/format';
+import { dateLong, dateTime, plural, standSize } from '@/lib/format';
 import { formatBytes } from '@/lib/upload-rules';
 import { loadEdition } from '../../load';
 import { ReviewForm } from './review-form';
@@ -93,7 +93,7 @@ export default async function ReviewPackPage({ params }: PageProps<'/manage/[edi
                     <TableTr>
                       <TableTh>Insurance cover</TableTh>
                       <TableTd>
-                        {typeof declared?.insuranceCoverGbp === 'number' ? `£${(declared.insuranceCoverGbp as number).toLocaleString('en-GB')}` : '—'}, expires {String(declared?.insuranceExpiresOn ?? '—')}
+                        {typeof declared?.insuranceCoverGbp === 'number' ? `£${(declared.insuranceCoverGbp as number).toLocaleString('en-GB')}` : '—'}, expires {declared?.insuranceExpiresOn ? dateLong(String(declared.insuranceExpiresOn)) : '—'}
                       </TableTd>
                     </TableTr>
                   </TableTbody>

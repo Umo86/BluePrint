@@ -44,6 +44,8 @@ export const users = pgTable(
     lockedUntil: timestamp('locked_until', tz),
     lastLoginAt: timestamp('last_login_at', tz),
     anonymisedAt: timestamp('anonymised_at', tz),
+    /** An invented person from the demo data, removed with it (super admins never are). */
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -213,6 +215,8 @@ export const companies = pgTable(
     aspExhibitorId: text('asp_exhibitor_id'),
     invoiceAllowed: boolean('invoice_allowed').notNull().default(false),
     archivedAt: timestamp('archived_at', tz),
+    /** An invented company from the demo data, removed with it. */
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -252,6 +256,8 @@ export const libraryItems = pgTable(
     description: text('description'),
     data: jsonb('data').$type<Record<string, unknown>>().notNull().default({}),
     createdBy: uuid('created_by'),
+    /** A sample template from the demo data, removed with it. */
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
