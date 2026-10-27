@@ -23,8 +23,11 @@ export type ToolResultBlock = { type: 'tool_result'; tool_use_id: string; conten
 export type TurnMessage = { role: 'user'; content: string | (ToolResultBlock | TextBlock)[] } | { role: 'assistant'; content: string | ReplyBlock[] };
 
 export type ModelRequest = {
-  /** Rules that are the same for every exhibitor (cached), then details about this exhibitor. */
-  system: { stable: string; dynamic: string };
+  /**
+   * Rules that are the same for every exhibitor (cached), the organiser's and the show team's own
+   * instructions (cached per show), then details about this exhibitor.
+   */
+  system: { stable: string; rules?: string; dynamic: string };
   messages: TurnMessage[];
   tools: ToolDef[];
   maxTokens: number;
@@ -33,7 +36,8 @@ export type ModelRequest = {
 export type ModelReply = {
   content: ReplyBlock[];
   stopReason: 'end_turn' | 'tool_use' | 'max_tokens' | 'refusal' | 'stop_sequence' | 'pause_turn' | string | null;
-  usage: { inputTokens: number; outputTokens: number };
+  /** Input tokens not read from or written to the cache, cache reads and writes, and output. */
+  usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number };
   model: string;
 };
 
@@ -58,22 +62,31 @@ class ClaudeModel implements AssistantModel {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: this.apiKey, maxRetries: 2, timeout: 60_000, ...(this.fetchImpl ? { fetch: this.fetchImpl } : {}) });
     const tools = req.tools.map((t, i) => (i === req.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' as const } } : t));
+    // Cached up to the end of the stable rules, and again after the show's own instructions. Empty
+    // blocks are left out: the API refuses them.
+    const system = [
+      { type: 'text' as const, text: req.system.stable, cache_control: { type: 'ephemeral' as const } },
+      ...(req.system.rules?.trim() ? [{ type: 'text' as const, text: req.system.rules, cache_control: { type: 'ephemeral' as const } }] : []),
+      ...(req.system.dynamic.trim() ? [{ type: 'text' as const, text: req.system.dynamic }] : []),
+    ].filter((b) => b.text.trim());
     const response = await client.messages.create({
       model: settings.model,
       max_tokens: req.maxTokens,
-      system: [
-        { type: 'text', text: req.system.stable, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: req.system.dynamic },
-      ],
+      system,
       // The message shapes match the API's; the SDK's own types are stricter than needed here.
       messages: req.messages as never,
-      tools: tools as never,
+      ...(tools.length ? { tools: tools as never } : {}),
       output_config: { effort: settings.effort },
     });
     return {
       content: response.content as unknown as ReplyBlock[],
       stopReason: response.stop_reason,
-      usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
       model: response.model,
     };
   }

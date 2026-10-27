@@ -364,7 +364,7 @@ describe('assistant', () => {
     expect(await db.select().from(assistantMessages)).not.toContainEqual(expect.objectContaining({ content: 'Hello?' }));
 
     await consumeRateLimit(`assistant:user-hour:${s.b.user.id}`, 30, 3600, 30);
-    await expect(askAssistant(actorFor(s.b.user), s.b.stand.id, { text: 'Hi' })).rejects.toThrow(/Too many/);
+    await expect(askAssistant(actorFor(s.b.user), s.b.stand.id, { text: 'Hi' })).rejects.toThrow(/a lot of questions in a short time/);
 
     await db.update(editions).set({ assistantEnabled: false }).where(eq(editions.id, s.edition.id));
     expect(await assistantView(actorFor(s.a.user), s.a.stand.id)).toMatchObject({ available: false, reason: 'The assistant is switched off for this show.' });

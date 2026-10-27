@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Group, NumberInput, Paper, Select, Stack, Switch, Text, TextInput } from '@mantine/core';
+import { Button, Group, NumberInput, Paper, Select, Stack, Text, TextInput } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useAction } from '@/lib/use-action';
 import type { ActionResult } from '@/lib/action-result';
+import { TextLink } from './links';
 
 export type EditionDetailsValues = {
   id: string;
@@ -19,7 +20,8 @@ export type EditionDetailsValues = {
   openStartsAt: string | null;
   openEndsAt: string | null;
   breakdownEndsAt: string | null;
-  assistantEnabled: boolean;
+  /** Shown for information; the AI assistant section switches it on and off. */
+  assistantEnabled?: boolean;
 };
 
 const STATUS_OPTIONS = [
@@ -43,7 +45,6 @@ type SaveAction = (
     openStartsAt: string | null;
     openEndsAt: string | null;
     breakdownEndsAt: string | null;
-    assistantEnabled: boolean;
   },
 ) => Promise<ActionResult>;
 
@@ -68,7 +69,6 @@ export function EditionDetailsForm({ edition, action, allowArchive }: { edition:
             openStartsAt: f.openStartsAt,
             openEndsAt: f.openEndsAt,
             breakdownEndsAt: f.breakdownEndsAt,
-            assistantEnabled: f.assistantEnabled,
           });
         }}
       >
@@ -112,12 +112,13 @@ export function EditionDetailsForm({ edition, action, allowArchive }: { edition:
               decimalScale={2}
             />
           </Group>
-          <Switch
-            label="Exhibitor assistant"
-            description="The AI assistant in the exhibitor portal, which answers from this show’s manual. It must also be switched on for BluePrint by a super admin."
-            checked={f.assistantEnabled}
-            onChange={(e) => setF({ ...f, assistantEnabled: e.currentTarget.checked })}
-          />
+          <Text fz="sm">
+            The AI assistant for exhibitors is {f.assistantEnabled === false ? 'switched off' : 'switched on'} for this show. Change it, and its name, greeting and house rules, in{' '}
+            <TextLink href={`/manage/${edition.id}/assistant?tab=settings`} fz="sm">
+              AI assistant settings
+            </TextLink>
+            .
+          </Text>
           <Text fz="xs" c="dimmed">
             Times are UK time. Deadlines set as “days before build-up” move automatically when you change the build-up date.
           </Text>

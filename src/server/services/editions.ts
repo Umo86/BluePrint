@@ -433,6 +433,9 @@ export async function cloneEdition(actor: Actor, sourceId: string, input: z.inpu
         emailSettings: src.emailSettings,
         spaceOnlyRules: src.spaceOnlyRules,
         contacts: src.contacts,
+        // The assistant keeps its name, greeting, house rules and office hours.
+        assistantEnabled: src.assistantEnabled,
+        assistantSettings: src.assistantSettings,
         feeMode: src.feeMode,
         defaultCommissionType: src.defaultCommissionType,
         defaultCommissionValue: src.defaultCommissionValue,

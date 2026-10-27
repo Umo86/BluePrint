@@ -2,7 +2,8 @@ import { Badge, Group, Paper, SimpleGrid, Stack, Table, TableTbody, TableTd, Tab
 import { PageHeader } from '@/components/ui/page-header';
 import { TextLink } from '@/components/links';
 import { ticketsForStand } from '@/server/services/helpdesk';
-import { assistantStatus } from '@/server/assistant';
+import { assistantConfigFor, assistantStatus } from '@/server/assistant';
+import { replyExpectation } from '@/lib/assistant-config';
 import { dateTime } from '@/lib/format';
 import { loadPortal } from '../load';
 import { AskTeamForm } from './help-forms';
@@ -24,9 +25,12 @@ export default async function PortalHelp({ params }: PageProps<'/portal/[slug]/h
       <PageHeader title="Help" description="Ask the show team a question. You will get an email when they reply, and the conversation stays here." />
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Paper withBorder p="md">
-          <Title order={2} fz="md" mb="sm">
+          <Title order={2} fz="md" mb={4}>
             Ask the show team
           </Title>
+          <Text fz="sm" c="dimmed" mb="sm">
+            {replyExpectation(assistantConfigFor(ctx.edition), new Date(), ctx.edition.timezone)}
+          </Text>
           {assistant.available ? (
             <Text fz="sm" c="dimmed" mb="sm">
               Quick question? The assistant answers from the exhibitor manual straight away:{' '}

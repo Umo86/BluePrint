@@ -37,6 +37,7 @@ import { isCronJob, runCronJob, type CronJob } from '@/server/cron';
 import { invalid } from '@/server/errors';
 import { createLibraryItem, deleteLibraryItem, updateLibraryItem, type LibraryKind } from '@/server/services/library';
 import { updatePlatformSettings, type PlatformSettings } from '@/server/services/settings';
+import { checkAssistantConnection, type ConnectionCheck } from '@/server/assistant/admin';
 import { removeSuppression, retryFailedEmails } from '@/server/services/system';
 import { anonymisePerson, eraseEmailAddress, findPersonRecords } from '@/server/services/gdpr';
 import { audit } from '@/server/audit';
@@ -369,7 +370,12 @@ export async function updateSettingsAction(patch: Partial<PlatformSettings>): Pr
   return runAction(async () => {
     await updatePlatformSettings(await superAdmin(), patch);
     revalidatePath('/admin/settings');
+    revalidatePath('/admin/assistant');
   }, 'Settings saved.');
+}
+
+export async function checkAssistantConnectionAction(): Promise<ActionResult<ConnectionCheck>> {
+  return runAction(async () => checkAssistantConnection(await superAdmin()));
 }
 
 export async function retryEmailsAction(): Promise<ActionResult<{ attempted: number; sent: number }>> {

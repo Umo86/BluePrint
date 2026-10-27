@@ -64,6 +64,13 @@
       "when": 1793011799236,
       "tag": "0008_review_additions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793113651633,
+      "tag": "0009_assistant_section",
+      "breakpoints": true
     }
   ]
 }

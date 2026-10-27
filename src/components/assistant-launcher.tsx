@@ -9,8 +9,11 @@ import { TextLink } from './links';
 import { AssistantChat } from './assistant-chat';
 import { assistantViewAction, type ChatView } from '@/app/portal/help-actions';
 
-/** The "Ask the assistant" button in the corner of every portal page, opening the chat in a side panel. */
-export function AssistantLauncher({ slug, standId }: { slug: string; standId: string }) {
+/**
+ * The "Ask the assistant" button in the corner of every portal page, opening the chat in a side panel.
+ * `name` is the show's own name for it, if it has one.
+ */
+export function AssistantLauncher({ slug, standId, name = null }: { slug: string; standId: string; name?: string | null }) {
   const pathname = usePathname();
   const [opened, setOpened] = useState(false);
   const [view, setView] = useState<ChatView | null>(null);
@@ -27,16 +30,16 @@ export function AssistantLauncher({ slug, standId }: { slug: string; standId: st
       <div style={{ height: 72 }} aria-hidden />
       <Affix position={{ bottom: 20, right: 20 }}>
         <Button size="md" radius="xl" leftSection={<IconMessageChatbot size={20} />} onClick={open} aria-haspopup="dialog" style={{ boxShadow: 'var(--mantine-shadow-md)' }}>
-          Ask the assistant
+          {name ? `Ask ${name}` : 'Ask the assistant'}
         </Button>
       </Affix>
-      <Drawer opened={opened} onClose={() => setOpened(false)} position="right" size="lg" title="Your exhibitor assistant" closeButtonProps={{ 'aria-label': 'Close the assistant' }}>
+      <Drawer opened={opened} onClose={() => setOpened(false)} position="right" size="lg" title={name ?? 'Your exhibitor assistant'} closeButtonProps={{ 'aria-label': 'Close the assistant' }}>
         {!view ? (
           <Stack align="center" py="xl">
             <Loader size="sm" />
           </Stack>
         ) : view.available ? (
-          <AssistantChat key={view.conversationId ?? 'new'} slug={slug} standId={standId} initial={view} compact />
+          <AssistantChat key={view.conversationId ?? 'new'} mode={{ kind: 'exhibitor', slug, standId }} initial={view} compact />
         ) : (
           <Alert color="gray">
             <Text fz="sm">{view.reason ?? 'The assistant is not available.'}</Text>

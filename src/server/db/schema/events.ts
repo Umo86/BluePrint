@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { COMMISSION_TYPES, createdAt, id, tz, updatedAt } from './common';
 import { companies, users } from './core';
+import type { EditionAssistantSettings } from '../../../lib/assistant-config';
 
 export const shows = pgTable(
   'shows',
@@ -92,6 +93,7 @@ export const editions = pgTable(
     status: text('status', { enum: EDITION_STATUSES }).notNull().default('draft'),
     /** The exhibitor assistant for this show (it also has to be switched on for the platform). */
     assistantEnabled: boolean('assistant_enabled').notNull().default(true),
+    assistantSettings: jsonb('assistant_settings').$type<EditionAssistantSettings>().notNull().default({}),
     branding: jsonb('branding').$type<EditionBranding>().notNull().default({}),
     emailSettings: jsonb('email_settings').$type<EditionEmailSettings>().notNull().default({}),
     spaceOnlyRules: jsonb('space_only_rules').$type<SpaceOnlyRules | null>(),

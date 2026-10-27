@@ -278,6 +278,8 @@ export const assistantConversations = pgTable(
       .references(() => editions.id, { onDelete: 'cascade' }),
     standId: uuid('stand_id').references(() => stands.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').notNull(),
+    /** A show team member trying the assistant out as this stand (never shown to the exhibitor). */
+    isTest: boolean('is_test').notNull().default(false),
     /** Set when the exhibitor starts a new conversation; old ones stay for the record. */
     closedAt: timestamp('closed_at', tz),
     createdAt: createdAt(),

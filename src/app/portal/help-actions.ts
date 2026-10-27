@@ -43,7 +43,18 @@ export async function closeTicketAction(slug: string, standId: string, ticketId:
 export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; meta: AssistantMeta; createdAt: string };
 export type ChatView =
   | { available: false; reason: string | null }
-  | { available: true; offline: boolean; readOnly: boolean; greeting: { text: string; suggestions: string[] }; conversationId: string | null; messages: ChatMessage[] };
+  | {
+      available: true;
+      offline: boolean;
+      readOnly: boolean;
+      /** A show team member trying the assistant out as this exhibitor. */
+      test: boolean;
+      name: string;
+      greeting: { text: string; suggestions: string[] };
+      handoff: { askPhone: boolean; phone: string; expectation: string };
+      conversationId: string | null;
+      messages: ChatMessage[];
+    };
 
 export async function assistantViewAction(standId: string): Promise<ActionResult<ChatView>> {
   return runAction(async () => {
@@ -68,9 +79,14 @@ export async function applyProposalAction(slug: string, standId: string, message
   }, 'The answers are in the form. Check them, then send the form.');
 }
 
-export async function sendTicketProposalAction(slug: string, standId: string, messageId: string): Promise<ActionResult<{ ticketId: string; number: string | null }>> {
+export async function sendTicketProposalAction(
+  slug: string,
+  standId: string,
+  messageId: string,
+  contact: { phone?: string; bestTime?: string } = {},
+): Promise<ActionResult<{ ticketId: string; number: string | null; expectation: string }>> {
   return runAction(async () => {
-    const r = await sendTicketProposal(await requireActor(), id(standId), id(messageId));
+    const r = await sendTicketProposal(await requireActor(), id(standId), id(messageId), { phone: String(contact?.phone ?? ''), bestTime: String(contact?.bestTime ?? '') });
     refresh(slug);
     return r;
   }, 'Sent to the show team. You will get an email when they reply.');

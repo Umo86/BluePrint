@@ -69,7 +69,7 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
   }
   if (p.has('helpdesk') || p.has('edit_content')) {
     const gaps = await unansweredCount(edition.id);
-    nav.push({ label: 'Assistant', href: `${base}/assistant`, icon: <IconMessageChatbot size={18} />, section: 'Exhibitor manual', badge: gaps || null });
+    nav.push({ label: 'AI assistant', href: `${base}/assistant`, icon: <IconMessageChatbot size={18} />, section: 'Exhibitor manual', badge: gaps || null });
   }
   if (p.has('manage_orders')) nav.push({ label: 'Shop catalogue', href: `${base}/shop`, icon: <IconBuildingStore size={18} />, section: 'Shop' });
   if (p.has('manage_orders') || p.has('view_reports')) nav.push({ label: 'Orders', href: `${base}/orders`, icon: <IconReceipt size={18} />, section: 'Shop' });

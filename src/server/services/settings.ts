@@ -61,6 +61,11 @@ export const platformSettingsSchema = z.object({
   assistantEffort: z.enum(['low', 'medium', 'high']).default('low'),
   /** Most questions the assistant answers per show per day (a cost ceiling). */
   assistantDailyLimit: z.number().int().min(0).max(100_000).default(3000),
+  /** Most questions one person can ask in an hour, and in a day. */
+  assistantPersonHourLimit: z.number().int().min(1).max(1000).default(30),
+  assistantPersonDayLimit: z.number().int().min(1).max(5000).default(150),
+  /** The organiser's instructions for the assistant at every show (each show can add its own). */
+  assistantInstructions: z.string().trim().max(2000).default(''),
   maintenanceMessage: z.string().max(500).default(''),
 });
 

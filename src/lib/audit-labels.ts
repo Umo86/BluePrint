@@ -190,6 +190,8 @@ const LABELS: Record<string, string> = {
   'assistant.faq_deleted': 'Deleted an assistant answer',
   'assistant.unanswered_resolved': 'Resolved an unanswered question',
   'assistant.form_filled': 'Assistant filled in a form',
+  'assistant.settings_updated': 'Changed a show’s AI assistant settings',
+  'assistant.connection_checked': 'Checked the connection to Claude',
 
   // Records, privacy and system
   'report.downloaded': 'Downloaded a report',

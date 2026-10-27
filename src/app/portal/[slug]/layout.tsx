@@ -6,7 +6,7 @@ import { getWorkspaces } from '@/server/services/workspaces';
 import { checklistForStand } from '@/server/services/submissions';
 import { basketCountForStand } from '@/server/services/shop';
 import { ticketsAwaitingExhibitor } from '@/server/services/helpdesk';
-import { assistantStatus } from '@/server/assistant';
+import { assistantConfigFor, assistantStatus } from '@/server/assistant';
 import { AssistantLauncher } from '@/components/assistant-launcher';
 import { loadPortal } from './load';
 import { StandSwitcher } from './stand-switcher';
@@ -20,6 +20,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
   const toDo = checklist.items.filter((i) => !i.done && i.state !== 'submitted').length;
   const basketCount = await basketCountForStand(ctx.actor, ctx.stand.id);
   const [awaiting, assistant] = await Promise.all([ticketsAwaitingExhibitor(ctx.actor, ctx.stand.id), assistantStatus(ctx.edition)]);
+  const assistantConfig = assistantConfigFor(ctx.edition);
   const base = `/portal/${ctx.edition.slug}`;
   const nav: NavItem[] = [
     { label: 'Home', href: base, exact: true, icon: <IconHome size={18} /> },
@@ -49,7 +50,7 @@ export default async function PortalLayout({ children, params }: LayoutProps<'/p
     >
       <PlatformNotice />
       {children}
-      {assistant.available ? <AssistantLauncher slug={ctx.edition.slug} standId={ctx.stand.id} /> : null}
+      {assistant.available ? <AssistantLauncher slug={ctx.edition.slug} standId={ctx.stand.id} name={assistantConfig.customName ? assistantConfig.name : null} /> : null}
     </AppShell>
   );
 }

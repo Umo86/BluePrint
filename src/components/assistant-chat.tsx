@@ -2,13 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Badge, Box, Button, Group, Loader, Paper, ScrollArea, Stack, Text, Textarea } from '@mantine/core';
+import { Alert, Badge, Box, Button, Group, Loader, Paper, ScrollArea, Stack, Text, TextInput, Textarea } from '@mantine/core';
 import { IconCheck, IconMessagePlus, IconRobot, IconSend, IconUser } from '@tabler/icons-react';
 import { useAction } from '@/lib/use-action';
 import { ChatText } from './chat-text';
 import { applyProposalAction, askAssistantAction, newConversationAction, sendTicketProposalAction, type ChatMessage, type ChatView } from '@/app/portal/help-actions';
+import { testChatAskAction, testChatResetAction } from '@/app/manage/assistant-actions';
 
 type Ready = Extract<ChatView, { available: true }>;
+
+/** Who the chat is for: an exhibitor in the portal, or a show team member trying it out as one. */
+export type ChatMode = { kind: 'exhibitor'; slug: string; standId: string } | { kind: 'test'; editionId: string; standId: string; userId: string };
 
 function Bubble({ message, children }: { message: Pick<ChatMessage, 'role'>; children: React.ReactNode }) {
   const mine = message.role === 'user';
@@ -38,21 +42,116 @@ function Bubble({ message, children }: { message: Pick<ChatMessage, 'role'>; chi
   );
 }
 
-export function AssistantChat({ slug, standId, initial, compact = false }: { slug: string; standId: string; initial: Ready; compact?: boolean }) {
+/** A question the assistant prepared for the show team, with a phone number and a good time to call. */
+function TicketCard({
+  ticket,
+  handoff,
+  test,
+  readOnly,
+  pending,
+  phoneError,
+  onSend,
+}: {
+  ticket: NonNullable<ChatMessage['meta']['ticket']>;
+  handoff: Ready['handoff'];
+  test: boolean;
+  readOnly: boolean;
+  pending: boolean;
+  phoneError?: string;
+  onSend: (contact: { phone: string; bestTime: string }) => Promise<string | null>;
+}) {
+  const [phone, setPhone] = useState(handoff.phone);
+  const [bestTime, setBestTime] = useState('');
+  const [expectation, setExpectation] = useState(handoff.expectation);
+  return (
+    <Paper withBorder p="xs" mt={6} bg="var(--mantine-color-body)">
+      <Text fz="xs" fw={700}>
+        For the show team: {ticket.subject}
+      </Text>
+      <Text fz="xs" style={{ whiteSpace: 'pre-wrap' }}>
+        {ticket.message}
+      </Text>
+      {ticket.sent ? (
+        <>
+          <Badge mt={6} color="green" variant="light" leftSection={<IconCheck size={12} />}>
+            Sent ({ticket.sent})
+          </Badge>
+          <Text fz="xs" c="dimmed" mt={4}>
+            {expectation}
+          </Text>
+        </>
+      ) : (
+        <Stack gap={6} mt={6}>
+          {handoff.askPhone ? (
+            <Group gap="xs" grow align="flex-start">
+              <TextInput
+                size="xs"
+                label="Your phone number (optional)"
+                description="If a call would be quicker."
+                value={phone}
+                onChange={(e) => setPhone(e.currentTarget.value)}
+                maxLength={40}
+                error={phoneError}
+                disabled={readOnly || test}
+                autoComplete="tel"
+              />
+              <TextInput
+                size="xs"
+                label="Best time to call (optional)"
+                placeholder="For example, weekday mornings"
+                value={bestTime}
+                onChange={(e) => setBestTime(e.currentTarget.value)}
+                maxLength={80}
+                disabled={readOnly || test}
+              />
+            </Group>
+          ) : null}
+          <Text fz="xs" c="dimmed">
+            {handoff.expectation}
+          </Text>
+          {test ? (
+            <Text fz="xs" c="dimmed">
+              Test chat: in a real chat the exhibitor sends this to your help desk.
+            </Text>
+          ) : (
+            <Button
+              size="compact-xs"
+              style={{ alignSelf: 'flex-start' }}
+              disabled={readOnly}
+              loading={pending}
+              onClick={async () => {
+                const r = await onSend({ phone, bestTime });
+                if (r) setExpectation(r);
+              }}
+            >
+              Send to the show team
+            </Button>
+          )}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
+export function AssistantChat({ mode, initial, compact = false }: { mode: ChatMode; initial: Ready; compact?: boolean }) {
   const router = useRouter();
+  const test = mode.kind === 'test';
   const [messages, setMessages] = useState<ChatMessage[]>(initial.messages);
   const [draft, setDraft] = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
-  const ask = useAction(askAssistantAction, {
-    onSuccess: (data) => {
-      if (data) setMessages((m) => [...m, ...data.messages]);
-      setPendingText(null);
-    },
-  });
+  const onAnswer = (data?: { messages: ChatMessage[] }) => {
+    if (data) setMessages((m) => [...m, ...data.messages]);
+    setPendingText(null);
+  };
+  const ask = useAction(askAssistantAction, { onSuccess: onAnswer });
+  const askTest = useAction(testChatAskAction, { onSuccess: onAnswer });
   const apply = useAction(applyProposalAction);
   const sendTicket = useAction(sendTicketProposalAction);
   const fresh = useAction(newConversationAction, { onSuccess: () => setMessages([]) });
+  const freshTest = useAction(testChatResetAction, { onSuccess: () => setMessages([]) });
+  const asking = ask.pending || askTest.pending;
+  const readOnly = initial.readOnly;
 
   useEffect(() => {
     viewport.current?.scrollTo({ top: viewport.current.scrollHeight, behavior: 'smooth' });
@@ -60,10 +159,10 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
 
   const send = async (text: string) => {
     const t = text.trim();
-    if (!t || ask.pending) return;
+    if (!t || asking) return;
     setPendingText(t);
     setDraft('');
-    const r = await ask.run(standId, t);
+    const r = mode.kind === 'test' ? await askTest.run(mode.editionId, mode.standId, mode.userId, t) : await ask.run(mode.standId, t);
     if (!r.ok) {
       setPendingText(null);
       setDraft(t);
@@ -106,12 +205,16 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
                           {d.value}
                         </Text>
                       ))}
-                      {p.applied ? (
+                      {mode.kind === 'test' ? (
+                        <Text fz="xs" c="dimmed" mt={6}>
+                          Test chat: in a real chat the exhibitor puts these answers in their form with a button.
+                        </Text>
+                      ) : p.applied ? (
                         <Group gap={6} mt={6}>
                           <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>
                             In the form
                           </Badge>
-                          <Button size="compact-xs" variant="subtle" onClick={() => router.push(`/portal/${slug}/tasks/${p.taskId}`)}>
+                          <Button size="compact-xs" variant="subtle" onClick={() => router.push(`/portal/${mode.slug}/tasks/${p.taskId}`)}>
                             Open the form to check and send it
                           </Button>
                         </Group>
@@ -119,10 +222,10 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
                         <Button
                           size="compact-xs"
                           mt={6}
-                          disabled={initial.readOnly}
+                          disabled={readOnly}
                           loading={apply.pending}
                           onClick={async () => {
-                            const r = await apply.run(slug, standId, m.id, i);
+                            const r = await apply.run(mode.slug, mode.standId, m.id, i);
                             if (r.ok) updateMeta(m.id, (x) => ({ ...x, meta: { ...x.meta, proposals: (x.meta.proposals ?? []).map((q, j) => (j === i ? { ...q, applied: true } : q)) } }));
                           }}
                         >
@@ -132,32 +235,22 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
                     </Paper>
                   ))}
                   {m.meta.ticket ? (
-                    <Paper withBorder p="xs" mt={6} bg="var(--mantine-color-body)">
-                      <Text fz="xs" fw={700}>
-                        For the show team: {m.meta.ticket.subject}
-                      </Text>
-                      <Text fz="xs" style={{ whiteSpace: 'pre-wrap' }}>
-                        {m.meta.ticket.message}
-                      </Text>
-                      {m.meta.ticket.sent ? (
-                        <Badge mt={6} color="green" variant="light" leftSection={<IconCheck size={12} />}>
-                          Sent ({m.meta.ticket.sent})
-                        </Badge>
-                      ) : (
-                        <Button
-                          size="compact-xs"
-                          mt={6}
-                          disabled={initial.readOnly}
-                          loading={sendTicket.pending}
-                          onClick={async () => {
-                            const r = await sendTicket.run(slug, standId, m.id);
-                            if (r.ok && r.data) updateMeta(m.id, (x) => ({ ...x, meta: { ...x.meta, ticket: x.meta.ticket ? { ...x.meta.ticket, sent: r.data!.number ?? 'sent' } : null } }));
-                          }}
-                        >
-                          Send to the show team
-                        </Button>
-                      )}
-                    </Paper>
+                    <TicketCard
+                      ticket={m.meta.ticket}
+                      handoff={initial.handoff}
+                      test={test}
+                      readOnly={readOnly}
+                      pending={sendTicket.pending}
+                      phoneError={sendTicket.fieldErrors.phone}
+                      onSend={async (contact) => {
+                        if (mode.kind !== 'exhibitor') return null;
+                        const r = await sendTicket.run(mode.slug, mode.standId, m.id, contact);
+                        if (!r.ok || !r.data) return null;
+                        const sent = r.data.number ?? 'sent';
+                        updateMeta(m.id, (x) => ({ ...x, meta: { ...x.meta, ticket: x.meta.ticket ? { ...x.meta.ticket, sent } : null } }));
+                        return r.data.expectation;
+                      }}
+                    />
                   ) : null}
                 </>
               )}
@@ -183,13 +276,13 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
       {messages.length === 0 && !pendingText ? (
         <Group gap={6}>
           {initial.greeting.suggestions.map((s) => (
-            <Button key={s} size="compact-xs" variant="light" radius="xl" onClick={() => send(s)} disabled={initial.readOnly}>
+            <Button key={s} size="compact-xs" variant="light" radius="xl" onClick={() => send(s)} disabled={readOnly}>
               {s}
             </Button>
           ))}
         </Group>
       ) : null}
-      {initial.readOnly ? (
+      {readOnly ? (
         <Alert color="gray" p="xs">
           <Text fz="xs">You are viewing as someone else, so the assistant is switched off.</Text>
         </Alert>
@@ -218,7 +311,7 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
               maxLength={2000}
               style={{ flex: 1 }}
             />
-            <Button type="submit" loading={ask.pending} disabled={!draft.trim()} leftSection={<IconSend size={16} />}>
+            <Button type="submit" loading={asking} disabled={!draft.trim()} leftSection={<IconSend size={16} />}>
               Send
             </Button>
           </Group>
@@ -226,11 +319,20 @@ export function AssistantChat({ slug, standId, initial, compact = false }: { slu
       )}
       <Group justify="space-between" gap="xs">
         <Text fz="xs" c="dimmed" maw={420}>
-          Answers come from the exhibitor manual and can be wrong, so check anything important. The show team can read these conversations.
+          {test
+            ? 'Test chat: answers come from Claude and count towards today’s limit. Nothing is saved for the exhibitor, and nothing goes to the help desk.'
+            : 'Answers come from the exhibitor manual and can be wrong, so check anything important. The show team can read these conversations.'}
         </Text>
         {messages.length ? (
-          <Button size="compact-xs" variant="subtle" leftSection={<IconMessagePlus size={14} />} loading={fresh.pending} onClick={() => fresh.run(standId)} disabled={initial.readOnly}>
-            New conversation
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            leftSection={<IconMessagePlus size={14} />}
+            loading={fresh.pending || freshTest.pending}
+            onClick={() => (mode.kind === 'test' ? freshTest.run(mode.editionId, mode.standId) : fresh.run(mode.standId))}
+            disabled={readOnly}
+          >
+            {test ? 'Start again' : 'New conversation'}
           </Button>
         ) : null}
       </Group>

@@ -30,6 +30,10 @@ export type ToolContext = {
   ticket: TicketProposal | null;
   /** Questions the assistant could not answer, saved for the show team. */
   unanswered: string[];
+  /** A show team member trying the assistant out: nothing is recorded for the show team. */
+  test?: boolean;
+  /** When the show team will answer a question passed on now. */
+  handoffNote?: string;
 };
 
 /** Field types the assistant may fill in. Uploads, signatures and tables are left to the exhibitor. */
@@ -223,11 +227,18 @@ export async function runTool(ctx: ToolContext, name: string, input: Record<stri
       const message = str(input.message, 3000);
       if (subject.length < 3 || !message) throw new Error('Give a subject and a message.');
       ctx.ticket = { subject, message };
-      return JSON.stringify({ ok: true, shown_to_exhibitor: true, note: 'The exhibitor sees the message with a button to send it to the show team.' });
+      return JSON.stringify({
+        ok: true,
+        shown_to_exhibitor: true,
+        note: `The exhibitor sees the message with a button to send it to the show team, and can add a phone number first. Tell them when to expect an answer: ${ctx.handoffNote ?? 'the show team will reply as soon as they can.'}`,
+      });
     }
     case 'log_unanswered': {
       const question = str(input.question, 500);
       if (!question) throw new Error('Give the question.');
+      ctx.unanswered.push(question);
+      // A team member's test chat is not a real exhibitor's question.
+      if (ctx.test) return JSON.stringify({ ok: true });
       const db = await getDb();
       const recent = await db
         .select({ id: assistantUnanswered.id })
@@ -235,7 +246,6 @@ export async function runTool(ctx: ToolContext, name: string, input: Record<stri
         .where(and(eq(assistantUnanswered.editionId, ctx.edition.id), eq(assistantUnanswered.question, question), gt(assistantUnanswered.createdAt, new Date(Date.now() - 86_400_000))))
         .limit(1);
       if (!recent.length) await db.insert(assistantUnanswered).values({ editionId: ctx.edition.id, question, conversationId: ctx.conversationId });
-      ctx.unanswered.push(question);
       return JSON.stringify({ ok: true });
     }
     default:

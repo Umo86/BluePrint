@@ -1,7 +1,8 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '../db/client';
-import { companies, companyMembers, editions, editionStaff, exhibitorTypes, halls, invitations, orderLines, standContractors, stands, supplierUsers, users } from '../db/schema';
+import { assistantFaqs, companies, companyMembers, editions, editionStaff, exhibitorTypes, halls, invitations, orderLines, standContractors, stands, supplierUsers, users } from '../db/schema';
+import type { EditionAssistantSettings } from '@/lib/assistant-config';
 import type { Actor } from '../auth/actor';
 import { hashPassword, passwordProblems } from '../security/password';
 import { createEdition, createShow, updateEditionBranding, updateEditionContacts } from '../services/editions';
@@ -77,8 +78,51 @@ export async function loadDemoData(logins: TestLogin[]): Promise<string[]> {
     await createDemoShows(logins);
     done.push('Added the demo shows, accounts and activity.');
   }
+  done.push(...(await ensureDemoAssistant(logins)));
   done.push(...(await setDemoPasswords(logins)));
   return done;
+}
+
+/** The demo show's assistant set-up: a name, greeting, house rules, office hours, a low daily limit and a few answers. */
+export const DEMO_ASSISTANT: EditionAssistantSettings = {
+  name: 'BuildExpo helper',
+  greeting: 'Hi {first_name}, I’m the BuildExpo helper. Ask me anything about getting your stand ready for BuildExpo London, or let me help you with your checklist.',
+  suggestions: ['What do I still need to do?', 'When can I start building my stand?', 'How do I book a delivery slot?', 'What should I order for my stand?'],
+  instructions:
+    'Call us the BuildExpo team. For anything urgent on site during build-up or the show, give the operations team’s number, 020 7946 0101. Never promise refunds, discounts or extra stand space: offer to pass those questions to the show team.',
+  // Low while anyone can try the demo logins.
+  dailyLimit: 100,
+  officeHours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:30' },
+  replyTime: 'hours4',
+  askPhone: true,
+};
+
+const DEMO_FAQS = [
+  { question: 'Can we bring our own furniture?', answer: 'Yes. Keep it within your stand and the gangways clear. Deliveries need a delivery slot, which you can book from 1 March 2027.' },
+  { question: 'Is wifi included with our stand?', answer: 'No, wifi is not included with any stand. Ask the show team on the Help page if you need an internet connection.' },
+  { question: 'Who do we call on site if something goes wrong?', answer: 'Call the BuildExpo operations team on 020 7946 0101, or come to the organiser’s office in hall N1.' },
+];
+
+/**
+ * Gives the live demo show its assistant set-up and answers, once: a show the team has set up itself
+ * (any settings or answers already there) is left alone.
+ */
+export async function ensureDemoAssistant(logins: TestLogin[]): Promise<string[]> {
+  const db = await getDb();
+  const [edition] = await db.select().from(editions).where(eq(editions.slug, DEMO_EDITION_SLUG)).limit(1);
+  if (!edition) return [];
+  const notes: string[] = [];
+  if (!Object.keys(edition.assistantSettings ?? {}).length) {
+    await db.update(editions).set({ assistantSettings: DEMO_ASSISTANT }).where(eq(editions.id, edition.id));
+    notes.push('Set up the demo show’s AI assistant.');
+  }
+  const [faq] = await db.select({ id: assistantFaqs.id }).from(assistantFaqs).where(eq(assistantFaqs.editionId, edition.id)).limit(1);
+  if (!faq) {
+    const admin = await superAdmin(logins);
+    await db.insert(assistantFaqs).values(DEMO_FAQS.map((f) => ({ editionId: edition.id, ...f, createdBy: admin.id })));
+    notes.push('Added answers for the demo show’s AI assistant.');
+  }
+  return notes;
 }
 
 /** Gives each test login's account its password (accounts that do not exist are skipped). */

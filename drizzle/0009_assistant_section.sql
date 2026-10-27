@@ -1,0 +1,2 @@
+ALTER TABLE "editions" ADD COLUMN "assistant_settings" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "assistant_conversations" ADD COLUMN "is_test" boolean DEFAULT false NOT NULL;

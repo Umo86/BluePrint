@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, count, eq } from 'drizzle-orm';
 import { closeDb, getDb, useInMemoryDatabaseForTests } from '@/server/db/client';
-import { editions, editionStaff, tickets, orders, spaceOnlyPacks, standContractors, stands, submissions, supplierUsers, users } from '@/server/db/schema';
+import { assistantFaqs, editions, editionStaff, tickets, orders, spaceOnlyPacks, standContractors, stands, submissions, supplierUsers, users } from '@/server/db/schema';
 import { DEMO_ACCOUNTS, DEMO_EDITION_SLUG, loadDemoData } from '@/server/demo/data';
 import { signInWithPassword } from '@/server/auth/login';
 
@@ -48,6 +48,10 @@ describe('demo data', () => {
     expect(pack.insuranceCoverGbp).toBe(5_000_000);
     const [supplier] = await db.select().from(users).where(eq(users.email, DEMO_ACCOUNTS.supplier.email));
     expect(await db.select().from(supplierUsers).where(eq(supplierUsers.userId, supplier.id))).toHaveLength(1);
+    // The assistant is set up, with a low daily limit while anyone can try the demo, and a few answers.
+    expect(edition.assistantSettings).toMatchObject({ name: 'BuildExpo helper', dailyLimit: 100, replyTime: 'hours4' });
+    expect(await db.select().from(assistantFaqs).where(eq(assistantFaqs.editionId, edition.id))).toHaveLength(3);
+    expect(notes).toContain('Set up the demo show’s AI assistant.');
   });
 
   it('lets the test logins sign in with their passwords', async () => {
@@ -63,6 +67,10 @@ describe('demo data', () => {
     expect(notes[0]).toMatch(/already there/);
     const db = await getDb();
     expect(await db.select().from(editions).where(eq(editions.slug, DEMO_EDITION_SLUG))).toHaveLength(1);
+    // The assistant set-up is not repeated or overwritten.
+    expect(notes.some((n) => /AI assistant/.test(n))).toBe(false);
+    const [edition] = await db.select().from(editions).where(eq(editions.slug, DEMO_EDITION_SLUG));
+    expect(await db.select().from(assistantFaqs).where(eq(assistantFaqs.editionId, edition.id))).toHaveLength(3);
     await expect(signInWithPassword(changed[1].email, 'a different long password', { ...ctx, ip: '10.9.0.2' })).resolves.toMatchObject({ email: changed[1].email });
   });
 });

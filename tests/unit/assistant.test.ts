@@ -32,7 +32,7 @@ describe('Claude requests', () => {
     );
     expect(reply.stopReason).toBe('tool_use');
     expect(reply.content[1]).toEqual({ type: 'tool_use', id: 'toolu_1', name: 'search_manual', input: { query: 'deliveries' } });
-    expect(reply.usage).toEqual({ inputTokens: 1200, outputTokens: 40 });
+    expect(reply.usage).toEqual({ inputTokens: 1200, outputTokens: 40, cacheReadTokens: 1000, cacheWriteTokens: 0 });
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://api.anthropic.com/v1/messages');
@@ -52,6 +52,29 @@ describe('Claude requests', () => {
     expect(body).not.toHaveProperty('temperature');
     const headers = new Headers(calls[0].init.headers);
     expect(headers.get('authorization') ?? headers.get('x-api-key')).toContain('sk-ant-test');
+  });
+
+  it('sends the organiser’s and show team’s instructions as their own cached block, and leaves out empty ones', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fakeFetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(
+        JSON.stringify({ id: 'msg_2', type: 'message', role: 'assistant', model: 'claude-haiku-5-5', content: [{ type: 'text', text: 'OK' }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 5, output_tokens: 1 } }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as typeof fetch;
+    const model = new ClaudeModel('sk-ant-test', fakeFetch);
+    await model.reply({ system: { stable: 'Rules', rules: 'Call us the BuildExpo team.', dynamic: 'Today is …' }, messages: [{ role: 'user', content: 'Hi' }], tools: TOOL_DEFS, maxTokens: 100 }, { model: 'claude-haiku-5-5', effort: 'low' });
+    expect(bodies[0].system).toEqual([
+      { type: 'text', text: 'Rules', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: 'Call us the BuildExpo team.', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: 'Today is …' },
+    ]);
+    // A connection check: no instructions, no details and no tools.
+    const reply = await model.reply({ system: { stable: 'Reply OK.', dynamic: '' }, messages: [{ role: 'user', content: 'Check' }], tools: [], maxTokens: 16 }, { model: 'claude-haiku-5-5', effort: 'low' });
+    expect(bodies[1].system).toEqual([{ type: 'text', text: 'Reply OK.', cache_control: { type: 'ephemeral' } }]);
+    expect(bodies[1]).not.toHaveProperty('tools');
+    expect(reply.usage).toEqual({ inputTokens: 5, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 });
   });
 
   it('describes every tool with a closed input schema', () => {
