@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Group, Progress, Stack, Text } from '@mantine/core';
+import { Group, Paper, Progress, Stack, Text } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
-import { IconCloudUpload, IconFile, IconX } from '@tabler/icons-react';
+import { IconCloudOff, IconCloudUpload, IconFile, IconX } from '@tabler/icons-react';
+import { useUploadsOn } from './uploads-context';
 import { beginUploadAction, completeUploadAction, type UploadedFile } from '@/app/file-actions';
 import { UPLOAD_RULES, formatBytes, type UploadPurpose } from '@/lib/upload-rules';
 
@@ -52,6 +53,26 @@ export function FileUpload({
 }) {
   const rules = UPLOAD_RULES[purpose];
   const [progress, setProgress] = useState<{ name: string; pct: number } | null>(null);
+  const uploadsOn = useUploadsOn();
+
+  if (!uploadsOn) {
+    // Said up front rather than after someone has chosen a file.
+    return (
+      <Paper withBorder p="md" style={{ borderStyle: 'dashed' }}>
+        <Group justify="center" gap="sm" mih={60} wrap="nowrap">
+          <IconCloudOff size={28} aria-hidden />
+          <div>
+            <Text fz="sm" fw={600}>
+              File uploads are not switched on yet
+            </Text>
+            <Text fz="xs" c="dimmed">
+              Nothing can be uploaded on this site for now.
+            </Text>
+          </div>
+        </Group>
+      </Paper>
+    );
+  }
 
   const handle = async (list: File[]) => {
     for (const file of list) {

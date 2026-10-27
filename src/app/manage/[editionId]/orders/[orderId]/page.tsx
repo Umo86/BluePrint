@@ -119,15 +119,10 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
           {d.documents.length ? (
             d.documents.map((doc) => (
               <Group key={doc.id} justify="space-between">
-                {doc.fileId ? (
-                  <Anchor href={`/files/${doc.fileId}`} fz="sm">
-                    {doc.kind === 'credit_note' ? 'Credit note' : 'Invoice'} {doc.number}
-                  </Anchor>
-                ) : (
-                  <Text fz="sm">
-                    {doc.number} (being prepared)
-                  </Text>
-                )}
+                {/* A document that could not be stored (file storage off) is drawn from the order instead. */}
+                <Anchor href={doc.fileId ? `/files/${doc.fileId}` : `/files/documents/${doc.id}`} fz="sm">
+                  {doc.kind === 'credit_note' ? 'Credit note' : 'Invoice'} {doc.number}
+                </Anchor>
                 <Text fz="sm">{money(doc.totalPence)}</Text>
               </Group>
             ))

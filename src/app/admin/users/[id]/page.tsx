@@ -292,7 +292,8 @@ export default async function UserPage({ params }: PageProps<'/admin/users/[id]'
                 {detail.contractorStands.length ? (
                   <Stack gap={4}>
                     {detail.contractorStands.map((c) => (
-                      <Text key={c.contractor.id} fz="sm">
+                      // A div, not a paragraph: the status badge is a div, which a paragraph cannot hold.
+                      <Text key={c.contractor.id} fz="sm" component="div">
                         {c.edition.name} · stand {c.stand.number} · <StatusBadge status={c.contractor.status} />
                       </Text>
                     ))}

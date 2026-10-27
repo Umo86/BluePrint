@@ -14,6 +14,7 @@ import type { Metadata } from 'next';
 import { connection } from 'next/server';
 import { mantineHtmlProps } from '@mantine/core';
 import { Providers } from '@/components/providers';
+import { storageMode } from '@/server/env';
 
 export const metadata: Metadata = {
   title: { default: 'BluePrint', template: '%s · BluePrint' },
@@ -30,7 +31,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en-GB" {...mantineHtmlProps}>
       <body>
-        <Providers>{children}</Providers>
+        {/* Upload areas say so up front when file storage is switched off, rather than failing on use. */}
+        <Providers uploadsOn={storageMode() !== 'off'}>{children}</Providers>
       </body>
     </html>
   );

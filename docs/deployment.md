@@ -77,7 +77,7 @@ Follow sections 1 to 3 of the [email guide](email.md): verify a sending subdomai
 
    The site refuses to start if a required value is missing, and says which one.
 
-   Email and file storage can be added later. Until `RESEND_API_KEY` is set, emails are recorded on each person's record as not sent (with sign-in codes and links taken out), so nobody receives sign-in codes: people who have set a password can still sign in with it. Until all the R2 settings are in, uploads are switched off with a message, and invoices and permission-to-build certificates are not stored. The super admin overview lists what is still to set up. Redeploy after adding them.
+   Email and file storage can be added later. Until `RESEND_API_KEY` is set, emails are recorded on each person's record as not sent (with sign-in codes and links taken out), so nobody receives sign-in codes: people who have set a password can still sign in with it. Until all the R2 settings are in, upload areas say that uploads are switched off, and invoices and permission-to-build certificates are not stored: invoices and credit notes are drawn from the order each time someone downloads one, and are stored at the first download once R2 is set up. The super admin overview lists what is still to set up. Redeploy after adding them.
 4. **Deploy**, then **Settings → Domains**: add your address (for example `blueprint.yourcompany.com`) and create the DNS record Vercel shows. `APP_URL` must match it exactly.
 5. Keep **Deployment Protection** on for preview deployments.
 

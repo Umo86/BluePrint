@@ -7,8 +7,9 @@ import { Notifications } from '@mantine/notifications';
 import { DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/en-gb';
 import { cssVariablesResolver, theme } from '@/theme';
+import { UploadsOnContext } from './uploads-context';
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children, uploadsOn = true }: { children: React.ReactNode; uploadsOn?: boolean }) {
   // Marks the page as interactive (used by automated browser tests to avoid typing before React is ready).
   useEffect(() => {
     document.documentElement.dataset.ready = 'true';
@@ -18,7 +19,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <DatesProvider settings={{ locale: 'en-gb', firstDayOfWeek: 1 }}>
         <ModalsProvider>
           <Notifications position="top-right" limit={4} />
-          {children}
+          <UploadsOnContext value={uploadsOn}>{children}</UploadsOnContext>
         </ModalsProvider>
       </DatesProvider>
     </MantineProvider>

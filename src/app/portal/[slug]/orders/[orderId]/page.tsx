@@ -65,13 +65,10 @@ export default async function MyOrder({ params, searchParams }: PageProps<'/port
           {view.documents.length ? (
             view.documents.map((d) => (
               <Group key={d.id} justify="space-between">
-                {d.fileId ? (
-                  <Anchor href={`/files/${d.fileId}`} fz="sm">
-                    {d.kind === 'credit_note' ? 'Credit note' : 'VAT invoice'} {d.number} (PDF)
-                  </Anchor>
-                ) : (
-                  <Text fz="sm">{d.number} (being prepared)</Text>
-                )}
+                {/* A document that could not be stored (file storage off) is drawn from the order instead. */}
+                <Anchor href={d.fileId ? `/files/${d.fileId}` : `/files/documents/${d.id}`} fz="sm">
+                  {d.kind === 'credit_note' ? 'Credit note' : 'VAT invoice'} {d.number} (PDF)
+                </Anchor>
                 <Text fz="sm">{money(d.totalPence)}</Text>
               </Group>
             ))

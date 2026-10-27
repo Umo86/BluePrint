@@ -20,7 +20,7 @@ import {
   supplierUsers,
   suppliers,
 } from '@/server/db/schema';
-import { MemoryStorage, setStorageForTests } from '@/server/storage';
+import { MemoryStorage, NoStorage, setStorageForTests } from '@/server/storage';
 import { SimulatedPayments, payments, resetPaymentsForTests, setPaymentsForTests } from '@/server/payments/provider';
 import { resetEnvCache } from '@/server/env';
 import {
@@ -43,6 +43,7 @@ import {
   handleStripeEvent,
   markInvoicePaid,
   markOrderPaid,
+  orderDocumentPdf,
   orderForExhibitor,
   orderForStaff,
   refundOrder,
@@ -419,6 +420,46 @@ describe('invoice orders', () => {
     expect(await db.select().from(invoices).where(and(eq(invoices.orderId, second.orderId), eq(invoices.kind, 'credit_note')))).toHaveLength(1);
     expect((await shopForStand(me, ex.stand.id)).categories[0].products[0].stockLeft).toBe(3);
     await expect(cancelOrder(adminActor, placed.orderId, 'Too late')).rejects.toThrow(/refunded rather than cancelled/);
+  });
+
+  it('lets the exhibitor and the team download invoices and credit notes while file storage is off', async () => {
+    // A live site without file storage: documents are issued and numbered, but cannot be stored.
+    setStorageForTests(new NoStorage());
+    const { edition, shell, adminActor, chair, furnitureCo } = await shopFixture();
+    const ex = await makeExhibitor(edition.id, shell.id);
+    const me = actorFor(ex.user);
+    const db = await getDb();
+    await db.update(companies).set({ invoiceAllowed: true }).where(eq(companies.id, ex.company.id));
+    await addToBasket(me, ex.stand.id, { productId: chair.id, quantity: 2, options: { Colour: 'Black' } });
+    const b = await basketForStand(me, ex.stand.id, 'invoice');
+    const placed = await checkout(me, ex.stand.id, { method: 'invoice', expectedTotalPence: b.totals.totalPence });
+    const [inv] = await db.select().from(invoices).where(eq(invoices.orderId, placed.orderId));
+    expect(inv.fileId).toBeNull();
+
+    // Drawn from the order instead, for the exhibitor and the team only.
+    const pdf = await orderDocumentPdf(me, inv.id);
+    if (!('body' in pdf)) throw new Error('expected a drawn PDF');
+    expect(pdf.filename).toBe(`${inv.number}.pdf`);
+    expect(Buffer.from(pdf.body.subarray(0, 5)).toString()).toBe('%PDF-');
+    await expect(orderDocumentPdf(adminActor, inv.id)).resolves.toMatchObject({ filename: `${inv.number}.pdf` });
+    await expect(orderDocumentPdf(furnitureCo.actor, inv.id)).rejects.toThrow();
+    const stranger = await makeExhibitor(edition.id, shell.id);
+    await expect(orderDocumentPdf(actorFor(stranger.user), inv.id)).rejects.toThrow();
+    const helper = await makeStaff(edition.id, 'show_team', []);
+    await expect(orderDocumentPdf(actorFor(helper), inv.id)).rejects.toThrow();
+
+    // A cancellation's credit note works the same way.
+    await cancelOrder(adminActor, placed.orderId, 'Exhibitor withdrew');
+    const [note] = await db.select().from(invoices).where(and(eq(invoices.orderId, placed.orderId), eq(invoices.kind, 'credit_note')));
+    expect(note.fileId).toBeNull();
+    await expect(orderDocumentPdf(me, note.id)).resolves.toMatchObject({ filename: `${note.number}.pdf` });
+
+    // Once file storage is on, the next download stores the document and serves the stored copy.
+    setStorageForTests(new MemoryStorage());
+    const stored = await orderDocumentPdf(me, inv.id);
+    expect(stored).toMatchObject({ fileId: expect.any(String) });
+    const [after] = await db.select().from(invoices).where(eq(invoices.id, inv.id));
+    expect(after).toMatchObject({ number: inv.number, fileId: (stored as { fileId: string }).fileId });
   });
 });
 

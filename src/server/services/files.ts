@@ -363,6 +363,33 @@ export async function canReadFile(actor: Actor | null, file: FileRow): Promise<b
   return false;
 }
 
+/**
+ * Whether the actor may read an order's VAT invoices and credit notes: the same people who may
+ * download them once stored (the exhibitor's team, show team members who handle orders or reports,
+ * and super admins).
+ */
+export async function canReadOrderDocuments(actor: Actor, order: { id: string; editionId: string; companyId: string | null; standId: string }) {
+  const now = new Date();
+  return canReadFile(actor, {
+    id: order.id,
+    storageKey: '',
+    originalName: '',
+    mimeType: 'application/pdf',
+    sizeBytes: 0,
+    sha256: '',
+    purpose: 'invoice',
+    editionId: order.editionId,
+    companyId: order.companyId,
+    standId: order.standId,
+    supplierId: null,
+    isPublic: false,
+    uploadedBy: null,
+    verifiedAt: now,
+    deletedAt: null,
+    createdAt: now,
+  });
+}
+
 export async function getFile(fileId: string) {
   const db = await getDb();
   const [row] = await db.select().from(files).where(eq(files.id, fileId)).limit(1);

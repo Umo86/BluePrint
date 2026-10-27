@@ -31,9 +31,10 @@ import { renderSimpleEmail } from '../email/simple';
 import { renderTemplate } from '../email/templates';
 import { appUrl } from '../auth/login';
 import { payments, type WebhookEvent } from '../payments/provider';
-import { renderInvoice, type InvoiceLine } from '../pdf/invoice';
+import { renderInvoice, type InvoiceDocument, type InvoiceLine } from '../pdf/invoice';
 import { getPlatformSettings } from './settings';
-import { storeGeneratedFile } from './files';
+import { canReadOrderDocuments, storeGeneratedFile } from './files';
+import { storage } from '../storage';
 import { notifySupplier } from './catalogue';
 import { reversalFor, vatWithin } from '@/lib/pricing';
 import { money } from '@/lib/format';
@@ -43,6 +44,7 @@ import { answerText } from '@/lib/order-details';
 type OrderRow = typeof orders.$inferSelect;
 type LineRow = typeof orderLines.$inferSelect;
 type RefundRow = typeof refunds.$inferSelect;
+type InvoiceRow = typeof invoices.$inferSelect;
 
 /** Orders that count as sold (they hold stock, complete order tasks and appear to suppliers). */
 export const LIVE_ORDER_STATUSES: OrderStatus[] = ['paid', 'invoiced', 'partially_refunded'];
@@ -174,14 +176,22 @@ export async function ensureInvoice(orderId: string) {
   });
   if (reserved.fileId) return reserved;
   const ctx = await orderContext(db, orderId);
+  const pdf = await renderInvoice(await invoiceDocument(db, ctx, reserved));
+  const file = await storeDocument(ctx, reserved.number, pdf);
+  const [updated] = await db.update(invoices).set({ fileId: file.id }).where(eq(invoices.id, reserved.id)).returning();
+  return updated;
+}
+
+/** An order's VAT invoice as printed (marked paid for card orders). */
+async function invoiceDocument(db: DbLike, ctx: OrderContext, row: InvoiceRow): Promise<InvoiceDocument> {
   const base = await documentBase(db, ctx);
   const paid = ctx.order.paymentMethod === 'card' && Boolean(ctx.order.paidAt);
-  const pdf = await renderInvoice({
+  return {
     ...base,
     kind: 'invoice',
-    number: reserved.number,
-    issuedAt: reserved.issuedAt,
-    taxPointAt: paid ? ctx.order.paidAt! : reserved.issuedAt,
+    number: row.number,
+    issuedAt: row.issuedAt,
+    taxPointAt: paid ? ctx.order.paidAt! : row.issuedAt,
     dueAt: ctx.order.dueAt,
     paid,
     creditFor: null,
@@ -189,29 +199,12 @@ export async function ensureInvoice(orderId: string) {
     lines: ctx.lines.map((l) => ({ description: lineDescription(l), quantity: l.quantity, unitPence: l.unitPricePence, vatRateBps: l.vatRateBps, netPence: l.netPence, vatPence: l.vatPence })),
     cardFeePence: ctx.order.cardFeePence,
     totalPence: ctx.order.totalPence,
-  });
-  const file = await storeDocument(ctx, reserved.number, pdf);
-  const [updated] = await db.update(invoices).set({ fileId: file.id }).where(eq(invoices.id, reserved.id)).returning();
-  return updated;
+  };
 }
 
-/** The credit note for a refund, issued once (a refund already credited returns its existing note). */
-async function ensureCreditNote(refund: RefundRow) {
-  const db = await getDb();
-  const orderId = refund.orderId;
-  const row = await db.transaction(async (tx) => {
-    await tx.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId)).limit(1).for('update');
-    const [existing] = await tx.select().from(invoices).where(eq(invoices.refundId, refund.id)).limit(1);
-    if (existing) return { ...existing, fresh: false };
-    const number = await nextNumber(tx, 'credit_note');
-    const [created] = await tx.insert(invoices).values({ number, orderId, kind: 'credit_note', refundId: refund.id, totalPence: refund.amountPence }).returning();
-    return { ...created, fresh: true };
-  });
-  if (!row.fresh && row.fileId) return row;
-  const number = row.number;
-  const reason = refund.reason;
-  const ctx = await orderContext(db, orderId);
-  const [inv] = await db.select().from(invoices).where(and(eq(invoices.orderId, orderId), eq(invoices.kind, 'invoice'))).limit(1);
+/** A refund's credit note as printed. */
+async function creditNoteDocument(db: DbLike, ctx: OrderContext, row: InvoiceRow, refund: RefundRow): Promise<InvoiceDocument> {
+  const [inv] = await db.select().from(invoices).where(and(eq(invoices.orderId, ctx.order.id), eq(invoices.kind, 'invoice'))).limit(1);
   const base = await documentBase(db, ctx);
   const lines: InvoiceLine[] = [];
   for (const [lineId, amount] of Object.entries(refund.lineAmounts)) {
@@ -224,22 +217,68 @@ async function ensureCreditNote(refund: RefundRow) {
       lines.push({ description: `${lineDescription(l)} (part refund)`, quantity: 1, unitPence: amount - vat, vatRateBps: l.vatRateBps, netPence: amount - vat, vatPence: vat });
     }
   }
-  const pdf = await renderInvoice({
+  return {
     ...base,
     kind: 'credit_note',
-    number,
+    number: row.number,
     issuedAt: row.issuedAt,
     taxPointAt: row.issuedAt,
     dueAt: null,
     paid: false,
     creditFor: inv?.number ?? null,
-    reason,
+    reason: refund.reason,
     lines,
     cardFeePence: refund.cardFeePence,
     totalPence: refund.amountPence,
     paymentInstructions: null,
+  };
+}
+
+/**
+ * An order's VAT invoice or credit note, for the people who may see it: the exhibitor's team, show
+ * team members who handle orders or reports, and super admins. Issued documents are stored, so this
+ * usually points at the stored PDF. One that could not be stored when it was issued (file storage
+ * was off or failed) is stored now; while file storage is off it is drawn again from the order, so
+ * it can still be downloaded.
+ */
+export async function orderDocumentPdf(actor: Actor, documentId: string): Promise<{ fileId: string } | { filename: string; body: Uint8Array }> {
+  const db = await getDb();
+  const [doc] = await db.select().from(invoices).where(eq(invoices.id, documentId)).limit(1);
+  if (!doc) throw notFound();
+  const [o] = await db.select().from(orders).where(eq(orders.id, doc.orderId)).limit(1);
+  if (!o || !(await canReadOrderDocuments(actor, o))) throw notFound();
+  if (doc.fileId) return { fileId: doc.fileId };
+  const [refund] = doc.refundId ? await db.select().from(refunds).where(eq(refunds.id, doc.refundId)).limit(1) : [];
+  if (doc.kind === 'credit_note' && !refund) throw notFound();
+  if (storage().kind !== 'off') {
+    try {
+      const stored = doc.kind === 'credit_note' ? await ensureCreditNote(refund) : await ensureInvoice(o.id);
+      if (stored.fileId) return { fileId: stored.fileId };
+    } catch (err) {
+      console.error('Storing document failed', doc.number, err);
+    }
+  }
+  const ctx = await orderContext(db, o.id);
+  const body = await renderInvoice(doc.kind === 'credit_note' ? await creditNoteDocument(db, ctx, doc, refund) : await invoiceDocument(db, ctx, doc));
+  return { filename: `${doc.number}.pdf`, body };
+}
+
+/** The credit note for a refund, issued once (a refund already credited returns its existing note). */
+async function ensureCreditNote(refund: RefundRow) {
+  const db = await getDb();
+  const orderId = refund.orderId;
+  const row = await db.transaction(async (tx) => {
+    await tx.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId)).limit(1).for('update');
+    const [existing] = await tx.select().from(invoices).where(eq(invoices.refundId, refund.id)).limit(1);
+    if (existing) return existing;
+    const number = await nextNumber(tx, 'credit_note');
+    const [created] = await tx.insert(invoices).values({ number, orderId, kind: 'credit_note', refundId: refund.id, totalPence: refund.amountPence }).returning();
+    return created;
   });
-  const file = await storeDocument(ctx, number, pdf);
+  if (row.fileId) return row;
+  const ctx = await orderContext(db, orderId);
+  const pdf = await renderInvoice(await creditNoteDocument(db, ctx, row, refund));
+  const file = await storeDocument(ctx, row.number, pdf);
   await db.update(invoices).set({ fileId: file.id }).where(eq(invoices.id, row.id));
   return { ...row, fileId: file.id };
 }
