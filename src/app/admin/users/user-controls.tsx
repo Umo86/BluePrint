@@ -6,7 +6,7 @@ import { Alert, Button, Group, Modal, Paper, Select, Stack, Switch, Text, TextIn
 import { IconShieldPlus } from '@tabler/icons-react';
 import { useAction } from '@/lib/use-action';
 import { startViewAsAction } from '@/app/view-as-actions';
-import { inviteSuperAdminAction, setSuperAdminAction, setUserStatusAction, updateUserAction } from '../actions';
+import { inviteSuperAdminAction, setLibraryRightAction, setSuperAdminAction, setUserStatusAction, updateUserAction } from '../actions';
 
 export function InviteSuperAdminButton() {
   const router = useRouter();
@@ -93,12 +93,26 @@ export function UserProfileForm({ user }: { user: { id: string; name: string; em
   );
 }
 
-export function AccessSwitches({ userId, isSuperAdmin, status, isSelf }: { userId: string; isSuperAdmin: boolean; status: string; isSelf: boolean }) {
+export function AccessSwitches({
+  userId,
+  isSuperAdmin,
+  canAddToLibrary,
+  status,
+  isSelf,
+}: {
+  userId: string;
+  isSuperAdmin: boolean;
+  canAddToLibrary: boolean;
+  status: string;
+  isSelf: boolean;
+}) {
   const router = useRouter();
   const [confirm, setConfirm] = useState<null | 'grant' | 'revoke' | 'disable'>(null);
   // Local copies so the switches flip as soon as the change is saved, without waiting for the page to refresh.
   const [admin, setAdmin] = useState(isSuperAdmin);
   const [enabled, setEnabled] = useState(status !== 'disabled');
+  const [libraryRight, setLibraryRight] = useState(canAddToLibrary);
+  const library = useAction(setLibraryRightAction);
   const superAdmin = useAction(setSuperAdminAction);
   const setStatus = useAction(setUserStatusAction);
 
@@ -127,6 +141,17 @@ export function AccessSwitches({ userId, isSuperAdmin, status, isSelf }: { userI
         checked={admin}
         disabled={isSelf || superAdmin.pending}
         onChange={(e) => setConfirm(e.currentTarget.checked ? 'grant' : 'revoke')}
+      />
+      <Switch
+        label="Can add to the library"
+        description={admin ? 'Super admins always can.' : 'Save tasks and manual pages from their shows into the shared library, for every show to copy.'}
+        checked={admin || libraryRight}
+        disabled={admin || library.pending}
+        onChange={async (e) => {
+          const value = e.currentTarget.checked;
+          const res = await library.run(userId, value);
+          if (res.ok) setLibraryRight(value);
+        }}
       />
       <Switch
         label="Account enabled"

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "can_add_to_library" boolean DEFAULT false NOT NULL;

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { closeDb, getDb, useInMemoryDatabaseForTests } from '@/server/db/client';
 import {
   auditLog,
@@ -20,7 +20,7 @@ import { listUsers, setSuperAdmin, setUserStatus } from '@/server/services/users
 import { anonymisePerson, exportPersonData } from '@/server/services/gdpr';
 import { canManageCompany, listCompanies, removeMember, setMemberAccess, updateCompany } from '@/server/services/companies';
 import { createCategory } from '@/server/services/catalogue';
-import { removeStaff, updateStaffRole } from '@/server/services/staff';
+import { removeStaff, rightsOverview, setStaffAccess, updateStaffRole } from '@/server/services/staff';
 import { createSupplier, listSuppliers } from '@/server/services/suppliers';
 import { queryAuditLog } from '@/server/services/audit-log';
 import { actorFor, makeEdition, makeExhibitor, makeStaff, makeUser } from '../support/factories';
@@ -190,6 +190,42 @@ describe('companies and staff', () => {
     const ex = await makeExhibitor(edition.id, shell.id, 'K3');
     await expect(createSupplier(actorFor(admin), { name: 'Clean Co', email: 'clean@example.com' })).resolves.toBeTruthy();
     await expect(listSuppliers(actorFor(ex.user))).rejects.toThrow(/permission/);
+  });
+
+  it('lists everyone who works on the shows, and sets each person’s rights from the list', async () => {
+    const { edition, shell } = await makeEdition();
+    const other = await makeEdition('Other Expo 2027');
+    const root = actorFor(await makeUser({ isSuperAdmin: true }));
+    const admin = await makeStaff(edition.id, 'show_admin');
+    const colleague = await makeStaff(other.edition.id, 'show_team', ['helpdesk']);
+    const exhibitor = await makeExhibitor(edition.id, shell.id, 'R1');
+
+    const r = await rightsOverview(root, edition.id);
+    expect(r.edition?.id).toBe(edition.id);
+    const ids = r.people.map((p) => p.userId);
+    expect(ids).toEqual(expect.arrayContaining([admin.id, colleague.id, root.userId]));
+    expect(ids).not.toContain(exhibitor.user.id);
+    // This show's team comes first; people from other shows are listed as not on it.
+    expect(r.people[0].role).not.toBeNull();
+    expect(r.people.find((p) => p.userId === colleague.id)).toMatchObject({ role: null, showCount: 1 });
+
+    // A super admin adds someone from another show by ticking a right; refunds bring orders with them.
+    await setStaffAccess(root, edition.id, colleague.id, { role: 'show_team', permissions: ['refunds'] });
+    const db = await getDb();
+    const [row] = await db.select().from(editionStaff).where(and(eq(editionStaff.editionId, edition.id), eq(editionStaff.userId, colleague.id)));
+    expect(row.permissions.sort()).toEqual(['manage_orders', 'refunds']);
+    await setStaffAccess(root, edition.id, colleague.id, { role: 'show_team', permissions: ['manage_orders'] });
+    expect((await db.select().from(editionStaff).where(and(eq(editionStaff.editionId, edition.id), eq(editionStaff.userId, colleague.id))))[0].permissions).toEqual(['manage_orders']);
+
+    // Show admins change their own team's rights, but add people only by invitation.
+    const stranger = await makeStaff(other.edition.id, 'show_team', []);
+    await expect(setStaffAccess(actorFor(admin), edition.id, stranger.id, { role: 'show_team', permissions: ['helpdesk'] })).rejects.toThrow(/permission/);
+    await setStaffAccess(actorFor(admin), edition.id, colleague.id, { role: 'show_team', permissions: ['helpdesk'] });
+    await expect(rightsOverview(actorFor(admin), edition.id)).rejects.toThrow(/permission/);
+
+    // Taking someone off the show leaves their other shows alone.
+    await setStaffAccess(root, edition.id, colleague.id, null);
+    expect(await db.select().from(editionStaff).where(eq(editionStaff.userId, colleague.id))).toHaveLength(1);
   });
 
   it('counts each company’s stands and each supplier’s categories in the lists', async () => {

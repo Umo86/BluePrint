@@ -48,7 +48,12 @@ export default async function OrderDetail({ params }: PageProps<'/manage/[editio
           <Group gap="xs">
             <StatusBadge status={o.status} label={ORDER_STATUS_LABELS[o.status]} />
             {d.canManage && o.status === 'invoiced' ? <MarkPaidButton orderId={o.id} /> : null}
-            {d.canManage && refundable ? (
+            {d.canManage && refundable && !d.canRefund ? (
+              <Text fz="xs" c="dimmed" maw={220}>
+                Refunds are made by show admins and people given the Refunds right.
+              </Text>
+            ) : null}
+            {d.canRefund && refundable ? (
               <RefundButton
                 orderId={o.id}
                 viaCard={o.paymentMethod === 'card' && Boolean(o.stripePaymentIntentId)}

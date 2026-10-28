@@ -78,6 +78,13 @@
       "when": 1793119113019,
       "tag": "0010_demo_data",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793177125171,
+      "tag": "0011_rights",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import { listExhibitorTypes } from '@/server/services/show-setup';
 import { AppError } from '@/server/errors';
 import { loadEdition } from '../../load';
 import { PageEditor } from './page-editor';
+import { mayAddToLibrary } from '@/server/services/library';
 
 export default async function EditManualPage({ params }: PageProps<'/manage/[editionId]/manual/[pageId]'>) {
   const { editionId, pageId } = await params;
@@ -23,6 +24,7 @@ export default async function EditManualPage({ params }: PageProps<'/manage/[edi
     if (page.editionId !== edition.id) notFound();
   }
   const [types, pages] = await Promise.all([listExhibitorTypes(actor, edition.id), listPages(actor, edition.id)]);
+  const canSaveToLibrary = await mayAddToLibrary(actor);
   return (
     <Stack>
       <PageHeader eyebrow="Exhibitor manual" title={page ? page.title : 'New page'} />
@@ -39,7 +41,7 @@ export default async function EditManualPage({ params }: PageProps<'/manage/[edi
         }}
         types={types.map((t) => ({ value: t.id, label: t.name }))}
         sections={pages.filter((p) => !p.parentId && p.id !== page?.id).map((p) => ({ value: p.id, label: p.title }))}
-        canSaveToLibrary={actor.isSuperAdmin && !actor.readOnly}
+        canSaveToLibrary={canSaveToLibrary}
       />
     </Stack>
   );

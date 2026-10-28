@@ -16,7 +16,7 @@ import {
   type FormField,
   type TaskRequirement,
 } from '../db/schema';
-import { assertSuperAdmin, requireEditionPermission } from '../authz';
+import { requireEditionPermission } from '../authz';
 import { conflict, invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { sanitizeRichText } from '../security/sanitize';
@@ -24,6 +24,7 @@ import { formSchemaSchema } from '@/lib/forms';
 import { parseLocalDateTime } from '@/lib/dates';
 import { resolveDeadline } from './editions';
 import { syncOrderTaskForAllStands } from './orders';
+import { assertMayAddToLibrary } from './library';
 import type { Actor } from '../auth/actor';
 
 export const REQUIREMENT_CHOICES = ['required', 'if_applicable', 'optional', 'hidden'] as const;
@@ -279,8 +280,9 @@ export async function copyTaskFromLibrary(actor: Actor, editionId: string, itemI
 
 /** Saves a task as a library template (super admins only). */
 export async function saveTaskToLibrary(actor: Actor, taskId: string) {
-  assertSuperAdmin(actor);
+  await assertMayAddToLibrary(actor);
   const { task, requirements } = await getTask(actor, taskId);
+  await requireEditionPermission(actor, task.editionId, 'edit_content', { write: true });
   const db = await getDb();
   const types = await db.select().from(exhibitorTypes).where(eq(exhibitorTypes.editionId, task.editionId));
   const requirementsByKey = Object.fromEntries(types.filter((t) => requirements[t.id]).map((t) => [t.key, requirements[t.id]]));

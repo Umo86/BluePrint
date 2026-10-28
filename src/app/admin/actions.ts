@@ -18,7 +18,7 @@ import {
   type commercialSchema,
   type editionBasicsSchema,
 } from '@/server/services/editions';
-import { inviteStaff, removeStaff, updateStaffRole } from '@/server/services/staff';
+import { inviteStaff, removeStaff, setStaffAccess, updateStaffRole } from '@/server/services/staff';
 import {
   adminUpdateUser,
   removeCompanyMembership,
@@ -26,6 +26,7 @@ import {
   revokeUserSessions,
   setSuperAdmin,
   setUserStatus,
+  setLibraryRight,
 } from '@/server/services/users';
 import { resetTwoFactor } from '@/server/auth/login';
 import { createInvitation, resendInvitation, revokeInvitation } from '@/server/auth/invitations';
@@ -139,6 +140,25 @@ export async function updateStaffAction(editionId: string, userId: string, role:
     revalidatePath(`/admin/editions/${editionId}`);
     revalidatePath(`/manage/${editionId}/settings/team`);
   }, 'Access updated.');
+}
+
+/** From the rights list: adds someone to a show team, changes what they can do, or (null) takes them off it. Quiet on success. */
+export async function setStaffAccessAction(
+  editionId: string,
+  userId: string,
+  access: { role: EditionRole; permissions: EditionPermission[] } | null,
+): Promise<ActionResult> {
+  return runAction(async () => {
+    await setStaffAccess(await requireActor(), editionId, userId, access);
+    revalidatePath(`/admin/editions/${editionId}`);
+  });
+}
+
+export async function setLibraryRightAction(userId: string, value: boolean): Promise<ActionResult> {
+  return runAction(async () => {
+    await setLibraryRight(await superAdmin(), userId, value);
+    revalidatePath(`/admin/users/${userId}`);
+  }, value ? 'They can now add to the library.' : 'Library right taken away.');
 }
 
 export async function removeStaffAction(editionId: string, userId: string): Promise<ActionResult> {

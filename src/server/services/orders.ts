@@ -730,7 +730,13 @@ async function staffOrder(actor: Actor, orderId: string, write: boolean) {
  * payout is reversed in proportion; invoice orders get a credit note for finance to settle.
  */
 export async function refundOrder(actor: Actor, orderId: string, raw: z.input<typeof refundSchema>) {
-  await staffOrder(actor, orderId, true);
+  const o = await staffOrder(actor, orderId, true);
+  await requireEditionPermission(actor, o.editionId, 'refunds', { write: true });
+  return makeRefund(actor, orderId, raw);
+}
+
+/** The refund itself, once the caller has checked who may do it (see refundOrder and cancelOrder). */
+async function makeRefund(actor: Actor, orderId: string, raw: z.input<typeof refundSchema>) {
   const input = refundSchema.parse(raw);
   const db = await getDb();
 
@@ -923,7 +929,8 @@ export async function cancelOrder(actor: Actor, orderId: string, reason: string)
   if (o.status === 'invoiced') {
     const db = await getDb();
     const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, orderId));
-    await refundOrder(actor, orderId, {
+    // Crediting an invoice nobody has paid moves no money, so it does not need the refunds right.
+    await makeRefund(actor, orderId, {
       lines: lines.map((l) => ({ lineId: l.id, amountPence: lineGross(l) - l.refundedPence })),
       cardFeePence: o.cardFeePence - cardFeeRefunded(o, lines),
       reason: why,
@@ -1191,6 +1198,7 @@ export async function orderForStaff(actor: Actor, orderId: string) {
     documents: await documentsFor(db, [orderId]),
     cardFeeRefundable: o.cardFeePence - cardFeeRefunded(o, ctx.lines),
     canManage: access.permissions.has('manage_orders') && !actor.readOnly,
+    canRefund: access.permissions.has('manage_orders') && access.permissions.has('refunds') && !actor.readOnly,
     paymentsMode: (await paymentsForEdition(o.editionId))?.kind ?? null,
   };
 }

@@ -3,11 +3,12 @@ import { and, asc, eq, max } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
 import { exhibitorTypes, libraryItems, manualPages, tasks } from '../db/schema';
-import { assertSuperAdmin, requireEditionPermission } from '../authz';
+import { requireEditionPermission } from '../authz';
 import { invalid, notFound } from '../errors';
 import { audit } from '../audit';
 import { sanitizeRichText } from '../security/sanitize';
 import { slugify } from '@/lib/slug';
+import { assertMayAddToLibrary } from './library';
 import type { Actor } from '../auth/actor';
 
 export const pageSchema = z.object({
@@ -155,8 +156,9 @@ export async function copyPageFromLibrary(actor: Actor, editionId: string, itemI
 
 /** Saves a page as a library template (super admins only). */
 export async function savePageToLibrary(actor: Actor, pageId: string) {
-  assertSuperAdmin(actor);
+  await assertMayAddToLibrary(actor);
   const page = await loadPage(pageId);
+  await requireEditionPermission(actor, page.editionId, 'edit_content', { write: true });
   const db = await getDb();
   const [row] = await db
     .insert(libraryItems)

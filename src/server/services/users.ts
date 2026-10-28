@@ -173,6 +173,17 @@ export async function setSuperAdmin(actor: Actor, userId: string, value: boolean
   await audit(actor, value ? 'user.super_admin_granted' : 'user.super_admin_removed', { entityType: 'user', entityId: userId, details: { email: u.email } });
 }
 
+/** Gives or takes away the right to save tasks and manual pages into the shared library. */
+export async function setLibraryRight(actor: Actor, userId: string, value: boolean) {
+  assertSuperAdmin(actor);
+  const db = await getDb();
+  const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!u || u.anonymisedAt) throw notFound();
+  if (u.canAddToLibrary === value) return;
+  await db.update(users).set({ canAddToLibrary: value }).where(eq(users.id, userId));
+  await audit(actor, value ? 'user.library_right_granted' : 'user.library_right_removed', { entityType: 'user', entityId: userId, details: { email: u.email } });
+}
+
 export const adminUserSchema = z.object({
   name: z.string().trim().min(1, 'Enter a name.').max(120),
   email: z.string().trim().max(254),

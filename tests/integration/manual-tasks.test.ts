@@ -2,8 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { closeDb, getDb, useInMemoryDatabaseForTests } from '@/server/db/client';
 import { editions, emailOutbox, libraryItems, manualPages, tasks } from '@/server/db/schema';
-import { createPage, deletePage, pageForType, pagesForType, updatePage } from '@/server/services/manual';
-import { copyTaskFromLibrary, createTask, deleteTask, listTasks, updateTask, type TaskInput } from '@/server/services/tasks';
+import { createPage, deletePage, pageForType, pagesForType, savePageToLibrary, updatePage } from '@/server/services/manual';
+import { copyTaskFromLibrary, createTask, deleteTask, listTasks, saveTaskToLibrary, updateTask, type TaskInput } from '@/server/services/tasks';
+import { mayAddToLibrary } from '@/server/services/library';
+import { setLibraryRight } from '@/server/services/users';
 import {
   checklistForStand,
   exportResponses,
@@ -239,5 +241,37 @@ describe('tasks and the exhibitor checklist', () => {
     expect(pageCount).toHaveLength(0);
     const stranger = await makeUser();
     await expect(listTasks(actorFor(stranger), edition.id)).rejects.toThrow();
+  });
+
+  it('lets people a super admin has given the library right add to the library', async () => {
+    const { edition, shell } = await makeEdition();
+    const editorUser = await makeStaff(edition.id, 'show_admin');
+    const editor = actorFor(editorUser);
+    const root = actorFor(await makeUser({ isSuperAdmin: true }));
+    const t = await createTask(editor, edition.id, taskInput({ title: 'Stand build declaration', requirements: { [shell.id]: 'required' } }));
+    const page = await createPage(editor, edition.id, { title: 'Fire safety', bodyHtml: '<p>Rules</p>' });
+
+    // Even a show admin needs the right.
+    expect(await mayAddToLibrary(editor)).toBe(false);
+    await expect(saveTaskToLibrary(editor, t.id)).rejects.toThrow(/library right/);
+    await expect(savePageToLibrary(editor, page.id)).rejects.toThrow(/library right/);
+
+    // Only super admins give it.
+    await expect(setLibraryRight(editor, editorUser.id, true)).rejects.toThrow();
+    await setLibraryRight(root, editorUser.id, true);
+    expect(await mayAddToLibrary(editor)).toBe(true);
+    const savedTask = await saveTaskToLibrary(editor, t.id);
+    const savedPage = await savePageToLibrary(editor, page.id);
+    expect([savedTask.name, savedPage.name]).toEqual(['Stand build declaration', 'Fire safety']);
+
+    // The right is for their own shows: a task from another show is out of reach.
+    const other = await makeEdition('Other Expo 2027');
+    const otherAdmin = actorFor(await makeStaff(other.edition.id, 'show_admin'));
+    const otherTask = await createTask(otherAdmin, other.edition.id, taskInput({ requirements: { [other.shell.id]: 'required' } }));
+    await expect(saveTaskToLibrary(editor, otherTask.id)).rejects.toThrow();
+    // Nor while viewing as someone, and it can be taken away again.
+    expect(await mayAddToLibrary({ ...editor, readOnly: true })).toBe(false);
+    await setLibraryRight(root, editorUser.id, false);
+    await expect(saveTaskToLibrary(editor, t.id)).rejects.toThrow(/library right/);
   });
 });

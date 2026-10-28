@@ -69,7 +69,7 @@ export function EditionTabs({ edition, platformFeeMode, platformCommission, staf
         <CommercialForm edition={edition} platformFeeMode={platformFeeMode} platformCommission={platformCommission} />
       </Tabs.Panel>
       <Tabs.Panel value="team">
-        <StaffManager editionId={edition.id} staff={staff} pending={pending} currentUserId={currentUserId} />
+        <StaffManager editionId={edition.id} staff={staff} pending={pending} currentUserId={currentUserId} viewerIsSuperAdmin />
       </Tabs.Panel>
       <Tabs.Panel value="clone">
         <CloneForm edition={edition} />

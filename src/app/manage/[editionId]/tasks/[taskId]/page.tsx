@@ -10,6 +10,7 @@ import { AppError } from '@/server/errors';
 import { toLocalDateTimeString } from '@/lib/dates';
 import { loadEdition } from '../../load';
 import { TaskEditor } from './task-editor';
+import { mayAddToLibrary } from '@/server/services/library';
 
 export default async function TaskPage({ params, searchParams }: PageProps<'/manage/[editionId]/tasks/[taskId]'>) {
   const { editionId, taskId } = await params;
@@ -39,6 +40,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<'/man
     string,
     'required' | 'if_applicable' | 'optional' | 'hidden'
   >;
+  const canSaveToLibrary = access.permissions.has('edit_content') && (await mayAddToLibrary(actor));
   return (
     <Stack>
       <PageHeader eyebrow="Tasks and forms" title={t ? t.title : 'New task'} />
@@ -49,7 +51,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<'/man
         canReview={access.permissions.has('manage_exhibitors')}
         canExport={access.permissions.has('manage_exhibitors') || access.permissions.has('view_reports')}
         canEmail={access.permissions.has('send_emails') && !actor.readOnly}
-        canSaveToLibrary={actor.isSuperAdmin && !actor.readOnly}
+        canSaveToLibrary={canSaveToLibrary}
         initialTab={typeof sp.tab === 'string' ? sp.tab : undefined}
         initial={{
           title: t?.title ?? '',

@@ -2,7 +2,7 @@ import 'server-only';
 import { asc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
-import { editionStaff, libraryItems } from '../db/schema';
+import { editionStaff, libraryItems, users } from '../db/schema';
 import { assertSuperAdmin, isViewingAs } from '../authz';
 import { forbidden, notFound } from '../errors';
 import { audit } from '../audit';
@@ -33,6 +33,22 @@ function cleanData(kind: LibraryKind, data: Record<string, unknown>) {
     return { ...data, descriptionHtml: sanitizeRichText(data.descriptionHtml) };
   }
   return data;
+}
+
+/**
+ * Whether the person may save tasks and manual pages from their shows into the shared library:
+ * super admins, and anyone a super admin has given the library right.
+ */
+export async function mayAddToLibrary(actor: Actor) {
+  if (actor.readOnly || isViewingAs(actor)) return false;
+  if (actor.isSuperAdmin) return true;
+  const db = await getDb();
+  const [u] = await db.select({ allowed: users.canAddToLibrary, status: users.status }).from(users).where(eq(users.id, actor.userId)).limit(1);
+  return Boolean(u?.allowed) && u.status === 'active';
+}
+
+export async function assertMayAddToLibrary(actor: Actor) {
+  if (!(await mayAddToLibrary(actor))) throw forbidden('Adding to the library needs the library right. A super admin can give it to you.');
 }
 
 export async function listLibrary(actor: Actor, kind?: LibraryKind) {

@@ -126,6 +126,8 @@ export const EDITION_PERMISSIONS = [
   'manage_exhibitors',
   'review_space_only',
   'manage_orders',
+  /** Giving refunds. Show admins hold it; team members only when it is given to them. */
+  'refunds',
   'send_emails',
   'helpdesk',
   'view_reports',

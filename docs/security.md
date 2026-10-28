@@ -25,14 +25,15 @@ The sign-in page asks for an email address and password. People without a passwo
 
 ## Who can see and do what
 
-Every request is checked on the server against the person's role and the record involved. Hiding a button is never the only protection.
+Every request is checked on the server against the person's role and the record involved. Hiding a button is never the only protection. Super admins set everyone's rights on one page (Super admin → Rights: pick a show, tick a box); show admins do the same for their own show on its Team page.
 
 | Person | Can reach |
 | --- | --- |
 | Super admin | Everything. |
 | Show admin | Everything in their own shows. |
-| Show team | Only the areas ticked for them (manual and tasks, exhibitors and stands, space-only approvals, orders and refunds, emails, help desk, reports) in their own shows. Exhibitors' documents open only for people with exhibitor, help desk or space-only rights. |
+| Show team | Only the areas ticked for them (manual and tasks, exhibitors and stands, space-only approvals, orders, refunds, emails, help desk, reports) in their own shows. Refunds are a separate right that only show admins have unless it is ticked for someone. Exhibitors' documents open only for people with exhibitor, help desk or space-only rights. |
 | Health and safety reviewer | Only the space-only review queue and its documents. |
+| Anyone with the library right | Can also save tasks and manual pages from their shows into the shared library. Only super admins give it. |
 | Exhibitor | Only their own company's stands, at the shows they were invited for. Paying needs payment rights. |
 | Contractor | Only the space-only stands they were nominated for. |
 | Supplier | Only their own catalogue, their orders and their payouts. |

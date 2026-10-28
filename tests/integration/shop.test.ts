@@ -342,7 +342,14 @@ describe('card checkout and payouts', () => {
     await expect(refundOrder(adminActor, placed.orderId, { lines: [{ lineId: line.id, amountPence: 99_999 }], reason: 'Damaged' })).rejects.toThrow(/at most/);
     await expect(refundOrder(adminActor, placed.orderId, { lines: [{ lineId: line.id, amountPence: 3000 }], reason: '' })).rejects.toThrow();
 
-    const first = await refundOrder(adminActor, placed.orderId, { lines: [{ lineId: line.id, amountPence: 3000 }], reason: 'One chair was damaged' });
+    // Orders alone do not allow refunds: show admins give them, and anyone given the refunds right.
+    const clerk = actorFor(await makeStaff(edition.id, 'show_team', ['manage_orders']));
+    await expect(refundOrder(clerk, placed.orderId, { lines: [{ lineId: line.id, amountPence: 3000 }], reason: 'One chair was damaged' })).rejects.toThrow(/permission/);
+    expect((await orderForStaff(clerk, placed.orderId)).canRefund).toBe(false);
+    const cashier = actorFor(await makeStaff(edition.id, 'show_team', ['manage_orders', 'refunds']));
+    expect((await orderForStaff(cashier, placed.orderId)).canRefund).toBe(true);
+
+    const first = await refundOrder(cashier, placed.orderId, { lines: [{ lineId: line.id, amountPence: 3000 }], reason: 'One chair was damaged' });
     expect(first.creditNote).toMatch(/^CRN-\d{6}$/);
     expect(sim.calls.find((c) => c.method === 'refund')!.args).toMatchObject({ amountPence: 3000 });
     expect(sim.calls.find((c) => c.method === 'reverseTransfer')!.args).toMatchObject({ amountPence: 2550 });
@@ -473,8 +480,10 @@ describe('invoice orders', () => {
     const helper = await makeStaff(edition.id, 'show_team', []);
     await expect(orderDocumentPdf(actorFor(helper), inv.id)).rejects.toThrow();
 
-    // A cancellation's credit note works the same way.
-    await cancelOrder(adminActor, placed.orderId, 'Exhibitor withdrew');
+    // A cancellation's credit note works the same way. Cancelling an unpaid invoice is not a refund,
+    // so someone with orders but not the refunds right can do it.
+    const clerk = actorFor(await makeStaff(edition.id, 'show_team', ['manage_orders']));
+    await cancelOrder(clerk, placed.orderId, 'Exhibitor withdrew');
     const [note] = await db.select().from(invoices).where(and(eq(invoices.orderId, placed.orderId), eq(invoices.kind, 'credit_note')));
     expect(note.fileId).toBeNull();
     await expect(orderDocumentPdf(me, note.id)).resolves.toMatchObject({ filename: `${note.number}.pdf` });

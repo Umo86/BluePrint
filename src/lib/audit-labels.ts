@@ -31,11 +31,14 @@ const LABELS: Record<string, string> = {
   'user.sessions_revoked': 'Signed someone out everywhere',
   'user.super_admin_granted': 'Made someone a super admin',
   'user.super_admin_removed': 'Removed someone’s super admin access',
+  'user.library_right_granted': 'Let someone add to the library',
+  'user.library_right_removed': 'Took away someone’s library right',
   'invitation.created': 'Invited someone',
   'invitation.bulk_sent': 'Sent invitations in bulk',
   'invitation.revoked': 'Cancelled an invitation',
   'invitation.accepted': 'Accepted an invitation',
-  'staff.role_changed': 'Changed a team member’s role',
+  'staff.role_changed': 'Changed a team member’s rights',
+  'staff.added': 'Added someone to a show team',
   'staff.removed': 'Removed a team member',
 
   // Shows and set-up

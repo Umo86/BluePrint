@@ -86,6 +86,21 @@ test('super admin dashboard: every page works and changes are saved', async ({ p
     await expectToast(page, 'Account enabled.');
   });
 
+  await test.step('rights: everyone listed with a tick box for each right', async () => {
+    await page.goto('/admin/rights');
+    await expect(page.getByRole('heading', { name: 'Rights' })).toBeVisible();
+    // Sanjay is on the UKCW team; the library right covers every show.
+    await expect(page.getByRole('checkbox', { name: 'Orders and services for Sanjay Sales' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Refunds for Sanjay Sales' })).not.toBeChecked();
+    await page.getByRole('checkbox', { name: 'Library for Sanjay Sales' }).check();
+    await expectToast(page, 'They can now add to the library.');
+    await page.getByRole('checkbox', { name: 'Library for Sanjay Sales' }).uncheck();
+    await expectToast(page, 'Library right taken away.');
+    // Show admins have every right in their show, so their boxes cannot be changed.
+    await expect(page.getByRole('checkbox', { name: 'Refunds for Olivia Ops' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Refunds for Olivia Ops' })).toBeDisabled();
+  });
+
   await test.step('companies: create, invoice and archive', async () => {
     await page.goto('/admin/companies');
     await page.getByRole('button', { name: 'New company' }).click();

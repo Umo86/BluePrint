@@ -87,7 +87,7 @@ export default async function UserPage({ params }: PageProps<'/admin/users/[id]'
                 Access and security
               </Title>
               <Stack gap="md">
-                <AccessSwitches userId={user.id} isSuperAdmin={user.isSuperAdmin} status={user.status} isSelf={isSelf} />
+                <AccessSwitches userId={user.id} isSuperAdmin={user.isSuperAdmin} canAddToLibrary={user.canAddToLibrary} status={user.status} isSelf={isSelf} />
                 <Table variant="vertical" withTableBorder={false}>
                   <TableTbody>
                     <TableTr>

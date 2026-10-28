@@ -46,7 +46,7 @@ export function testLogins(): TestLogin[] {
 const ROLE_NOTES: Record<string, string> = {
   'super admin': 'Runs the whole platform: shows, users, suppliers, payments and the demo data.',
   'show admin': 'Runs BuildExpo London (live) and Green Homes Live (being set up): exhibitors, orders, approvals, emails and settings.',
-  'show team': 'Exhibitor services at BuildExpo London: exhibitors, orders, reports and the help desk.',
+  'show team': 'Exhibitor services at BuildExpo London: exhibitors, orders (but not refunds), reports and the help desk.',
   'health and safety reviewer': 'Reviews the space-only stand packs at BuildExpo London, and nothing else.',
   'exhibitor (shell scheme)': 'Acme Insulation: checklist, shop, orders, help and the AI assistant.',
   'exhibitor (space only)': 'Evergreen Timber Frames: the same, plus stand approval with their contractor.',

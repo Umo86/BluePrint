@@ -160,10 +160,22 @@ test('show team dashboard: exhibitors, stands, import and settings', async ({ pa
     await expectToast(page, 'Space-only rules saved.');
   });
 
-  await test.step('team page lists the show team', async () => {
+  await test.step('team page lists the show team with a tick box for each right', async () => {
     await page.goto(`${dashboard}/team`);
     await expect(page.getByText('ops@blueprint.test')).toBeVisible();
     await expect(page.getByText('hs@blueprint.test')).toBeVisible();
+    // Giving refunds saves straight away and stays after a reload; then it is taken away again.
+    const refunds = () => page.getByRole('checkbox', { name: 'Refunds for Sanjay Sales' });
+    await expect(refunds()).not.toBeChecked();
+    await refunds().check();
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(refunds()).toBeChecked();
+    await refunds().uncheck();
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(refunds()).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Orders and services for Sanjay Sales' })).toBeChecked();
   });
 
   expect(errors, errors.join('\n')).toEqual([]);

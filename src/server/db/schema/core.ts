@@ -30,6 +30,8 @@ export const users = pgTable(
     phone: text('phone'),
     jobTitle: text('job_title'),
     isSuperAdmin: boolean('is_super_admin').notNull().default(false),
+    /** May save tasks and manual pages from their shows into the shared library. Given by a super admin. */
+    canAddToLibrary: boolean('can_add_to_library').notNull().default(false),
     status: text('status', { enum: USER_STATUSES }).notNull().default('active'),
     /** argon2id hash; null when the person only signs in with email codes. */
     passwordHash: text('password_hash'),

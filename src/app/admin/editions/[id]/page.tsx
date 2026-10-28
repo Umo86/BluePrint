@@ -53,7 +53,7 @@ export default async function EditionAdminPage({ params }: PageProps<'/admin/edi
         }}
         platformFeeMode={settings.feeMode}
         platformCommission={{ type: settings.defaultCommissionType, value: settings.defaultCommissionValue }}
-        staff={team.staff.map((s) => ({ userId: s.user.id, name: s.user.name, email: s.user.email, role: s.role, permissions: s.permissions }))}
+        staff={team.staff.map((s) => ({ userId: s.user.id, name: s.user.name, email: s.user.email, jobTitle: s.user.jobTitle, role: s.role, permissions: s.permissions }))}
         pending={team.pending.map((p) => ({ id: p.id, email: p.email, role: p.role ?? '', expiresAt: p.expiresAt.toISOString() }))}
         currentUserId={actor.realUserId}
       />

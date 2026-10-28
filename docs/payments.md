@@ -33,8 +33,8 @@ Separate charges and transfers: the organiser takes the payment into its own Str
 
 ## Refunds and cancellations
 
-- **Refund** (order page, needs "manage orders"): choose an amount per line and, optionally, the card fee. Card orders are refunded to the card through Stripe; each supplier's transfer is reversed in proportion to what was refunded on their lines. A credit note is issued and the exhibitor is emailed. Stripe does not return its own fee on refunds.
-- **Invoice orders** get a credit note; finance settles it. Cancelling an unpaid invoice order credits it in full.
+- **Refund** (order page): only show admins, super admins, and team members given the Refunds right can refund; "Orders and services" alone is not enough. Choose an amount per line and, optionally, the card fee. Card orders are refunded to the card through Stripe; each supplier's transfer is reversed in proportion to what was refunded on their lines. A credit note is issued and the exhibitor is emailed. Stripe does not return its own fee on refunds.
+- **Invoice orders** get a credit note; finance settles it. Cancelling an unpaid invoice order credits it in full; that needs only "Orders and services", as no money moves.
 - Two refunds started at the same moment cannot refund the same money twice.
 
 ## Connecting Stripe
