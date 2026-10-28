@@ -6,6 +6,7 @@ import { recordCronRun } from './services/system';
 import { runReminders, runStaffDigest } from './services/reminders';
 import { runHousekeeping, sendQueuedEmails } from './services/housekeeping';
 import { processScheduledCampaigns } from './services/campaigns';
+import { runBasketReminders } from './services/baskets';
 
 /** Scheduled jobs. Vercel Cron calls /api/cron/<job> on the schedules in vercel.json. */
 export const CRON_JOBS = {
@@ -15,11 +16,12 @@ export const CRON_JOBS = {
     const emails = await sendQueuedEmails();
     return { ...emails, campaignsQueued: campaigns.campaigns, campaignProblems: campaigns.problems };
   },
-  /** Every morning: exhibitor reminders and the team's summary. */
+  /** Every morning: exhibitor reminders, basket reminders and the team's summary. */
   reminders: async () => {
     const reminders = await runReminders();
+    const baskets = await runBasketReminders();
     const digest = await runStaffDigest();
-    return { ...reminders, staffDigests: digest.sent };
+    return { ...reminders, basketsReminded: baskets.stands, staffDigests: digest.sent };
   },
   /** Every night: abandoned checkouts, waiting payouts, expired records and retention. */
   housekeeping: async () => runHousekeeping(),

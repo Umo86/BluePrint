@@ -136,6 +136,8 @@ export const cartItems = pgTable(
     details: jsonb('details').$type<Record<string, unknown>>().notNull().default({}),
     addedBy: uuid('added_by'),
     createdAt: createdAt(),
+    /** The last change to the item (or to the basket around it), so basket reminders know when it was left. */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('cart_items_stand_idx').on(t.standId)],
 );

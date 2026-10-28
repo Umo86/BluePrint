@@ -136,6 +136,8 @@ const LABELS: Record<string, string> = {
   'shop.supplier_product_withdrawn': 'Supplier withdrew a product',
   'shop.supplier_product_deleted': 'Supplier deleted a draft product',
   'shop.order_placed': 'Placed an order',
+  'shop.basket_reminder_sent': 'Sent a basket reminder',
+  'shop.basket_reminders_updated': 'Changed the basket reminder settings',
   'shop.order_paid': 'Order paid',
   'shop.invoice_paid': 'Invoice marked as paid',
   'shop.order_cancelled': 'Cancelled an order',

@@ -18,6 +18,8 @@ import {
   type PRODUCT_DECISIONS,
 } from '@/server/services/catalogue';
 import { cancelOrder, markInvoicePaid, refundOrder, retryTransfer, setLineFulfilment, settleManualTransfer, type refundSchema } from '@/server/services/orders';
+import { sendBasketReminderNow, updateBasketReminderSettings, type basketSettingsSchema } from '@/server/services/baskets';
+import { isDemoEdition } from '@/server/demo/flags';
 import type { z } from 'zod';
 
 const id = (v: unknown) => String(v ?? '');
@@ -131,4 +133,27 @@ export async function setLineFulfilmentAction(lineId: string, status: 'received'
     await setLineFulfilment(await requireActor(), id(lineId), status);
     revalidatePath('/', 'layout');
   }, 'Updated.');
+}
+
+export async function sendBasketReminderAction(editionId: string, standId: string): Promise<ActionResult<{ emails: number }>> {
+  const res = await runAction(async () => {
+    const r = await sendBasketReminderNow(await requireActor(), id(editionId), id(standId));
+    refresh();
+    return r;
+  });
+  if (!res.ok || !res.data) return res;
+  const { emails, recipients } = res.data;
+  const message = emails
+    ? `Reminder sent${recipients > 1 ? ` to ${recipients} people` : ''}.`
+    : (await isDemoEdition(id(editionId)))
+      ? 'Reminder kept in the sent emails. Demo shows never send email.'
+      : 'Reminder recorded, but email sending is not set up yet, so it was not sent.';
+  return { ...res, message };
+}
+
+export async function updateBasketRemindersAction(editionId: string, input: z.input<typeof basketSettingsSchema>): Promise<ActionResult> {
+  return runAction(async () => {
+    await updateBasketReminderSettings(await requireActor(), id(editionId), input);
+    refresh();
+  }, 'Basket reminder settings saved.');
 }

@@ -2,6 +2,7 @@ import 'server-only';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import {
+  cartItems,
   companies,
   companyMembers,
   editions,
@@ -179,11 +180,21 @@ export async function runStaffDigest(now = new Date()) {
       .select({ n: sql<number>`count(*)::int` })
       .from(orders)
       .where(and(eq(orders.editionId, edition.id), eq(orders.status, 'invoiced'), sql`${orders.dueAt} < now()`));
+    // Baskets nobody has touched for a day.
+    const waiting = await db
+      .select({ standId: cartItems.standId })
+      .from(cartItems)
+      .innerJoin(stands, eq(stands.id, cartItems.standId))
+      .where(and(eq(stands.editionId, edition.id), eq(stands.status, 'active')))
+      .groupBy(cartItems.standId)
+      .having(sql`max(${cartItems.updatedAt}) < ${since}`);
+    const baskets = { n: waiting.length };
     const lines = [
       toReview.n ? `${toReview.n} form ${toReview.n === 1 ? 'answer is' : 'answers are'} waiting for your review.` : null,
       packs.n ? `${packs.n} space-only ${packs.n === 1 ? 'pack is' : 'packs are'} waiting for a decision.` : null,
       newOrders.n ? `${newOrders.n} new ${newOrders.n === 1 ? 'order' : 'orders'} yesterday, worth ${money(Number(newOrders.total))}.` : null,
       overdueInvoices.n ? `${overdueInvoices.n} invoice ${overdueInvoices.n === 1 ? 'order is' : 'orders are'} past the payment date.` : null,
+      baskets.n ? `${baskets.n} ${baskets.n === 1 ? 'exhibitor has' : 'exhibitors have'} left services in their basket for more than a day without ordering.` : null,
     ].filter((x): x is string => Boolean(x));
     if (!lines.length) continue;
     const [logged] = await db

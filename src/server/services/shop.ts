@@ -200,7 +200,7 @@ export async function addToBasket(actor: Actor, standId: string, raw: z.input<ty
   }
   if (same) {
     const quantity = Math.min(999, same.quantity + input.quantity);
-    await db.update(cartItems).set({ quantity }).where(eq(cartItems.id, same.id));
+    await db.update(cartItems).set({ quantity, updatedAt: new Date() }).where(eq(cartItems.id, same.id));
   } else {
     await db.insert(cartItems).values({ standId, productId: product.id, quantity: input.quantity, options: choice.options, details: choice.details, addedBy: actor.userId });
   }
@@ -219,13 +219,19 @@ async function ownItem(actor: Actor, standId: string, itemId: string) {
 export async function updateBasketItem(actor: Actor, standId: string, itemId: string, quantity: number) {
   const { db, item } = await ownItem(actor, standId, itemId);
   if (!Number.isInteger(quantity) || quantity < 0 || quantity > 999) throw invalid('Choose a quantity between 0 and 999.');
-  if (quantity === 0) await db.delete(cartItems).where(eq(cartItems.id, item.id));
-  else await db.update(cartItems).set({ quantity }).where(eq(cartItems.id, item.id));
+  if (quantity === 0) await removeAndTouch(db, standId, item.id);
+  else await db.update(cartItems).set({ quantity, updatedAt: new Date() }).where(eq(cartItems.id, item.id));
 }
 
 export async function removeBasketItem(actor: Actor, standId: string, itemId: string) {
   const { db, item } = await ownItem(actor, standId, itemId);
-  await db.delete(cartItems).where(eq(cartItems.id, item.id));
+  await removeAndTouch(db, standId, item.id);
+}
+
+/** Takes an item out, and marks the rest of the basket as just changed, so basket reminders start again. */
+async function removeAndTouch(db: DbLike, standId: string, itemId: string) {
+  await db.delete(cartItems).where(eq(cartItems.id, itemId));
+  await db.update(cartItems).set({ updatedAt: new Date() }).where(eq(cartItems.standId, standId));
 }
 
 type BasketProblem = 'unavailable' | 'stock';
@@ -261,6 +267,10 @@ async function priceBasket(db: DbLike, standId: string, method: 'card' | 'invoic
       itemId: i.item.id,
       productId: p.id,
       categoryId: i.category.id,
+      categoryName: i.category.name,
+      orderBy: orderByDate(i.category, edition),
+      bandUntil: price.until,
+      lateFrom: p.latePricePence !== null && p.lateFromOffsetDays !== null && edition.buildUpStartsAt ? new Date(edition.buildUpStartsAt.getTime() - p.lateFromOffsetDays * DAY) : null,
       name: p.name,
       code: p.code,
       unit: p.unit,
@@ -301,6 +311,27 @@ async function priceBasket(db: DbLike, standId: string, method: 'card' | 'invoic
   }));
   const priced = priceOrder(lines, { method, feeMode, cardFee: { percentBps: settings.stripeFeePercentBps, fixedPence: settings.stripeFeeFixedPence } });
   return { stand, edition, company, settings, items: view, buyable, priced, feeMode };
+}
+
+/**
+ * A stand's basket for reminders and the show team: what is in it, what it costs (with VAT, before
+ * any card fee), and the next date that matters, such as the end of early-bird prices.
+ */
+export async function basketSnapshot(db: DbLike, standId: string, now = new Date()) {
+  const b = await priceBasket(db, standId, 'invoice', await getPlatformSettings(), now);
+  const lines = b.items.map((i) => {
+    const l = b.priced.lines.find((x) => x.key === i.itemId);
+    return { name: i.name, quantity: i.quantity, options: i.options, totalPence: l ? l.netPence + l.vatPence : 0, problem: i.problem };
+  });
+  const changes = b.buyable
+    .flatMap((i) => [
+      i.band === 'early' && i.bandUntil ? { at: i.bandUntil, what: 'Early-bird prices end' } : null,
+      i.band !== 'late' && i.lateFrom ? { at: i.lateFrom, what: 'Prices go up' } : null,
+      i.orderBy ? { at: i.orderBy, what: `Orders for ${i.categoryName.toLowerCase()} close` } : null,
+    ])
+    .filter((c): c is { at: Date; what: string } => Boolean(c) && c!.at.getTime() > now.getTime())
+    .sort((x, y) => x.at.getTime() - y.at.getTime());
+  return { edition: b.edition, stand: b.stand, company: b.company, lines, buyableCount: b.buyable.length, totalPence: b.priced.totalPence, next: changes[0] ?? null };
 }
 
 /** The basket as the exhibitor sees it, priced for the chosen way of paying. */

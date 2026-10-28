@@ -5,6 +5,7 @@ import {
   assistantConversations,
   assistantFaqs,
   auditLog,
+  cartItems,
   companies,
   counters,
   editions,
@@ -32,6 +33,7 @@ import { beginUpload, completeUpload, receiveLocalUpload } from '@/server/servic
 import { paymentsForEdition, payments, setPaymentsForTests, type PaymentsProvider } from '@/server/payments/provider';
 import { sendEmail } from '@/server/email/send';
 import { setEmailProviderForTests } from '@/server/email/provider';
+import { basketsForStaff } from '@/server/services/baskets';
 import { actorFor, makeEdition, makeExhibitor, makeUser } from '../support/factories';
 
 const ctx = { ip: '10.9.0.1', userAgent: 'vitest' };
@@ -66,7 +68,7 @@ async function demoEdition() {
 describe('demo data', () => {
   it('adds a live show with every kind of account, at every stage', async () => {
     const notes = await loadDemoData(logins);
-    expect(notes[0]).toMatch(/Added version 2/);
+    expect(notes[0]).toMatch(/Added version 3/);
     expect(notes.filter((n) => n.startsWith('Password set'))).toHaveLength(logins.length);
 
     const db = await getDb();
@@ -117,6 +119,13 @@ describe('demo data', () => {
     expect((await db.select().from(companies)).every((c) => c.isDemo)).toBe(true);
     expect((await db.select().from(suppliers)).every((s) => s.isDemo)).toBe(true);
     expect((await getDemoState())?.version).toBe(DEMO_VERSION);
+
+    // Baskets left without ordering, at different stages, for the basket reminders. Vantage's is
+    // the card checkout they gave up on: the items stay in the basket.
+    const team = await basketsForStaff(actorFor(people.find((u) => u.email === DEMO_ACCOUNTS.showAdmin.email)!), edition.id);
+    expect(team.rows.map((r) => r.standNumber).sort()).toEqual(['N1-132', 'N1-156', 'N1-214', 'N2-312', 'N3-620']);
+    expect(team.rows.find((r) => r.standNumber === 'N1-132')?.reminders).toHaveLength(2);
+    expect(team.totals.recoveredOrders).toBe(1);
   });
 
   it('lets the test logins sign in with their passwords', async () => {
@@ -129,10 +138,29 @@ describe('demo data', () => {
   it('adds the shows only once, and updates the passwords when run again', async () => {
     const changed = logins.map((l, i) => (i === 1 ? { ...l, password: 'a different long password' } : l));
     const notes = await loadDemoData(changed);
-    expect(notes[0]).toMatch(/already there/);
+    expect(notes[0]).toMatch(/up to date/);
     const db = await getDb();
     expect(await db.select().from(editions).where(eq(editions.slug, DEMO_EDITION_SLUG))).toHaveLength(1);
     await expect(signInWithPassword(changed[1].email, 'a different long password', { ...ctx, ip: '10.9.0.2' })).resolves.toMatchObject({ email: changed[1].email });
+  });
+
+  it('brings a version 2 demo up to date without starting it again', async () => {
+    const db = await getDb();
+    const edition = await demoEdition();
+    // A version 2 demo had no open baskets; something a tester did is still there afterwards.
+    const demoStands = (await db.select({ id: stands.id }).from(stands).where(eq(stands.editionId, edition.id))).map((s) => s.id);
+    await db.delete(cartItems).where(inArray(cartItems.standId, demoStands));
+    const state = await getDemoState();
+    await setDemoState({ ...state!, version: 2 });
+    const before = await db.select({ id: orders.id }).from(orders).where(eq(orders.editionId, edition.id));
+    const notes = await loadDemoData(logins);
+    expect(notes[0]).toMatch(/Added open baskets/);
+    expect(notes[1]).toMatch(/up to date/);
+    expect((await getDemoState())?.version).toBe(DEMO_VERSION);
+    expect((await demoEdition()).id).toBe(edition.id);
+    expect(await db.select({ id: orders.id }).from(orders).where(eq(orders.editionId, edition.id))).toHaveLength(before.length);
+    const baskets = await db.selectDistinct({ standId: cartItems.standId }).from(cartItems).where(inArray(cartItems.standId, demoStands));
+    expect(baskets).toHaveLength(4);
   });
 });
 

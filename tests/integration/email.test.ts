@@ -44,7 +44,7 @@ describe('editable emails', () => {
     const noEmails = actorFor(await makeStaff(edition.id, 'show_team', ['manage_exhibitors']));
     await expect(listTemplates(noEmails, edition.id)).rejects.toThrow();
     const list = await listTemplates(admin, edition.id);
-    expect(list.map((t) => t.key)).toEqual(['invite_exhibitor', 'reminder_digest', 'order_confirmation']);
+    expect(list.map((t) => t.key)).toEqual(['invite_exhibitor', 'reminder_digest', 'order_confirmation', 'basket_reminder']);
     expect(list.every((t) => !t.custom)).toBe(true);
 
     await expect(

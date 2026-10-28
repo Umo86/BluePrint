@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { PageNav, SearchFilter } from '@/components/ui/list-controls';
 import { ButtonLink, DownloadButton, TextLink } from '@/components/links';
 import { ORDER_FILTERS, ORDER_STATUS_LABELS, ordersForEdition } from '@/server/services/orders';
+import { openBasketCount } from '@/server/services/baskets';
 import { dateTime, money } from '@/lib/format';
 import { loadEdition } from '../load';
 
@@ -24,7 +25,7 @@ export default async function OrdersPage({ params, searchParams }: PageProps<'/m
   const status = ORDER_FILTERS.find((f) => f === sp.filter) ?? 'all';
   const page = Number.parseInt(typeof sp.page === 'string' ? sp.page : '1', 10) || 1;
   const q = typeof sp.q === 'string' ? sp.q : '';
-  const result = await ordersForEdition(actor, edition.id, { status, q, page });
+  const [result, basketCount] = await Promise.all([ordersForEdition(actor, edition.id, { status, q, page }), openBasketCount(actor, edition.id)]);
   const base = `/manage/${edition.id}/orders`;
   return (
     <Stack>
@@ -33,6 +34,9 @@ export default async function OrdersPage({ params, searchParams }: PageProps<'/m
         description="Everything exhibitors have ordered from the shop, how they paid, and refunds."
         actions={
           <Group gap="xs">
+            <ButtonLink href={`${base}/baskets`} variant="default">
+              Open baskets{basketCount ? ` (${basketCount})` : ''}
+            </ButtonLink>
             <ButtonLink href={`${base}/services`} variant="default">
               Services by stand
             </ButtonLink>

@@ -64,6 +64,25 @@ export const EDITABLE_TEMPLATES = {
       ] as EmailBlock[],
     },
   },
+  basket_reminder: {
+    name: 'Basket reminder',
+    description: 'Sent when an exhibitor leaves services in their basket without ordering. The items, total and next price change fill themselves in for each stand.',
+    category: 'reminder',
+    variables: ['first_name', 'company', 'show', 'stand', 'basket_link', 'basket_lines', 'basket_total', 'count', 'deadline_note'],
+    required: ['basket_link'],
+    default: {
+      subject: '{{show}}: your basket for stand {{stand}} is waiting',
+      preheader: '{{count}} saved and ready to order.',
+      blocks: [
+        { type: 'heading', text: 'You left something in your basket' },
+        { type: 'paragraph', text: 'Hello {{first_name}}, you have {{count}} waiting in your basket for stand {{stand}} at {{show}}:' },
+        { type: 'paragraph', text: '{{basket_lines}}' },
+        { type: 'paragraph', text: 'Total {{basket_total}} including VAT. {{deadline_note}}' },
+        { type: 'button', label: 'Review your basket and order', url: '{{basket_link}}' },
+        { type: 'paragraph', text: 'Prices and availability are confirmed when you order. If you no longer need these, empty your basket and we will stop reminding you.' },
+      ] as EmailBlock[],
+    },
+  },
 } as const;
 
 export type EditableTemplateKey = keyof typeof EDITABLE_TEMPLATES;

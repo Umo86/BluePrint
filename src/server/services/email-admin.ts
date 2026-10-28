@@ -102,6 +102,10 @@ function sampleVars(edition: typeof editions.$inferSelect, actor: Actor) {
     order_link: appUrl(`/portal/${edition.slug}/orders`),
     order_lines: '4 × Folding chair: £86.40\n1 × 500 W power socket: £102.00',
     payment_note: 'We have received your payment of £188.40 for stand A100.',
+    basket_link: appUrl(`/portal/${edition.slug}/shop/basket`),
+    basket_lines: '2 × LED spotlight on arm: £100.80\n1 × Literature rack: £42.00',
+    basket_total: '£142.80',
+    deadline_note: 'Early-bird prices end on Monday 9 November.',
   };
 }
 

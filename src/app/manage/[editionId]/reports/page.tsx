@@ -20,6 +20,7 @@ export default async function Reports({ params }: PageProps<'/manage/[editionId]
     { label: 'Task completion and answers, task by task', href: `${base}/tasks`, show: p.has('view') },
     { label: 'Services by stand (the delivery list)', href: `${base}/orders/services`, show: p.has('manage_orders') || p.has('view_reports') },
     { label: 'Commission and payouts', href: `${base}/orders/commission`, show: p.has('manage_orders') || p.has('view_reports') },
+    { label: 'Open baskets (services not ordered yet)', href: `${base}/orders/baskets`, show: p.has('manage_orders') || p.has('view_reports') },
     { label: 'Space-only approvals', href: `${base}/space-only`, show: p.has('review_space_only') || p.has('manage_exhibitors') },
   ].filter((v) => v.show);
   return (

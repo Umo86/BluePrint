@@ -85,6 +85,13 @@
       "when": 1793177125171,
       "tag": "0011_rights",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793200566868,
+      "tag": "0012_basket_reminders",
+      "breakpoints": true
     }
   ]
 }

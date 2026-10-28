@@ -50,6 +50,8 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
   const branded = Boolean(brand?.color && /^#[0-9a-fA-F]{6}$/.test(brand.color));
   const [opened, { toggle, close }] = useDisclosure();
   const pathname = usePathname();
+  const matches = (item: NavItem) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/'));
+  const currentHref = nav.filter(matches).reduce<string | null>((best, item) => (!best || item.href.length > best.length ? item.href : best), null);
 
   return (
     <MantineAppShell header={{ height: 60 }} navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="lg">
@@ -136,7 +138,8 @@ export function AppShell({ title, subtitle, nav, user, workspaces, viewAs, brand
         <MantineAppShell.Section grow component={ScrollArea}>
           <Stack gap={2}>
             {nav.map((item, i) => {
-              const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/');
+              // Only the most specific match is highlighted (Open baskets, not Orders as well).
+              const active = item.href === currentHref;
               const previousSection = nav.slice(0, i).reduce<string | undefined>((acc, n) => n.section ?? acc, undefined);
               const header = item.section && item.section !== previousSection ? item.section : null;
               return (

@@ -1,13 +1,14 @@
 import { Alert, Badge, Group, Paper, Progress, SimpleGrid, Stack, Text, Title } from '@mantine/core';
-import { IconAlertTriangle, IconMessageChatbot } from '@tabler/icons-react';
+import { IconAlertTriangle, IconMessageChatbot, IconShoppingCart } from '@tabler/icons-react';
 import { ButtonLink, TextLink } from '@/components/links';
 import { RichHtml } from '@/components/rich-html';
 import { checklistForStand } from '@/server/services/submissions';
 import { pagesForType } from '@/server/services/manual';
 import { announcementsForType } from '@/server/services/announcements';
 import { pendingNudges, assistantStatus } from '@/server/assistant';
+import { basketNudge } from '@/server/services/baskets';
 import { NudgesSeen } from './nudges-seen';
-import { dateLong, dateTime, daysUntil, standSize } from '@/lib/format';
+import { dateLong, dateTime, daysUntil, money, standSize } from '@/lib/format';
 import { TASK_STATE_LABELS } from '@/lib/task-labels';
 import { loadPortal } from './load';
 import { ShowContacts } from '@/components/show-contacts';
@@ -22,6 +23,7 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
     assistantStatus(ctx.edition),
   ]);
   const nudges = await pendingNudges(ctx.actor, ctx.stand.id);
+  const basket = ctx.closedReason ? null : await basketNudge(ctx.actor, ctx.stand.id);
   const base = `/portal/${ctx.edition.slug}`;
   const p = checklist.progress;
   const pct = p.required ? Math.round((p.requiredDone / p.required) * 100) : 100;
@@ -70,6 +72,20 @@ export default async function PortalHome({ params }: PageProps<'/portal/[slug]'>
           {p.overdue ? `${p.overdue} required ${p.overdue === 1 ? 'task is' : 'tasks are'} past the deadline. ` : ''}
           {p.changesNeeded ? `The show team has asked for changes on ${p.changesNeeded} ${p.changesNeeded === 1 ? 'task' : 'tasks'}.` : ''}{' '}
           <TextLink href={`${base}/checklist`}>Open your checklist</TextLink>
+        </Alert>
+      ) : null}
+      {basket ? (
+        <Alert color="teal" icon={<IconShoppingCart size={18} />} title="Your basket is waiting">
+          <Group justify="space-between" wrap="wrap" gap="xs">
+            <Text fz="sm">
+              {basket.lines.length <= 2 ? basket.lines.map((l) => `${l.quantity} × ${l.name}`).join(' and ') : `${basket.items} items`} worth {money(basket.totalPence)} including VAT, not ordered
+              yet.
+              {basket.next ? ` ${basket.next.what} on ${dateLong(basket.next.at)}.` : ''}
+            </Text>
+            <ButtonLink href={`${base}/shop/basket`} size="xs" color="teal" style={{ textDecoration: 'none' }}>
+              Review and order
+            </ButtonLink>
+          </Group>
         </Alert>
       ) : null}
 

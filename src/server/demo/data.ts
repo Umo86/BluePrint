@@ -4,6 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getDb } from '../db/client';
 import {
+  cartItems,
   assistantConversations,
   assistantFaqs,
   assistantMessages,
@@ -19,6 +20,8 @@ import {
   libraryItems,
   orderLines,
   orders,
+  products,
+  reminderLog,
   shows,
   standContractors,
   stands,
@@ -51,6 +54,7 @@ import { parseLocalDateTime, toLocalDateTimeString } from '@/lib/dates';
 import { SPACE_ONLY_DOC_LABELS } from '@/lib/space-only';
 import { clearDemoFlags } from './flags';
 import { getDemoState, removeAll, setDemoState } from './remove';
+import { basketCycle } from '../services/baskets';
 import type { TestLogin } from '../test-logins';
 
 /**
@@ -66,7 +70,7 @@ import type { TestLogin } from '../test-logins';
  */
 
 /** Bump when the demo data changes: the next build replaces an older version. */
-export const DEMO_VERSION = 2;
+export const DEMO_VERSION = 3;
 
 export const DEMO_EDITION_SLUG = 'buildexpo-london';
 
@@ -127,15 +131,22 @@ export async function loadDemoData(logins: TestLogin[]): Promise<string[]> {
     const legacy = await markLegacyDemoData();
     if (legacy) done.push('Marked the first version of the demo data so it can be replaced.');
     const present = await hasDemoShows();
-    if (present && (state?.version ?? 1) < DEMO_VERSION) {
+    let version = state?.version ?? 1;
+    // Small additions are made to the demo that is there, so what testers have done is kept.
+    while (present && version < DEMO_VERSION && DEMO_UPGRADES[version]) {
+      done.push(await DEMO_UPGRADES[version]());
+      version += 1;
+      await setDemoState({ ...(state ?? { loadedAt: new Date().toISOString() }), version });
+    }
+    if (present && version < DEMO_VERSION) {
       const counts = await removeAll({ actor: null, markRemoved: false });
       done.push(`Removed the older demo data (${counts.shows} shows, ${counts.people} people, ${counts.orders} orders).`);
     }
-    if (!present || (state?.version ?? 1) < DEMO_VERSION) {
+    if (!present || version < DEMO_VERSION) {
       await createDemoData(logins);
       done.push(`Added version ${DEMO_VERSION} of the demo shows, accounts and activity.`);
     } else {
-      done.push('The demo data is already there.');
+      done.push('The demo data is up to date.');
     }
   }
   done.push(...(await setDemoPasswords(logins)));
@@ -1299,6 +1310,76 @@ async function createDemoData(logins: TestLogin[]) {
   }
   clearDemoFlags();
 
+  await addDemoBaskets();
+
   // Done: remember which version is loaded. -----------------------------------------------------
   await setDemoState({ version: DEMO_VERSION, loadedAt: startedAt.toISOString() }, undefined, admin.id);
+}
+
+/** Changes from one demo version to the next that can be made to the demo already there. */
+const DEMO_UPGRADES: Record<number, () => Promise<string>> = {
+  2: async () => {
+    await addDemoBaskets();
+    return 'Added open baskets to the demo (version 3), keeping everything else as it was.';
+  },
+};
+
+/**
+ * Version 3: baskets left without ordering, at different stages, so the basket reminders and the
+ * Open baskets page can be tried. Stands that already have something in their basket are left alone.
+ */
+async function addDemoBaskets() {
+  const db = await getDb();
+  const [edition] = await db.select().from(editions).where(eq(editions.slug, DEMO_EDITION_SLUG)).limit(1);
+  if (!edition) return;
+  const byCode = new Map((await db.select().from(products).where(eq(products.editionId, edition.id))).map((p) => [p.code, p]));
+  const now = Date.now();
+  const HOUR = 3_600_000;
+  type Plan = { stand: string; items: [code: string, quantity: number, options?: Record<string, string>][]; leftHoursAgo: number; remindedHoursAgo: number[] };
+  const plans: Plan[] = [
+    // Left two days ago: the first reminder goes the next morning.
+    { stand: 'N1-214', items: [['ELE-LED', 2], ['FUR-LR1', 1]], leftHoursAgo: 50, remindedHoursAgo: [] },
+    // Reminded once; the second reminder is due.
+    { stand: 'N2-312', items: [['AV-55', 1], ['NET-W1', 1]], leftHoursAgo: 6 * 24, remindedHoursAgo: [5 * 24] },
+    // Reminded twice and still not ordered: one for the team to call.
+    { stand: 'N1-132', items: [['FUR-SF2', 1], ['FUR-PT1', 2, { Top: 'White' }]], leftHoursAgo: 12 * 24, remindedHoursAgo: [11 * 24, 8 * 24] },
+    // Left this morning: nothing yet.
+    { stand: 'N3-620', items: [['ELE-3P32', 1]], leftHoursAgo: 3, remindedHoursAgo: [] },
+  ];
+  for (const plan of plans) {
+    const [stand] = await db.select().from(stands).where(and(eq(stands.editionId, edition.id), eq(stands.number, plan.stand))).limit(1);
+    if (!stand?.companyId) continue;
+    const [already] = await db.select({ id: cartItems.id }).from(cartItems).where(eq(cartItems.standId, stand.id)).limit(1);
+    if (already) continue;
+    const [contact] = await db
+      .select({ id: companyMembers.userId })
+      .from(companyMembers)
+      .where(and(eq(companyMembers.companyId, stand.companyId), eq(companyMembers.role, 'main_contact')))
+      .limit(1);
+    const left = new Date(now - plan.leftHoursAgo * HOUR);
+    for (const [code, quantity, options] of plan.items) {
+      const p = byCode.get(code);
+      if (!p) continue;
+      await db.insert(cartItems).values({ standId: stand.id, productId: p.id, quantity, options: options ?? {}, addedBy: contact?.id ?? null, createdAt: left, updatedAt: left });
+    }
+    for (const [i, hours] of plan.remindedHoursAgo.entries()) {
+      await db
+        .insert(reminderLog)
+        .values({ editionId: edition.id, standId: stand.id, subject: basketCycle(left), step: `r${i + 1}`, channel: 'email', createdAt: new Date(now - hours * HOUR) })
+        .onConflictDoNothing();
+    }
+  }
+  // Lumen Lighting ordered the day after a basket reminder, so "Ordered after a reminder" has an example.
+  const [lumen] = await db
+    .select({ id: orders.id, standId: orders.standId, createdAt: orders.createdAt })
+    .from(orders)
+    .innerJoin(stands, eq(stands.id, orders.standId))
+    .where(and(eq(orders.editionId, edition.id), eq(stands.number, 'N1-126'), inArray(orders.status, ['paid', 'partially_refunded'])))
+    .limit(1);
+  if (lumen) {
+    await db
+      .insert(reminderLog)
+      .values({ editionId: edition.id, standId: lumen.standId, subject: basketCycle(new Date(lumen.createdAt.getTime() - 2 * 24 * HOUR)), step: 'r1', channel: 'email', createdAt: new Date(lumen.createdAt.getTime() - 24 * HOUR) })
+      .onConflictDoNothing();
+  }
 }

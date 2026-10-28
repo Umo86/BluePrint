@@ -13,6 +13,7 @@ import {
   IconFileSpreadsheet,
   IconReceipt,
   IconSettings,
+  IconShoppingCart,
   IconSpeakerphone,
   IconUsersGroup,
 } from '@tabler/icons-react';
@@ -26,6 +27,7 @@ import { AppError } from '@/server/errors';
 import { openTicketCount } from '@/server/services/helpdesk';
 import { unansweredCount } from '@/server/assistant';
 import { ROLE_LABELS } from '@/lib/roles';
+import { openBasketCount } from '@/server/services/baskets';
 
 export default async function ManageLayout({ children, params }: LayoutProps<'/manage/[editionId]'>) {
   const { editionId } = await params;
@@ -73,7 +75,11 @@ export default async function ManageLayout({ children, params }: LayoutProps<'/m
     nav.push({ label: 'AI assistant', href: `${base}/assistant`, icon: <IconMessageChatbot size={18} />, section: 'Exhibitor manual', badge: gaps || null });
   }
   if (p.has('manage_orders')) nav.push({ label: 'Shop catalogue', href: `${base}/shop`, icon: <IconBuildingStore size={18} />, section: 'Shop' });
-  if (p.has('manage_orders') || p.has('view_reports')) nav.push({ label: 'Orders', href: `${base}/orders`, icon: <IconReceipt size={18} />, section: 'Shop' });
+  if (p.has('manage_orders') || p.has('view_reports')) {
+    nav.push({ label: 'Orders', href: `${base}/orders`, icon: <IconReceipt size={18} />, section: 'Shop' });
+    const baskets = await openBasketCount(actor, edition.id);
+    nav.push({ label: 'Open baskets', href: `${base}/orders/baskets`, icon: <IconShoppingCart size={18} />, section: 'Shop', badge: baskets || null });
+  }
   if (isAdmin || p.has('edit_content') || p.has('manage_exhibitors')) {
     nav.push({ label: 'Show settings', href: `${base}/settings`, icon: <IconSettings size={18} />, section: 'Set-up' });
   }

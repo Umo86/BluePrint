@@ -20,6 +20,7 @@ const JOB_RESULT_LABELS: Record<string, [string, string]> = {
   campaignsQueued: ['scheduled email started', 'scheduled emails started'],
   emails: ['reminder email', 'reminder emails'],
   stands: ['stand reminded', 'stands reminded'],
+  basketsReminded: ['basket reminded', 'baskets reminded'],
   staffDigests: ['team summary sent', 'team summaries sent'],
   checkoutsReleased: ['unpaid checkout released', 'unpaid checkouts released'],
   payoutsSent: ['supplier payout sent', 'supplier payouts sent'],

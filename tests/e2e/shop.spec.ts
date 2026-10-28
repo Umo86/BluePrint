@@ -235,3 +235,54 @@ test('an exhibitor sends artwork with an order and the supplier downloads it', a
   expect(res.status()).toBe(200);
   expect(res.headers()['content-disposition']).toContain('attachment');
 });
+
+test('an exhibitor leaves services in the basket; their home page and the team’s open baskets show it', async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  const errors = watchForErrors(page);
+  await signInWithCode(page, 'finn@fortissteel.test');
+  await page.waitForURL(new RegExp(`${PORTAL}$`));
+  await page.goto(`${PORTAL}/shop`);
+  await addToBasket(page, 'Folding chair', async (dialog) => {
+    await dialog.getByRole('combobox', { name: 'Colour' }).click();
+    await page.getByRole('option', { name: 'Black' }).click();
+    await dialog.getByLabel('Quantity').fill('2');
+  });
+  // The home page reminds them: 2 × £18 plus VAT.
+  await page.goto(PORTAL);
+  await expect(page.getByText('Your basket is waiting')).toBeVisible();
+  await expect(page.getByText('2 × Folding chair worth £43.20 including VAT, not ordered yet.')).toBeVisible();
+  await page.getByRole('link', { name: 'Review and order' }).click();
+  await expect(page.getByRole('heading', { name: 'Your basket' })).toBeVisible();
+  expect(errors, errors.join('\n')).toEqual([]);
+
+  // The show team sees it among the open baskets and sends a reminder now.
+  const team = await (await browser.newContext()).newPage();
+  const teamErrors = watchForErrors(team);
+  await staffSession(team);
+  await team.goto('/admin/shows');
+  await team.getByRole('link', { name: 'UKCW London 2027' }).click();
+  await team.getByRole('link', { name: 'Open show dashboard' }).click();
+  // Open baskets is in the menu (with a count) and on the Orders page.
+  await expect(team.getByRole('navigation').getByRole('link', { name: /Open baskets/ })).toBeVisible();
+  await team.getByRole('navigation').getByRole('link', { name: 'Orders', exact: true }).click();
+  await team.getByRole('main').getByRole('link', { name: /^Open baskets \(\d+\)$/ }).click();
+  await expect(team.getByRole('heading', { name: 'Open baskets' })).toBeVisible();
+  const row = team.getByRole('row', { name: /Fortis Steel/ });
+  await expect(row).toContainText('2 × Folding chair');
+  await expect(row).toContainText('£43.20');
+  await row.getByRole('button', { name: 'Send reminder now' }).click();
+  await team.getByRole('dialog').getByRole('button', { name: 'Send reminder' }).click();
+  await expectToast(team, /Reminder (sent|recorded|kept)/);
+  await expect(team.getByRole('row', { name: /Fortis Steel/ })).toContainText('by the team');
+
+  // Reminders can be switched off for the show, and on again.
+  await team.getByLabel('Email exhibitors who leave services in their basket').click();
+  await team.getByRole('button', { name: 'Save reminder settings' }).click();
+  await expectToast(team, 'Basket reminder settings saved.');
+  await team.reload();
+  await expect(team.getByLabel('Email exhibitors who leave services in their basket')).not.toBeChecked();
+  await team.getByLabel('Email exhibitors who leave services in their basket').click();
+  await team.getByRole('button', { name: 'Save reminder settings' }).click();
+  await expectToast(team, 'Basket reminder settings saved.');
+  expect(teamErrors, teamErrors.join('\n')).toEqual([]);
+});

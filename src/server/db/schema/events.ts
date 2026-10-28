@@ -56,6 +56,15 @@ export type EditionEmailSettings = {
   campaignSenderAddress?: string;
 };
 
+/** Emails to exhibitors who leave services in their basket without ordering. Unset values use the defaults. */
+export type BasketReminderSettings = {
+  enabled?: boolean;
+  /** Days after the basket was last changed; sent with the morning reminders. */
+  firstAfterDays?: number;
+  /** Days after the basket was last changed; 0 for no second reminder. */
+  secondAfterDays?: number;
+};
+
 /** Someone exhibitors can contact about the show, shown on their home page (for example Operations). */
 export type EditionContact = {
   id: string;
@@ -103,6 +112,7 @@ export const editions = pgTable(
     assistantSettings: jsonb('assistant_settings').$type<EditionAssistantSettings>().notNull().default({}),
     branding: jsonb('branding').$type<EditionBranding>().notNull().default({}),
     emailSettings: jsonb('email_settings').$type<EditionEmailSettings>().notNull().default({}),
+    basketReminders: jsonb('basket_reminders').$type<BasketReminderSettings>().notNull().default({}),
     spaceOnlyRules: jsonb('space_only_rules').$type<SpaceOnlyRules | null>(),
     contacts: jsonb('contacts').$type<EditionContact[]>().notNull().default([]),
     /** Overrides the platform card-fee setting for this edition when set. */

@@ -24,6 +24,10 @@ export const TEMPLATE_VARIABLES: Record<string, string> = {
   venue: 'Venue',
   build_up: 'Build-up start date',
   show_opens: 'Show opening date',
+  basket_link: 'Link to their basket',
+  basket_lines: 'What is in their basket, one item a line',
+  basket_total: 'Basket total with VAT',
+  deadline_note: 'The next price rise or ordering deadline, if any',
 };
 
 const VAR = /\{\{\s*([a-z_]{1,40})\s*\}\}/g;

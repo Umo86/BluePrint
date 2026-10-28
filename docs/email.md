@@ -9,6 +9,7 @@ BluePrint sends all email through **Resend**. This page covers setting it up so 
 | Security | Sign-in codes | No. Always sent, even to addresses that bounced before. Fixed wording. |
 | Service | Invitations, order confirmations, approvals, refunds | No (they are about the person's own stand). |
 | Reminders | Deadline reminders | No, but a task marked "not needed" stops them. |
+| Basket reminders | "Your basket for stand N1-214 is waiting" | No, but emptying the basket or ordering stops them. Each show can switch them off (Orders → Open baskets). |
 | Updates (campaigns) | "Build-up times have changed" | Yes: one-click unsubscribe, per show. |
 
 Every email is recorded (Emails → Sent, and on each exhibitor's record) with its delivery status.
@@ -82,3 +83,13 @@ Every update has an unsubscribe link and the `List-Unsubscribe` / one-click head
 - Every email has a plain-text version (BluePrint adds it automatically).
 - Keep the bounce rate low: import clean contact lists, and let BluePrint block bounced addresses.
 - Avoid sending large updates to people who have never signed in, all at once, early in the year.
+
+## Basket reminders (cart abandonment)
+
+When an exhibitor puts services in their basket and leaves without ordering, BluePrint emails the people who filled the basket the morning after (with the deadline reminders, 07:00 UTC), and again four days after the basket was last changed. The email lists the basket, its total with VAT, and the next date that matters: the end of an early-bird price, a price rise, or a category's ordering deadline.
+
+- Any change to the basket starts the count again; ordering empties the basket, so the reminders stop.
+- A basket being paid for by card at the time is left alone.
+- The show team sees every open basket under **Orders → Open baskets**: what is in it, its value, who filled it, the reminders sent, and the orders placed within two weeks of a reminder. "Send reminder now" sends one straight away (at most once every 12 hours per stand).
+- The timing (or switching them off) is set per show on the same page. The wording is under **Emails → Basket reminder**.
+- The team's morning summary says how many baskets have been left for more than a day.
